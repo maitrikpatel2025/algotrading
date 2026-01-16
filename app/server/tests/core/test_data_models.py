@@ -10,8 +10,12 @@ from core.data_models import (
     HeadlineItem,
     HeadlinesResponse,
     HealthCheckResponse,
+    OpenTradesResponse,
     OptionItem,
     PriceDataResponse,
+    TradeHistoryItem,
+    TradeHistoryResponse,
+    TradeInfo,
     TradeRequest,
     TradeResponse,
     TradingOptionsResponse,
@@ -213,3 +217,197 @@ class TestErrorResponse:
         assert response.detail == "Resource not found"
         assert response.error_code == "NOT_FOUND"
         assert response.timestamp is not None
+
+
+class TestOpenTradesModels:
+    """Test cases for open trades models."""
+
+    def test_trade_info_creation(self):
+        """Test creating a trade info object."""
+        trade = TradeInfo(
+            id=12345,
+            instrument="EURUSD",
+            price=1.1050,
+            initial_amount=10000,
+            unrealized_pl=25.50,
+            margin_used=100.0,
+            stop_loss=1.1000,
+            take_profit=1.1100
+        )
+
+        assert trade.id == 12345
+        assert trade.instrument == "EURUSD"
+        assert trade.price == 1.1050
+        assert trade.initial_amount == 10000
+        assert trade.unrealized_pl == 25.50
+        assert trade.margin_used == 100.0
+        assert trade.stop_loss == 1.1000
+        assert trade.take_profit == 1.1100
+
+    def test_trade_info_without_sl_tp(self):
+        """Test creating trade info without stop loss and take profit."""
+        trade = TradeInfo(
+            id=12346,
+            instrument="GBPUSD",
+            price=1.2500,
+            initial_amount=-5000,
+            unrealized_pl=-15.25,
+            margin_used=50.0
+        )
+
+        assert trade.id == 12346
+        assert trade.initial_amount == -5000
+        assert trade.stop_loss is None
+        assert trade.take_profit is None
+
+    def test_open_trades_response_with_trades(self):
+        """Test open trades response with data."""
+        trades = [
+            TradeInfo(
+                id=1,
+                instrument="EURUSD",
+                price=1.1050,
+                initial_amount=10000,
+                unrealized_pl=25.50,
+                margin_used=100.0
+            ),
+            TradeInfo(
+                id=2,
+                instrument="GBPUSD",
+                price=1.2500,
+                initial_amount=-5000,
+                unrealized_pl=-10.0,
+                margin_used=50.0
+            ),
+        ]
+
+        response = OpenTradesResponse(
+            trades=trades,
+            count=2
+        )
+
+        assert len(response.trades) == 2
+        assert response.count == 2
+        assert response.error is None
+
+    def test_open_trades_response_empty(self):
+        """Test empty open trades response."""
+        response = OpenTradesResponse(
+            trades=[],
+            count=0
+        )
+
+        assert len(response.trades) == 0
+        assert response.count == 0
+        assert response.error is None
+
+    def test_open_trades_response_with_error(self):
+        """Test open trades response with error."""
+        response = OpenTradesResponse(
+            trades=[],
+            count=0,
+            error="Failed to fetch open trades"
+        )
+
+        assert response.error == "Failed to fetch open trades"
+        assert len(response.trades) == 0
+
+
+class TestTradeHistoryModels:
+    """Test cases for trade history models."""
+
+    def test_trade_history_item_creation(self):
+        """Test creating a trade history item."""
+        from datetime import datetime
+
+        trade = TradeHistoryItem(
+            id=12345,
+            instrument="EURUSD",
+            side="Buy",
+            amount=10000,
+            entry_price=1.1050,
+            exit_price=1.1100,
+            realized_pl=50.0,
+            closed_at=datetime(2024, 1, 15, 10, 30, 0)
+        )
+
+        assert trade.id == 12345
+        assert trade.instrument == "EURUSD"
+        assert trade.side == "Buy"
+        assert trade.amount == 10000
+        assert trade.entry_price == 1.1050
+        assert trade.exit_price == 1.1100
+        assert trade.realized_pl == 50.0
+        assert trade.closed_at is not None
+
+    def test_trade_history_item_minimal(self):
+        """Test creating trade history item with minimal data."""
+        trade = TradeHistoryItem(
+            id=12346,
+            instrument="GBPUSD",
+            side="Sell",
+            amount=5000,
+            entry_price=1.2500
+        )
+
+        assert trade.id == 12346
+        assert trade.exit_price is None
+        assert trade.realized_pl is None
+        assert trade.closed_at is None
+
+    def test_trade_history_response_with_trades(self):
+        """Test trade history response with data."""
+        trades = [
+            TradeHistoryItem(
+                id=1,
+                instrument="EURUSD",
+                side="Buy",
+                amount=10000,
+                entry_price=1.1050,
+                exit_price=1.1100,
+                realized_pl=50.0
+            ),
+            TradeHistoryItem(
+                id=2,
+                instrument="GBPUSD",
+                side="Sell",
+                amount=5000,
+                entry_price=1.2500,
+                exit_price=1.2450,
+                realized_pl=25.0
+            ),
+        ]
+
+        response = TradeHistoryResponse(
+            trades=trades,
+            count=2
+        )
+
+        assert len(response.trades) == 2
+        assert response.count == 2
+        assert response.error is None
+        assert response.message is None
+
+    def test_trade_history_response_empty_with_message(self):
+        """Test empty trade history response with message."""
+        response = TradeHistoryResponse(
+            trades=[],
+            count=0,
+            message="Trade history is not available from the current API."
+        )
+
+        assert len(response.trades) == 0
+        assert response.count == 0
+        assert response.message == "Trade history is not available from the current API."
+        assert response.error is None
+
+    def test_trade_history_response_with_error(self):
+        """Test trade history response with error."""
+        response = TradeHistoryResponse(
+            trades=[],
+            count=0,
+            error="Failed to fetch trade history"
+        )
+
+        assert response.error == "Failed to fetch trade history"
+        assert len(response.trades) == 0

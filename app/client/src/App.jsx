@@ -4,6 +4,7 @@ import NavigationBar from './components/NavigationBar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
+import Account from './pages/Account';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Routes>
             <Route exact path="/" element={<Home />} />
             <Route exact path="/dashboard" element={<Dashboard />} />
+            <Route exact path="/account" element={<Account />} />
           </Routes>
         </main>
         <Footer />

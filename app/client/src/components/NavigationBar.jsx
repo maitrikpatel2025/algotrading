@@ -6,6 +6,7 @@ import { Menu, X, TrendingUp } from 'lucide-react';
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/account", label: "Account" },
 ];
 
 function NavigationBar() {
