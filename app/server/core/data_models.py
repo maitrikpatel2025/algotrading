@@ -4,10 +4,10 @@ Pydantic Data Models
 Request and response models for the Forex Trading API.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
+from pydantic import BaseModel, Field
 
 # =============================================================================
 # Health Check Models

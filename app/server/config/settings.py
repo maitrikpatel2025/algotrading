@@ -6,8 +6,8 @@ Uses pydantic-settings for environment variable management.
 """
 
 import os
-from typing import Dict
 from pathlib import Path
+from typing import Dict
 
 # Load environment variables from .env file
 try:

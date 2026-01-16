@@ -5,7 +5,8 @@ Represents price data from the trading API.
 """
 
 import datetime as dt
-from typing import Dict, Any
+from typing import Any, Dict
+
 import pytz
 
 
@@ -17,7 +18,7 @@ class ApiPrice:
     def __init__(self, api_obj: Dict[str, Any]):
         """
         Initialize an ApiPrice from API response.
-        
+
         Args:
             api_obj: API response dictionary
         """
@@ -35,7 +36,7 @@ class ApiPrice:
     def get_dict(self) -> Dict[str, Any]:
         """
         Convert to dictionary format.
-        
+
         Returns:
             Dictionary representation of the price
         """

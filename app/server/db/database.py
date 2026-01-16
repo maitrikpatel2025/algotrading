@@ -5,7 +5,7 @@ Supabase database connection and operations.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from db.supabase_client import get_supabase_client, is_configured
 

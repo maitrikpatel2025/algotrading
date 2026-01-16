@@ -4,7 +4,7 @@ API Routes
 Flask route definitions for the trading API.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 from config import settings
 
@@ -12,10 +12,10 @@ from config import settings
 def make_option(key: str) -> Dict[str, str]:
     """
     Create an option dictionary for frontend select dropdowns.
-    
+
     Args:
         key: Option key/value/text
-        
+
     Returns:
         Dictionary with key, text, and value fields
     """
@@ -25,7 +25,7 @@ def make_option(key: str) -> Dict[str, str]:
 def get_options() -> Dict[str, Any]:
     """
     Get available trading options (pairs and timeframes) for the frontend.
-    
+
     Returns:
         Dictionary with granularities and pairs lists
     """

@@ -4,7 +4,7 @@ Instrument Model
 Represents a tradable instrument (currency pair).
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class Instrument:
@@ -15,7 +15,7 @@ class Instrument:
     def __init__(self, symbol: str, precision: int, trade_amount_step: float):
         """
         Initialize an Instrument.
-        
+
         Args:
             symbol: Instrument symbol (e.g., 'EURUSD')
             precision: Number of decimal places
@@ -37,10 +37,10 @@ class Instrument:
     def from_api_object(cls, obj: Dict[str, Any]) -> 'Instrument':
         """
         Create an Instrument from an API response object.
-        
+
         Args:
             obj: API response dictionary
-            
+
         Returns:
             New Instrument instance
         """

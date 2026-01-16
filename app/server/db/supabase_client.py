@@ -7,9 +7,9 @@ Supabase client initialization and connection validation.
 import logging
 from typing import Optional
 
-from supabase import create_client, Client
+from supabase import Client, create_client
 
-from config.settings import SUPABASE_URL, SUPABASE_ANON_KEY
+from config.settings import SUPABASE_ANON_KEY, SUPABASE_URL
 
 logger = logging.getLogger(__name__)
 
