@@ -4,22 +4,21 @@ OpenFX API Client
 Client for interacting with the OpenFX trading API.
 """
 
+import datetime as dt
 import json
 import logging
 import time
-import datetime as dt
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
-import requests
 import pandas as pd
+import requests
 
 from config import settings
-
-logger = logging.getLogger(__name__)
+from infrastructure.instrument_collection import instrument_collection
 from models.api_price import ApiPrice
 from models.open_trade import OpenTrade
-from infrastructure.instrument_collection import instrument_collection
 
+logger = logging.getLogger(__name__)
 
 LABEL_MAP = {
     'Open': 'o',
@@ -61,7 +60,7 @@ class OpenFxApi:
     ) -> Tuple[bool, Any]:
         """
         Make an HTTP request to the API.
-        
+
         Args:
             url: API endpoint path
             verb: HTTP method (get, post, put, delete)
@@ -69,7 +68,7 @@ class OpenFxApi:
             params: URL parameters
             data: Request body data
             headers: Additional headers
-            
+
         Returns:
             Tuple of (success, response_data)
         """
@@ -81,7 +80,7 @@ class OpenFxApi:
 
         try:
             response = None
-            
+
             if verb == "get":
                 response = self.session.get(full_url, params=params, data=data, headers=headers)
             elif verb == "post":
@@ -109,12 +108,12 @@ class OpenFxApi:
     def get_account_summary(self) -> Optional[Dict]:
         """
         Get account summary information.
-        
+
         Returns:
             Account data or None on error
         """
         ok, data = self._make_request("account")
-        
+
         if ok:
             return data
         else:
@@ -124,10 +123,10 @@ class OpenFxApi:
     def get_account_instruments(self, status_group: str = 'Forex') -> Optional[List[Dict]]:
         """
         Get available trading instruments.
-        
+
         Args:
             status_group: Filter by status group (default: 'Forex')
-            
+
         Returns:
             List of instruments or None on error
         """
@@ -144,7 +143,7 @@ class OpenFxApi:
         ]
 
         ok, history_symbols = self._make_request("quotehistory/symbols")
-        
+
         if not ok:
             return target_inst
 
@@ -163,13 +162,13 @@ class OpenFxApi:
     ) -> Tuple[bool, Optional[List]]:
         """
         Fetch candlestick data for a pair.
-        
+
         Args:
             pair_name: Trading pair symbol
             count: Number of candles (negative for most recent)
             granularity: Timeframe (M5, M15, H1, D)
             ts_from: Starting timestamp (milliseconds)
-            
+
         Returns:
             Tuple of (success, [ask_data, bid_data])
         """
@@ -204,13 +203,13 @@ class OpenFxApi:
     ) -> Optional[pd.DataFrame]:
         """
         Get candlestick data as a DataFrame.
-        
+
         Args:
             pair_name: Trading pair symbol
             count: Number of candles
             granularity: Timeframe
             date_from: Starting date
-            
+
         Returns:
             DataFrame with OHLC data or None on error
         """
@@ -262,11 +261,11 @@ class OpenFxApi:
     def last_complete_candle(self, pair_name: str, granularity: str) -> Optional[pd.Timestamp]:
         """
         Get the timestamp of the last complete candle.
-        
+
         Args:
             pair_name: Trading pair symbol
             granularity: Timeframe
-            
+
         Returns:
             Timestamp or None if no data
         """
@@ -278,18 +277,18 @@ class OpenFxApi:
     def web_api_candles(self, pair_name: str, granularity: str, count: int) -> Optional[Dict]:
         """
         Get candle data formatted for web API response.
-        
+
         Args:
             pair_name: Trading pair symbol (with or without underscore)
             granularity: Timeframe
             count: Number of candles
-            
+
         Returns:
             Dictionary with candle data for frontend
         """
         pair_name = pair_name.replace('_', '')
         df = self.get_candles_df(pair_name, granularity=granularity, count=int(count) * -1)
-        
+
         if df is None or df.shape[0] == 0:
             return None
 
@@ -313,14 +312,14 @@ class OpenFxApi:
     ) -> Optional[int]:
         """
         Place a market trade.
-        
+
         Args:
             pair_name: Trading pair symbol
             amount: Trade amount
             direction: BUY (1) or SELL (-1)
             stop_loss: Stop loss price
             take_profit: Take profit price
-            
+
         Returns:
             Trade ID or None on failure
         """
@@ -358,10 +357,10 @@ class OpenFxApi:
     def get_open_trade(self, trade_id: int) -> Optional[OpenTrade]:
         """
         Get an open trade by ID.
-        
+
         Args:
             trade_id: Trade ID
-            
+
         Returns:
             OpenTrade or None if not found
         """
@@ -375,7 +374,7 @@ class OpenFxApi:
     def get_open_trades(self) -> Optional[List[OpenTrade]]:
         """
         Get all open trades.
-        
+
         Returns:
             List of OpenTrade objects or None on error
         """
@@ -389,10 +388,10 @@ class OpenFxApi:
     def close_trade(self, trade_id: int) -> bool:
         """
         Close an open trade.
-        
+
         Args:
             trade_id: Trade ID to close
-            
+
         Returns:
             True on success, False on failure
         """
@@ -417,10 +416,10 @@ class OpenFxApi:
     def get_prices(self, instruments_list: List[str]) -> Optional[List[ApiPrice]]:
         """
         Get current prices for instruments.
-        
+
         Args:
             instruments_list: List of instrument symbols
-            
+
         Returns:
             List of ApiPrice objects or None on error
         """
@@ -434,10 +433,10 @@ class OpenFxApi:
     def get_pip_value(self, instruments_list: List[str]) -> Optional[Dict[str, float]]:
         """
         Get pip values for instruments.
-        
+
         Args:
             instruments_list: List of instrument symbols
-            
+
         Returns:
             Dictionary of symbol -> pip value or None on error
         """

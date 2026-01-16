@@ -7,7 +7,7 @@ Scrapes technical analysis data from Investing.com.
 import datetime as dt
 import logging
 import time
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -37,12 +37,12 @@ DATA_KEYS = [
 def _parse_data(text_list: List[str], pair_id: int, time_frame: int) -> Dict[str, Any]:
     """
     Parse scraped text data into a dictionary.
-    
+
     Args:
         text_list: List of key=value strings
         pair_id: Investing.com pair ID
         time_frame: Timeframe in seconds
-        
+
     Returns:
         Dictionary with parsed data
     """
@@ -66,11 +66,11 @@ def _parse_data(text_list: List[str], pair_id: int, time_frame: int) -> Dict[str
 def fetch_technicals(pair_id: int, time_frame: int) -> Optional[Dict[str, Any]]:
     """
     Fetch technical analysis data for a pair from Investing.com.
-    
+
     Args:
         pair_id: Investing.com pair ID
         time_frame: Timeframe in seconds
-        
+
     Returns:
         Dictionary with technical data or None on error
     """
@@ -108,11 +108,11 @@ def fetch_technicals(pair_id: int, time_frame: int) -> Optional[Dict[str, Any]]:
 def get_pair_technicals(pair_name: str, timeframe: str) -> Optional[Dict[str, Any]]:
     """
     Get technical analysis data for a currency pair.
-    
+
     Args:
         pair_name: Currency pair (e.g., 'EUR_USD')
         timeframe: Timeframe key (e.g., 'H1', 'D')
-        
+
     Returns:
         Dictionary with technical data or None if pair not found
     """
@@ -133,7 +133,7 @@ def get_pair_technicals(pair_name: str, timeframe: str) -> Optional[Dict[str, An
 def get_all_technicals() -> List[Dict[str, Any]]:
     """
     Fetch technical data for all major pairs and timeframes.
-    
+
     Returns:
         List of technical data dictionaries
     """

@@ -5,8 +5,8 @@ Quick test to verify Supabase connection and credentials.
 Run with: uv run python tests/test_supabase_connection.py
 """
 
-import sys
 import os
+import sys
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from config.settings import SUPABASE_URL, SUPABASE_ANON_KEY
+from config.settings import SUPABASE_ANON_KEY, SUPABASE_URL  # noqa: E402
 
 
 def test_supabase_connection():
@@ -32,7 +32,7 @@ def test_supabase_connection():
         # Mask URL for security but show domain
         masked_url = SUPABASE_URL.split("//")[1].split(".")[0] if "//" in SUPABASE_URL else "..."
         print(f"      → Project: {masked_url}...")
-    
+
     print(f"   SUPABASE_ANON_KEY: {'✅ Set' if SUPABASE_ANON_KEY else '❌ Not set'}")
     if SUPABASE_ANON_KEY:
         print(f"      → Key: {SUPABASE_ANON_KEY[:20]}...")

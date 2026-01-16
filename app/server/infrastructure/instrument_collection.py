@@ -6,7 +6,7 @@ Manages a collection of tradable instruments.
 
 import json
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 
 from db.database import DataDB
 from models.instrument import Instrument
@@ -29,13 +29,13 @@ class InstrumentCollection:
     def load_from_file(self, path: str) -> None:
         """
         Load instruments from a JSON file.
-        
+
         Args:
             path: Directory path containing instruments.json
         """
         self.instruments_dict = {}
         filename = f"{path}/{self.FILENAME}"
-        
+
         with open(filename, "r") as f:
             data = json.loads(f.read())
             for key, value in data.items():
@@ -63,7 +63,7 @@ class InstrumentCollection:
     def create_file(self, data: list, path: str) -> None:
         """
         Create instruments JSON file from API data.
-        
+
         Args:
             data: List of instrument data from API
             path: Directory path to save the file
@@ -117,10 +117,10 @@ class InstrumentCollection:
     def get(self, symbol: str) -> Optional[Instrument]:
         """
         Get an instrument by symbol.
-        
+
         Args:
             symbol: Instrument symbol
-            
+
         Returns:
             Instrument or None if not found
         """

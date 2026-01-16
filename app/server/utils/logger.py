@@ -7,7 +7,6 @@ Provides a consistent logging wrapper for the application.
 import logging
 import os
 import sys
-from typing import Optional
 
 LOG_FORMAT = "%(asctime)s %(message)s"
 DEFAULT_LEVEL = logging.DEBUG
@@ -24,7 +23,7 @@ class LogWrapper:
     def __init__(self, name: str, mode: str = "w"):
         """
         Initialize a logger with the given name.
-        
+
         Args:
             name: Logger name (used for filename)
             mode: File mode ('w' for write, 'a' for append)

@@ -25,6 +25,9 @@ from core.data_models import (
     HeadlineItem,
     HeadlinesResponse,
     HealthCheckResponse,
+    OpenTradesResponse,
+    TradeHistoryResponse,
+    TradeInfo,
     TradingOptionsResponse,
 )
 from core.openfx_api import OpenFxApi
@@ -157,6 +160,85 @@ async def account():
         logger.error(f"[ERROR] Account summary fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return {"error": str(e)}
+
+
+@app.get("/api/trades/open", response_model=OpenTradesResponse, tags=["Trades"])
+async def open_trades():
+    """
+    Get all open trades.
+
+    Returns:
+        JSON object with list of open trades including instrument, price,
+        amount, unrealized P/L, margin used, stop loss, and take profit
+    """
+    try:
+        trades = api.get_open_trades()
+
+        if trades is None:
+            logger.warning("[WARNING] Open trades returned None - API call may have failed")
+            return OpenTradesResponse(
+                trades=[],
+                count=0,
+                error="Failed to fetch open trades"
+            )
+
+        trade_info_list = [
+            TradeInfo(
+                id=trade.id,
+                instrument=trade.instrument,
+                price=trade.price,
+                initial_amount=trade.initialAmount,
+                unrealized_pl=trade.unrealizedPL,
+                margin_used=trade.marginUsed,
+                stop_loss=trade.stop_loss if trade.stop_loss else None,
+                take_profit=trade.take_profit if trade.take_profit else None,
+            )
+            for trade in trades
+        ]
+
+        response = OpenTradesResponse(
+            trades=trade_info_list,
+            count=len(trade_info_list)
+        )
+        logger.info(f"[SUCCESS] Open trades fetched: {len(trade_info_list)} trades")
+        return response
+    except Exception as e:
+        logger.error(f"[ERROR] Open trades fetch failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return OpenTradesResponse(
+            trades=[],
+            count=0,
+            error=str(e)
+        )
+
+
+@app.get("/api/trades/history", response_model=TradeHistoryResponse, tags=["Trades"])
+async def trade_history():
+    """
+    Get trade history (closed trades).
+
+    Returns:
+        JSON object with list of historical trades.
+        Note: Trade history may be limited by the external API capabilities.
+    """
+    try:
+        # The OpenFX API doesn't provide a direct trade history endpoint
+        # Return an empty response with a message indicating this limitation
+        response = TradeHistoryResponse(
+            trades=[],
+            count=0,
+            message="Trade history is not available from the current API. This feature requires historical trade data storage."
+        )
+        logger.info("[SUCCESS] Trade history endpoint called - returning empty response (API limitation)")
+        return response
+    except Exception as e:
+        logger.error(f"[ERROR] Trade history fetch failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return TradeHistoryResponse(
+            trades=[],
+            count=0,
+            error=str(e)
+        )
 
 
 @app.get("/api/headlines", response_model=HeadlinesResponse, tags=["Market Data"])

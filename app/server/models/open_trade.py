@@ -4,7 +4,7 @@ Open Trade Model
 Represents an open trade position.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class OpenTrade:
@@ -15,7 +15,7 @@ class OpenTrade:
     def __init__(self, api_obj: Dict[str, Any]):
         """
         Initialize an OpenTrade from API response.
-        
+
         Args:
             api_obj: API response dictionary
         """
@@ -34,7 +34,7 @@ class OpenTrade:
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to dictionary format.
-        
+
         Returns:
             Dictionary representation of the trade
         """

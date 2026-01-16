@@ -1,2 +1,2 @@
 """Utilities module."""
-from .logger import LogWrapper
+from .logger import LogWrapper as LogWrapper

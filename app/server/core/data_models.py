@@ -4,10 +4,10 @@ Pydantic Data Models
 Request and response models for the Forex Trading API.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
+from pydantic import BaseModel, Field
 
 # =============================================================================
 # Health Check Models
@@ -169,6 +169,26 @@ class OpenTradesResponse(BaseModel):
     """Open trades response."""
     trades: List[TradeInfo] = []
     count: int = 0
+    error: Optional[str] = None
+
+
+class TradeHistoryItem(BaseModel):
+    """Historical trade information."""
+    id: int
+    instrument: str
+    side: str
+    amount: int
+    entry_price: float
+    exit_price: Optional[float] = None
+    realized_pl: Optional[float] = None
+    closed_at: Optional[datetime] = None
+
+
+class TradeHistoryResponse(BaseModel):
+    """Trade history response."""
+    trades: List[TradeHistoryItem] = []
+    count: int = 0
+    message: Optional[str] = None
     error: Optional[str] = None
 
 
