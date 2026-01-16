@@ -10,28 +10,26 @@ This server provides endpoints for:
 - Market headlines
 """
 
-from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
 import logging
 import sys
 import traceback
-from dotenv import load_dotenv
+from datetime import datetime
 
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+
+from api.routes import get_options
 from config import settings
-from core.openfx_api import OpenFxApi
 from core.data_models import (
-    HealthCheckResponse,
     HeadlineItem,
     HeadlinesResponse,
+    HealthCheckResponse,
     TradingOptionsResponse,
-    TechnicalsResponse,
-    PriceDataResponse,
-    ErrorResponse,
 )
-from api.routes import get_options
+from core.openfx_api import OpenFxApi
+from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
-from db import validate_connection, is_configured
 
 # Load .env file from server directory
 load_dotenv()
@@ -137,29 +135,53 @@ async def health():
         )
 
 
+@app.get("/api/account", tags=["Account"])
+async def account():
+    """
+    Get account summary information.
+
+    Returns:
+        JSON object with account data including Id, Balance, Equity, Profit,
+        Margin, MarginLevel, and Leverage
+    """
+    try:
+        data = api.get_account_summary()
+
+        if data is None:
+            logger.warning("[WARNING] Account summary returned None - API call may have failed")
+            return {"error": "Failed to fetch account data"}
+
+        logger.info(f"[SUCCESS] Account summary fetched for account: {data.get('Id', 'unknown')}")
+        return data
+    except Exception as e:
+        logger.error(f"[ERROR] Account summary fetch failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return {"error": str(e)}
+
+
 @app.get("/api/headlines", response_model=HeadlinesResponse, tags=["Market Data"])
 async def headlines():
     """
     Get forex market headlines from Bloomberg.
-    
+
     Returns:
         JSON array of headline objects with 'headline' and 'link' fields
     """
     try:
         data = get_bloomberg_headlines()
-        
+
         if data is None:
             return HeadlinesResponse(
                 headlines=[],
                 count=0,
                 error="Failed to fetch headlines"
             )
-        
+
         headline_items = [
             HeadlineItem(headline=item['headline'], link=item['link'])
             for item in data
         ]
-        
+
         response = HeadlinesResponse(
             headlines=headline_items,
             count=len(headline_items)
@@ -174,51 +196,21 @@ async def headlines():
             count=0,
             error=str(e)
         )
-
-
-@app.get("/api/account", tags=["Account"])
-async def account():
-    """
-    Get trading account summary.
     
-    Returns:
-        JSON object with account balance, margin, and other details
-    """
-    try:
-        data = api.get_account_summary()
-        
-        if data is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Error getting account data"
-            )
-        
-        logger.info("[SUCCESS] Account summary fetched")
-        return data
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[ERROR] Account fetch failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
 @app.get("/api/options", response_model=TradingOptionsResponse, tags=["Trading"])
 async def options():
     """
     Get available trading options (pairs and timeframes).
-    
+
     Returns:
         JSON object with 'pairs' and 'granularities' arrays
     """
     try:
         data = get_options()
-        
+
         if data is None:
             return TradingOptionsResponse(error="Failed to get options")
-        
+
         response = TradingOptionsResponse(
             pairs=data.get('pairs', []),
             granularities=data.get('granularities', [])
@@ -234,23 +226,23 @@ async def options():
 async def technicals(pair: str, timeframe: str):
     """
     Get technical analysis data for a currency pair.
-    
+
     Args:
         pair: Currency pair (e.g., 'EUR_USD')
         timeframe: Timeframe (e.g., 'H1', 'D')
-        
+
     Returns:
         JSON object with technical indicators and support/resistance levels
     """
     try:
         data = get_pair_technicals(pair, timeframe)
-        
+
         if data is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Technical data not found for {pair}/{timeframe}"
             )
-        
+
         logger.info(f"[SUCCESS] Technicals fetched for {pair}/{timeframe}")
         return data
     except HTTPException:
@@ -267,24 +259,24 @@ async def technicals(pair: str, timeframe: str):
 async def prices(pair: str, granularity: str, count: str):
     """
     Get historical price data (candlesticks) for a currency pair.
-    
+
     Args:
         pair: Currency pair (e.g., 'EUR_USD')
         granularity: Timeframe (e.g., 'H1', 'D')
         count: Number of candles to fetch
-        
+
     Returns:
         JSON object with OHLC price arrays for charting
     """
     try:
         data = api.web_api_candles(pair, granularity, count)
-        
+
         if data is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Price data not found for {pair}/{granularity}"
             )
-        
+
         logger.info(f"[SUCCESS] Prices fetched for {pair}/{granularity}, count: {count}")
         return data
     except HTTPException:
@@ -303,7 +295,7 @@ async def prices(pair: str, granularity: str, count: str):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     logger.info(f"""
     ╔══════════════════════════════════════════════════════════════╗
     ║           🚀 FOREX TRADING API SERVER (FastAPI)              ║
@@ -320,7 +312,7 @@ if __name__ == "__main__":
     ║  📚 API Docs: http://localhost:{settings.API_PORT}/docs                   ║
     ╚══════════════════════════════════════════════════════════════╝
     """)
-    
+
     uvicorn.run(
         "server:app",
         host=settings.API_HOST,
