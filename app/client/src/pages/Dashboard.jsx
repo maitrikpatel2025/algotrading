@@ -5,7 +5,7 @@ import Button from '../components/Button';
 import PriceChart from '../components/PriceChart';
 import Select from '../components/Select';
 import Technicals from '../components/Technicals';
-import { Play, RefreshCw, BarChart3 } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, AlertTriangle } from 'lucide-react';
 
 function Dashboard() {
   const [selectedPair, setSelectedPair] = useState(null);
@@ -16,6 +16,7 @@ function Dashboard() {
   const [options, setOptions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadOptions();
@@ -35,19 +36,53 @@ function Dashboard() {
   };
 
   const loadPrices = async (count) => {
-    const data = await endPoints.prices(selectedPair, selectedGran, count);
-    setPriceData(data);
+    try {
+      const data = await endPoints.prices(selectedPair, selectedGran, count);
+      setPriceData(data);
+      return { success: true };
+    } catch (err) {
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to load price data';
+      console.error('Error loading prices:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
   };
 
   const loadTechnicals = async () => {
     setLoadingData(true);
+    setError(null);
+
+    const errors = [];
+
     try {
-      const data = await endPoints.technicals(selectedPair, selectedGran);
-      setTechnicalsData(data);
-      await loadPrices(selectedCount);
+      // Load technicals data
+      try {
+        const techData = await endPoints.technicals(selectedPair, selectedGran);
+        setTechnicalsData(techData);
+      } catch (err) {
+        const errorMessage = err.response?.data?.detail || err.message || 'Failed to load technical analysis';
+        console.error('Error loading technicals:', errorMessage);
+        errors.push(`Technical analysis: ${errorMessage}`);
+        setTechnicalsData(null);
+      }
+
+      // Load price data
+      const priceResult = await loadPrices(selectedCount);
+      if (!priceResult.success) {
+        errors.push(`Price data: ${priceResult.error}`);
+        setPriceData(null);
+      }
+
+      // Set combined error if any errors occurred
+      if (errors.length > 0) {
+        setError(errors.join(' | '));
+      }
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const clearError = () => {
+    setError(null);
   };
 
   // Loading state
@@ -123,6 +158,35 @@ function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="card p-4 border-destructive bg-destructive/10">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-destructive mb-1">
+                Unable to Load Data
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {error}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                This may be due to external data sources being temporarily unavailable. Please try again later.
+              </p>
+            </div>
+            <button
+              onClick={clearError}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss error"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       {(technicalsData || priceData) ? (
