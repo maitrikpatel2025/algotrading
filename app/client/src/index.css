@@ -1,0 +1,377 @@
+@import url('https://fonts.googleapis.com/css2?family=Anek+Odia:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Background & Foreground */
+    --background: 0 0% 100%;
+    --foreground: 240 6% 10%;
+    
+    /* Card & Popover */
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
+    
+    /* Primary - Microsoft Blue */
+    --primary: 206 100% 42%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 206 68% 51%;
+    
+    /* Secondary */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    
+    /* Accent - Teal */
+    --accent: 168 100% 35%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Muted */
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    
+    /* Destructive/Bearish - Red */
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Success/Bullish - Green */
+    --success: 140 70% 43%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    
+    /* Info */
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    
+    /* Border & Input */
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 206 100% 42%;
+    
+    /* Radius */
+    --radius: 0.5rem;
+    
+    /* Chart Colors */
+    --chart-bullish: 140 70% 43%;
+    --chart-bearish: 0 84% 50%;
+    --chart-neutral: 206 100% 42%;
+    --chart-grid: 240 5% 90%;
+    --chart-volume: 206 50% 70%;
+  }
+
+  .dark {
+    /* Background & Foreground */
+    --background: 240 6% 4%;
+    --foreground: 0 0% 98%;
+    
+    /* Card & Popover */
+    --card: 240 4% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 4% 10%;
+    --popover-foreground: 0 0% 98%;
+    
+    /* Primary - Microsoft Blue (consistent) */
+    --primary: 206 100% 42%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 206 68% 56%;
+    
+    /* Secondary */
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    
+    /* Accent - Teal (consistent) */
+    --accent: 168 100% 35%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Muted */
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    
+    /* Destructive/Bearish - Red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Success/Bullish - Green */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    
+    /* Info */
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    
+    /* Border & Input */
+    --border: 240 4% 25%;
+    --input: 240 4% 25%;
+    --ring: 206 100% 42%;
+    
+    /* Chart Colors (Dark Mode) */
+    --chart-bullish: 142 71% 45%;
+    --chart-bearish: 0 84% 60%;
+    --chart-neutral: 206 100% 50%;
+    --chart-grid: 240 4% 20%;
+    --chart-volume: 206 60% 50%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply h-full scroll-smooth;
+  }
+
+  body {
+    @apply h-full m-0 p-0 font-sans bg-background text-foreground antialiased;
+  }
+
+  #root {
+    @apply h-full;
+  }
+}
+
+@layer components {
+  /* Card Component */
+  .card {
+    @apply rounded-lg border border-border bg-card text-card-foreground shadow-sm;
+  }
+
+  .card-header {
+    @apply flex flex-col space-y-1.5 p-6;
+  }
+
+  .card-title {
+    @apply text-xl font-bold leading-none tracking-tight;
+  }
+
+  .card-description {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .card-content {
+    @apply p-6 pt-0;
+  }
+
+  .card-footer {
+    @apply flex items-center p-6 pt-0;
+  }
+
+  /* Button Variants */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-primary-foreground hover:bg-primary-hover px-5 py-2.5;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary text-secondary-foreground hover:bg-secondary/80 px-5 py-2.5;
+  }
+
+  .btn-destructive {
+    @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90 px-5 py-2.5;
+  }
+
+  .btn-success {
+    @apply btn bg-success text-success-foreground hover:bg-success/90 px-5 py-2.5;
+  }
+
+  .btn-outline {
+    @apply btn border border-input bg-background hover:bg-accent hover:text-accent-foreground px-5 py-2.5;
+  }
+
+  .btn-ghost {
+    @apply btn hover:bg-accent hover:text-accent-foreground px-5 py-2.5;
+  }
+
+  .btn-sm {
+    @apply h-8 rounded-md px-3 text-xs;
+  }
+
+  .btn-lg {
+    @apply h-12 rounded-md px-8 text-base;
+  }
+
+  /* Progress Bar */
+  .progress {
+    @apply relative h-4 w-full overflow-hidden rounded-full bg-secondary;
+  }
+
+  .progress-indicator {
+    @apply h-full w-full flex-1 transition-all duration-300 ease-out;
+  }
+
+  /* Input Styles */
+  .input {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Select Styles */
+  .select {
+    @apply flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+  }
+
+  .badge-default {
+    @apply badge border-transparent bg-primary text-primary-foreground hover:bg-primary/80;
+  }
+
+  .badge-secondary {
+    @apply badge border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80;
+  }
+
+  .badge-destructive {
+    @apply badge border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80;
+  }
+
+  .badge-success {
+    @apply badge border-transparent bg-success text-success-foreground hover:bg-success/80;
+  }
+
+  .badge-outline {
+    @apply badge text-foreground;
+  }
+
+  /* Table */
+  .table {
+    @apply w-full caption-bottom text-sm;
+  }
+
+  .table-header {
+    @apply [&_tr]:border-b;
+  }
+
+  .table-body {
+    @apply [&_tr:last-child]:border-0;
+  }
+
+  .table-row {
+    @apply border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted;
+  }
+
+  .table-head {
+    @apply h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0;
+  }
+
+  .table-cell {
+    @apply p-4 align-middle [&:has([role=checkbox])]:pr-0;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    @apply animate-pulse rounded-md bg-muted;
+  }
+}
+
+@layer utilities {
+  /* Tabular Numbers for Financial Data */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Typography */
+  .text-display {
+    @apply text-5xl font-bold leading-tight tracking-tight;
+  }
+
+  .text-h1 {
+    @apply text-4xl font-bold leading-tight;
+  }
+
+  .text-h2 {
+    @apply text-3xl font-bold leading-snug;
+  }
+
+  .text-h3 {
+    @apply text-2xl font-medium leading-snug;
+  }
+
+  .text-h4 {
+    @apply text-xl font-medium leading-normal;
+  }
+
+  .text-body-lg {
+    @apply text-lg font-normal leading-relaxed;
+  }
+
+  .text-data {
+    @apply text-base font-bold tabular-nums;
+  }
+
+  .text-data-lg {
+    @apply text-2xl font-bold tabular-nums;
+  }
+
+  /* Container */
+  .container {
+    @apply mx-auto w-full px-4;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      @apply max-w-screen-sm;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      @apply max-w-3xl;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      @apply max-w-5xl;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .container {
+      @apply max-w-6xl;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .container {
+      @apply max-w-7xl;
+    }
+  }
+
+  /* Price Flash Animation */
+  .price-up {
+    animation: price-flash 250ms ease-out;
+    background-color: hsl(var(--success) / 0.2);
+  }
+
+  .price-down {
+    animation: price-flash 250ms ease-out;
+    background-color: hsl(var(--destructive) / 0.2);
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

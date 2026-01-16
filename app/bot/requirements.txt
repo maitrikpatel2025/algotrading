@@ -1,0 +1,23 @@
+# Trading Bot Dependencies
+# ========================
+# Note: Bot shares server's virtual environment for most dependencies
+
+# Data Validation (Pydantic)
+pydantic>=2.5.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# Database
+supabase>=2.0.0
+
+# Utilities
+python-dateutil>=2.8.0
+pytz>=2023.3
+
+# Environment Variables
+python-dotenv>=1.0.0

@@ -1,0 +1,142 @@
+{
+  "EURUSD": {
+    "Symbol": "EURUSD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "GBPUSD": {
+    "Symbol": "GBPUSD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "USDJPY": {
+    "Symbol": "USDJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  },
+  "USDCHF": {
+    "Symbol": "USDCHF",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "AUDUSD": {
+    "Symbol": "AUDUSD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "EURGBP": {
+    "Symbol": "EURGBP",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "USDCAD": {
+    "Symbol": "USDCAD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "NZDUSD": {
+    "Symbol": "NZDUSD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "EURJPY": {
+    "Symbol": "EURJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  },
+  "GBPJPY": {
+    "Symbol": "GBPJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  },
+  "EURCHF": {
+    "Symbol": "EURCHF",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "GBPCHF": {
+    "Symbol": "GBPCHF",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "CHFJPY": {
+    "Symbol": "CHFJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  },
+  "CADCHF": {
+    "Symbol": "CADCHF",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "EURAUD": {
+    "Symbol": "EURAUD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "EURCAD": {
+    "Symbol": "EURCAD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "AUDCAD": {
+    "Symbol": "AUDCAD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "AUDCHF": {
+    "Symbol": "AUDCHF",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "AUDJPY": {
+    "Symbol": "AUDJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  },
+  "AUDNZD": {
+    "Symbol": "AUDNZD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "CADJPY": {
+    "Symbol": "CADJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  },
+  "EURNZD": {
+    "Symbol": "EURNZD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "GBPAUD": {
+    "Symbol": "GBPAUD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "GBPCAD": {
+    "Symbol": "GBPCAD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "GBPNZD": {
+    "Symbol": "GBPNZD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "NZDCAD": {
+    "Symbol": "NZDCAD",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "NZDCHF": {
+    "Symbol": "NZDCHF",
+    "Precision": 5,
+    "TradeAmountStep": 1000
+  },
+  "NZDJPY": {
+    "Symbol": "NZDJPY",
+    "Precision": 3,
+    "TradeAmountStep": 1000
+  }
+}
