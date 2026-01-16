@@ -31,3 +31,12 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with the trading bot
     - When implementing trading strategies
     - When modifying bot configuration or settings
+
+- app_docs/feature-bfd1a7d1-account-open-trades-order-history.md
+  - Conditions:
+    - When working with the Account page or trading account features
+    - When implementing or modifying open trades display functionality
+    - When implementing or modifying trade history functionality
+    - When adding new API endpoints for trading data
+    - When working with trading UI components (OpenTrades, OrderHistory)
+    - When troubleshooting Account page issues or trade data display

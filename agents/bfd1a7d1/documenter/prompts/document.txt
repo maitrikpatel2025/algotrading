@@ -1,0 +1,1 @@
+/document bfd1a7d1 specs/issue-1-adw-bfd1a7d1-sdlc_planner-account-open-trades-order-history.md agents/bfd1a7d1/reviewer/review_img
