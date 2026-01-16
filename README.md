@@ -19,7 +19,7 @@ A full-stack forex trading application with real-time price charts, technical an
 - Node.js 18+
 - npm (comes with Node.js)
 - OpenFX API credentials
-- MongoDB (optional, for data persistence)
+- Supabase account (for database & authentication)
 
 ## Setup
 
@@ -61,8 +61,11 @@ OPENFX_API_ID=your_api_id
 OPENFX_API_KEY=your_api_key
 OPENFX_API_SECRET=your_api_secret
 
-# MongoDB (optional)
-MONGO_CONN_STR=mongodb://localhost:27017/forex_learning
+# Supabase Database Configuration
+# Get your credentials from: https://supabase.com/dashboard/project/_/settings/api
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_publishable_key_here
+SUPABASE_SERVICE_KEY=your_secret_key_here
 
 # FastAPI Server
 API_DEBUG=True
@@ -72,6 +75,8 @@ API_PORT=8000
 # CORS Origins
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
+
+> **Note:** In the Supabase dashboard, "Publishable key" = `SUPABASE_ANON_KEY` and "Secret key" = `SUPABASE_SERVICE_KEY`
 
 #### Client Environment Variables (`app/client/.env`)
 
@@ -283,7 +288,7 @@ The bot uses a Bollinger Bands breakout strategy:
 | Pydantic | Data validation |
 | Pandas | Data processing |
 | BeautifulSoup4 | Web scraping |
-| PyMongo | MongoDB driver |
+| Supabase | PostgreSQL database & authentication |
 
 ### Trading Bot
 
@@ -342,10 +347,11 @@ npm test
 - Check API credentials are valid
 - Review logs in `app/bot/logs/`
 
-**MongoDB connection failed:**
-- Check `MONGO_CONN_STR` format
-- Verify MongoDB is running
-- Check network/firewall settings
+**Supabase connection failed:**
+- Verify `SUPABASE_URL` is correct (format: `https://xxxxx.supabase.co`)
+- Check that API keys are valid and not expired
+- Ensure your IP is not blocked in Supabase dashboard
+- Verify Row Level Security (RLS) policies if using anon key
 
 **Scraper returning None:**
 - External sites may block requests

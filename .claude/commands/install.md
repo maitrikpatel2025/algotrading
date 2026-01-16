@@ -32,7 +32,7 @@
 
 ## Report
 - Output the work you've just done in a concise bullet point list.
-- Instruct the user to fill out `./app/server/.env` based on `./app/server/env.example` with their OpenFX API credentials and MongoDB connection string.
+- Instruct the user to fill out `./app/server/.env` based on `./app/server/env.example` with their OpenFX API credentials and Supabase configuration (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY).
 - Instruct the user to verify `./app/client/.env` exists (it should have been created with default API URL settings).
 - Mention: 'To setup your Algotrading project with version control, be sure to update the remote repo url and push to a new repo so you have access to git issues and git PRs:
   ```
