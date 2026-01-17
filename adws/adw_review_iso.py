@@ -46,7 +46,7 @@ from adw_modules.workflow_ops import (
     implement_plan,
     find_spec_file,
 )
-from adw_modules.utils import setup_logger, parse_json, check_env_vars, strip_markdown_code_formatting
+from adw_modules.utils import setup_logger, parse_json, check_env_vars
 from adw_modules.data_types import (
     AgentTemplateRequest,
     ReviewResult,
@@ -235,10 +235,9 @@ def resolve_blocker_issues(
         if not plan_response.success:
             logger.error(f"Failed to create patch plan: {plan_response.output}")
             continue
-
+        
         # Extract plan file path
-        # Strip markdown code formatting that Claude may add around the file path
-        plan_file = strip_markdown_code_formatting(plan_response.output)
+        plan_file = plan_response.output.strip()
         
         # Implement the patch
         logger.info(f"Implementing patch from plan: {plan_file}")

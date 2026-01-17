@@ -17,7 +17,7 @@ from adw_modules.data_types import (
 from adw_modules.agent import execute_template
 from adw_modules.github import get_repo_url, extract_repo_path, ADW_BOT_IDENTIFIER
 from adw_modules.state import ADWState
-from adw_modules.utils import parse_json, strip_markdown_code_formatting
+from adw_modules.utils import parse_json
 
 
 # Agent name constants
@@ -249,8 +249,7 @@ def generate_branch_name(
     if not response.success:
         return None, response.output
 
-    # Strip markdown code formatting that Claude may add around the branch name
-    branch_name = strip_markdown_code_formatting(response.output)
+    branch_name = response.output.strip()
     logger.info(f"Generated branch name: {branch_name}")
     return branch_name, None
 
@@ -289,8 +288,7 @@ def create_commit(
     if not response.success:
         return None, response.output
 
-    # Strip markdown code formatting that Claude may add around the commit message
-    commit_message = strip_markdown_code_formatting(response.output)
+    commit_message = response.output.strip()
     logger.info(f"Created commit message: {commit_message}")
     return commit_message, None
 
@@ -345,8 +343,7 @@ def create_pull_request(
     if not response.success:
         return None, response.output
 
-    # Strip markdown code formatting that Claude may add around the PR URL
-    pr_url = strip_markdown_code_formatting(response.output)
+    pr_url = response.output.strip()
     logger.info(f"Created pull request: {pr_url}")
     return pr_url, None
 
@@ -698,8 +695,7 @@ def create_and_implement_patch(
         )
 
     # Extract the patch plan file path from the response
-    # Strip markdown code formatting that Claude may add around the file path
-    patch_file_path = strip_markdown_code_formatting(response.output)
+    patch_file_path = response.output.strip()
 
     # Validate that it looks like a file path
     if "specs/patch/" not in patch_file_path or not patch_file_path.endswith(".md"):

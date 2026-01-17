@@ -43,7 +43,7 @@ from adw_modules.workflow_ops import (
     format_issue_message,
     find_spec_file,
 )
-from adw_modules.utils import setup_logger, check_env_vars, strip_markdown_code_formatting
+from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.data_types import (
     GitHubIssue,
     GitHubUser,
@@ -146,8 +146,7 @@ def generate_documentation(
         return None
 
     # Parse the agent response - it should return the path to the documentation file created
-    # Strip markdown code formatting that Claude may add around the file path
-    doc_file_path = strip_markdown_code_formatting(response.output)
+    doc_file_path = response.output.strip()
 
     # Check if the agent actually created documentation
     if doc_file_path and doc_file_path != "No documentation needed":
