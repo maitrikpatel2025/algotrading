@@ -6,7 +6,7 @@
         "@playwright/mcp@latest",
         "--isolated",
         "--config",
-        "./playwright-mcp-config.json"
+        "/Users/maitrikpatel/Documents/Automate With Maitrik/Algotrading/trees/0bd04f2b/playwright-mcp-config.json"
       ]
     }
   }
