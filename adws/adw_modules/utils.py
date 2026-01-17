@@ -7,7 +7,7 @@ import re
 import sys
 import uuid
 from datetime import datetime
-from typing import Any, TypeVar, Type, Union, Dict
+from typing import Any, TypeVar, Type, Union, Dict, Optional
 
 T = TypeVar('T')
 
@@ -156,6 +156,80 @@ def parse_json(text: str, target_type: Type[T] = None) -> Union[T, Any]:
         return result
     except json.JSONDecodeError as e:
         raise ValueError(f"Failed to parse JSON: {e}. Text was: {json_str[:200]}...")
+
+
+def check_env_vars(logger: Optional[logging.Logger] = None) -> None:
+    """Check that all required environment variables are set.
+    
+    Args:
+        logger: Optional logger instance for error reporting
+        
+    Raises:
+        SystemExit: If required environment variables are missing
+    """
+    required_vars = [
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_CODE_PATH",
+    ]
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+
+    if missing_vars:
+        error_msg = "Error: Missing required environment variables:"
+        if logger:
+            logger.error(error_msg)
+            for var in missing_vars:
+                logger.error(f"  - {var}")
+        else:
+            print(error_msg, file=sys.stderr)
+            for var in missing_vars:
+                print(f"  - {var}", file=sys.stderr)
+        sys.exit(1)
+
+
+def strip_markdown_code_formatting(text: str) -> str:
+    """Strip markdown code formatting (backticks) from text.
+
+    Handles various formats:
+    - Single backticks: `path/to/file.md` -> path/to/file.md
+    - Triple backticks: ```path/to/file.md``` -> path/to/file.md
+    - Triple backticks with language: ```md\npath/to/file.md\n``` -> path/to/file.md
+    - No backticks: path/to/file.md -> path/to/file.md (unchanged)
+
+    Args:
+        text: String that may be wrapped in markdown code formatting
+
+    Returns:
+        Clean string with backticks removed
+    """
+    if not text:
+        return text
+
+    # Strip whitespace first
+    result = text.strip()
+
+    # Handle triple backticks with optional language specifier
+    # Pattern: ```lang\ncontent\n``` or ```content```
+    if result.startswith('```') and result.endswith('```'):
+        # Remove opening ```
+        result = result[3:]
+        # Remove closing ```
+        result = result[:-3]
+        # Strip any language identifier on the first line and trailing newlines
+        result = result.strip()
+        # If there's a newline, the first line might be a language identifier
+        if '\n' in result:
+            lines = result.split('\n')
+            # Check if first line looks like a language identifier (short, no spaces, no path separators)
+            first_line = lines[0].strip()
+            if first_line and len(first_line) < 20 and ' ' not in first_line and '/' not in first_line and '\\' not in first_line:
+                # Likely a language identifier, skip it
+                result = '\n'.join(lines[1:]).strip()
+
+    # Handle single backticks
+    if result.startswith('`') and result.endswith('`'):
+        result = result[1:-1]
+
+    return result.strip()
 
 
 def get_safe_subprocess_env() -> Dict[str, str]:

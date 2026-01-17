@@ -6,6 +6,7 @@ import os
 import json
 import re
 import logging
+import time
 from typing import Optional, List, Dict, Any, Tuple, Final
 from dotenv import load_dotenv
 from .data_types import (
@@ -14,6 +15,8 @@ from .data_types import (
     AgentTemplateRequest,
     ClaudeCodeResultMessage,
     SlashCommand,
+    ModelSet,
+    RetryCode,
 )
 
 # Load environment variables
@@ -23,46 +26,122 @@ load_dotenv()
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
 
 # Model selection mapping for slash commands
-# Maps slash command to preferred model
-SLASH_COMMAND_MODEL_MAP: Final[Dict[SlashCommand, str]] = {
-    # Issue classification
-    "/classify_issue": "sonnet",
-    "/classify_adw": "sonnet",
-    # Branch operations
-    "/generate_branch_name": "sonnet",
-    # Implementation tasks
-    "/implement": "opus",
-    # Testing and debugging
-    "/test": "sonnet",
-    "/resolve_failed_test": "sonnet",
-    "/test_e2e": "sonnet",
-    "/resolve_failed_e2e_test": "sonnet",
-    # Review
-    "/review": "opus",
-    # Documentation
-    "/document": "sonnet",
-    # Git operations
-    "/commit": "sonnet",
-    "/pull_request": "sonnet",
-    # Issue types + planning
-    "/chore": "sonnet",
-    "/bug": "opus",
-    "/feature": "opus",
-    "/patch": "opus",
+# Maps each command to its model configuration for base and heavy model sets
+SLASH_COMMAND_MODEL_MAP: Final[Dict[SlashCommand, Dict[ModelSet, str]]] = {
+    "/classify_issue": {"base": "sonnet", "heavy": "sonnet"},
+    "/classify_adw": {"base": "sonnet", "heavy": "sonnet"},
+    "/generate_branch_name": {"base": "sonnet", "heavy": "sonnet"},
+    "/implement": {"base": "sonnet", "heavy": "opus"},
+    "/test": {"base": "sonnet", "heavy": "sonnet"},
+    "/resolve_failed_test": {"base": "sonnet", "heavy": "opus"},
+    "/test_e2e": {"base": "sonnet", "heavy": "sonnet"},
+    "/resolve_failed_e2e_test": {"base": "sonnet", "heavy": "opus"},
+    "/review": {"base": "sonnet", "heavy": "sonnet"},
+    "/document": {"base": "sonnet", "heavy": "opus"},
+    "/commit": {"base": "sonnet", "heavy": "sonnet"},
+    "/pull_request": {"base": "sonnet", "heavy": "sonnet"},
+    "/chore": {"base": "sonnet", "heavy": "opus"},
+    "/bug": {"base": "sonnet", "heavy": "opus"},
+    "/feature": {"base": "sonnet", "heavy": "opus"},
+    "/patch": {"base": "sonnet", "heavy": "opus"},
+    "/install_worktree": {"base": "sonnet", "heavy": "sonnet"},
+    "/track_agentic_kpis": {"base": "sonnet", "heavy": "sonnet"},
 }
 
 
-def get_model_for_slash_command(slash_command: str, default: str = "sonnet") -> str:
-    """Get the recommended model for a slash command.
+def get_model_for_slash_command(
+    request: AgentTemplateRequest, default: str = "sonnet"
+) -> str:
+    """Get the appropriate model for a template request based on ADW state and slash command.
+
+    This function loads the ADW state to determine the model set (base or heavy)
+    and returns the appropriate model for the slash command.
 
     Args:
-        slash_command: The slash command to look up
+        request: The template request containing the slash command and adw_id
         default: Default model if not found in mapping
 
     Returns:
-        Model name to use
+        Model name to use (e.g., "sonnet" or "opus")
     """
-    return SLASH_COMMAND_MODEL_MAP.get(slash_command, default)
+    # Import here to avoid circular imports
+    from .state import ADWState
+
+    # Load state to get model_set
+    model_set: ModelSet = "base"  # Default model set
+    state = ADWState.load(request.adw_id)
+    if state:
+        model_set = state.get("model_set", "base")
+
+    # Get the model configuration for the command
+    command_config = SLASH_COMMAND_MODEL_MAP.get(request.slash_command)
+
+    if command_config:
+        # Get the model for the specified model set, defaulting to base if not found
+        return command_config.get(model_set, command_config.get("base", default))
+
+    return default
+
+
+def truncate_output(
+    output: str, max_length: int = 500, suffix: str = "... (truncated)"
+) -> str:
+    """Truncate output to a reasonable length for display.
+
+    Special handling for JSONL data - if the output appears to be JSONL,
+    try to extract just the meaningful part.
+
+    Args:
+        output: The output string to truncate
+        max_length: Maximum length before truncation (default: 500)
+        suffix: Suffix to add when truncated (default: "... (truncated)")
+
+    Returns:
+        Truncated string if needed, original if shorter than max_length
+    """
+    # Check if this looks like JSONL data
+    if output.startswith('{"type":') and '\n{"type":' in output:
+        # This is likely JSONL output - try to extract the last meaningful message
+        lines = output.strip().split("\n")
+        for line in reversed(lines):
+            try:
+                data = json.loads(line)
+                # Look for result message
+                if data.get("type") == "result":
+                    result = data.get("result", "")
+                    if result:
+                        return truncate_output(result, max_length, suffix)
+                # Look for assistant message
+                elif data.get("type") == "assistant" and data.get("message"):
+                    content = data["message"].get("content", [])
+                    if isinstance(content, list) and content:
+                        text = content[0].get("text", "")
+                        if text:
+                            return truncate_output(text, max_length, suffix)
+            except:
+                pass
+        # If we couldn't extract anything meaningful, just show that it's JSONL
+        return f"[JSONL output with {len(lines)} messages]{suffix}"
+
+    # Regular truncation logic
+    if len(output) <= max_length:
+        return output
+
+    # Try to find a good break point (newline or space)
+    truncate_at = max_length - len(suffix)
+
+    # Look for newline near the truncation point
+    newline_pos = output.rfind("\n", truncate_at - 50, truncate_at)
+    if newline_pos > 0:
+        return output[:newline_pos] + suffix
+
+    # Look for space near the truncation point
+    space_pos = output.rfind(" ", truncate_at - 20, truncate_at)
+    if space_pos > 0:
+        return output[:space_pos] + suffix
+
+    # Just truncate at the limit
+    return output[:truncate_at] + suffix
 
 
 def check_claude_installed() -> Optional[str]:
@@ -102,7 +181,6 @@ def parse_jsonl_output(
 
             return messages, result_message
     except Exception as e:
-        print(f"Error parsing JSONL file: {e}", file=sys.stderr)
         return [], None
 
 
@@ -125,7 +203,6 @@ def convert_jsonl_to_json(jsonl_file: str) -> str:
     with open(json_file, "w") as f:
         json.dump(messages, f, indent=2)
 
-    print(f"Created JSON file: {json_file}")
     return json_file
 
 
@@ -169,7 +246,59 @@ def save_prompt(prompt: str, adw_id: str, agent_name: str = "ops") -> None:
     with open(prompt_file, "w") as f:
         f.write(prompt)
 
-    print(f"Saved prompt to: {prompt_file}")
+
+def prompt_claude_code_with_retry(
+    request: AgentPromptRequest,
+    max_retries: int = 3,
+    retry_delays: List[int] = None,
+) -> AgentPromptResponse:
+    """Execute Claude Code with retry logic for certain error types.
+
+    Args:
+        request: The prompt request configuration
+        max_retries: Maximum number of retry attempts (default: 3)
+        retry_delays: List of delays in seconds between retries (default: [1, 3, 5])
+
+    Returns:
+        AgentPromptResponse with output and retry code
+    """
+    if retry_delays is None:
+        retry_delays = [1, 3, 5]
+
+    # Ensure we have enough delays for max_retries
+    while len(retry_delays) < max_retries:
+        retry_delays.append(retry_delays[-1] + 2)  # Add incrementing delays
+
+    last_response = None
+
+    for attempt in range(max_retries + 1):  # +1 for initial attempt
+        if attempt > 0:
+            # This is a retry
+            delay = retry_delays[attempt - 1]
+            time.sleep(delay)
+
+        response = prompt_claude_code(request)
+        last_response = response
+
+        # Check if we should retry based on the retry code
+        if response.success or response.retry_code == RetryCode.NONE:
+            # Success or non-retryable error
+            return response
+
+        # Check if this is a retryable error
+        if response.retry_code in [
+            RetryCode.CLAUDE_CODE_ERROR,
+            RetryCode.TIMEOUT_ERROR,
+            RetryCode.EXECUTION_ERROR,
+            RetryCode.ERROR_DURING_EXECUTION,
+        ]:
+            if attempt < max_retries:
+                continue
+            else:
+                return response
+
+    # Should not reach here, but return last response just in case
+    return last_response
 
 
 def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
@@ -178,7 +307,12 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     # Check if Claude Code CLI is installed
     error_msg = check_claude_installed()
     if error_msg:
-        return AgentPromptResponse(output=error_msg, success=False, session_id=None)
+        return AgentPromptResponse(
+            output=error_msg,
+            success=False,
+            session_id=None,
+            retry_code=RetryCode.NONE,  # Installation error is not retryable
+        )
 
     # Save prompt before execution
     save_prompt(request.prompt, request.adw_id, request.agent_name)
@@ -193,6 +327,12 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     cmd.extend(["--model", request.model])
     cmd.extend(["--output-format", "stream-json"])
     cmd.append("--verbose")
+    
+    # Check for MCP config in working directory
+    if request.working_dir:
+        mcp_config_path = os.path.join(request.working_dir, ".mcp.json")
+        if os.path.exists(mcp_config_path):
+            cmd.extend(["--mcp-config", mcp_config_path])
 
     # Add dangerous skip permissions flag if enabled
     if request.dangerously_skip_permissions:
@@ -202,14 +342,19 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     env = get_claude_env()
 
     try:
-        # Execute Claude Code and pipe output to file
-        with open(request.output_file, "w") as f:
+        # Open output file for streaming
+        with open(request.output_file, "w") as output_f:
+            # Execute Claude Code and stream output to file
             result = subprocess.run(
-                cmd, stdout=f, stderr=subprocess.PIPE, text=True, env=env
+                cmd,
+                stdout=output_f,  # Stream directly to file
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                cwd=request.working_dir,  # Use working_dir if provided
             )
 
         if result.returncode == 0:
-            print(f"Output saved to: {request.output_file}")
 
             # Parse the JSONL file
             messages, result_message = parse_jsonl_output(request.output_file)
@@ -229,45 +374,161 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
                 if subtype == "error_during_execution":
                     error_msg = "Error during execution: Agent encountered an error and did not return a result"
                     return AgentPromptResponse(
-                        output=error_msg, success=False, session_id=session_id
+                        output=error_msg,
+                        success=False,
+                        session_id=session_id,
+                        retry_code=RetryCode.ERROR_DURING_EXECUTION,
                     )
 
                 result_text = result_message.get("result", "")
 
+                # For error cases, truncate the output to prevent JSONL blobs
+                if is_error and len(result_text) > 1000:
+                    result_text = truncate_output(result_text, max_length=800)
+
                 return AgentPromptResponse(
-                    output=result_text, success=not is_error, session_id=session_id
+                    output=result_text,
+                    success=not is_error,
+                    session_id=session_id,
+                    retry_code=RetryCode.NONE,  # No retry needed for successful or non-retryable errors
                 )
             else:
-                # No result message found, return raw output
-                with open(request.output_file, "r") as f:
-                    raw_output = f.read()
+                # No result message found, try to extract meaningful error
+                error_msg = "No result message found in Claude Code output"
+
+                # Try to get the last few lines of output for context
+                try:
+                    with open(request.output_file, "r") as f:
+                        lines = f.readlines()
+                        if lines:
+                            # Get last 5 lines or less
+                            last_lines = lines[-5:] if len(lines) > 5 else lines
+                            # Try to parse each as JSON to find any error messages
+                            for line in reversed(last_lines):
+                                try:
+                                    data = json.loads(line.strip())
+                                    if data.get("type") == "assistant" and data.get(
+                                        "message"
+                                    ):
+                                        # Extract text from assistant message
+                                        content = data["message"].get("content", [])
+                                        if isinstance(content, list) and content:
+                                            text = content[0].get("text", "")
+                                            if text:
+                                                error_msg = f"Claude Code output: {text[:500]}"  # Truncate
+                                                break
+                                except:
+                                    pass
+                except:
+                    pass
+
                 return AgentPromptResponse(
-                    output=raw_output, success=True, session_id=None
+                    output=truncate_output(error_msg, max_length=800),
+                    success=False,
+                    session_id=None,
+                    retry_code=RetryCode.NONE,
                 )
         else:
-            error_msg = f"Claude Code error: {result.stderr}"
-            print(error_msg, file=sys.stderr)
-            return AgentPromptResponse(output=error_msg, success=False, session_id=None)
+            # Error occurred - stderr is captured, stdout went to file
+            stderr_msg = result.stderr.strip() if result.stderr else ""
+
+            # Try to read the output file to check for errors in stdout
+            stdout_msg = ""
+            error_from_jsonl = None
+            try:
+                if os.path.exists(request.output_file):
+                    # Parse JSONL to find error message
+                    messages, result_message = parse_jsonl_output(request.output_file)
+
+                    if result_message and result_message.get("is_error"):
+                        # Found error in result message
+                        error_from_jsonl = result_message.get("result", "Unknown error")
+                    elif messages:
+                        # Look for error in last few messages
+                        for msg in reversed(messages[-5:]):
+                            if msg.get("type") == "assistant" and msg.get(
+                                "message", {}
+                            ).get("content"):
+                                content = msg["message"]["content"]
+                                if isinstance(content, list) and content:
+                                    text = content[0].get("text", "")
+                                    if text and (
+                                        "error" in text.lower()
+                                        or "failed" in text.lower()
+                                    ):
+                                        error_from_jsonl = text[:500]  # Truncate
+                                        break
+
+                    # If no structured error found, get last line only
+                    if not error_from_jsonl:
+                        with open(request.output_file, "r") as f:
+                            lines = f.readlines()
+                            if lines:
+                                # Just get the last line instead of entire file
+                                stdout_msg = lines[-1].strip()[
+                                    :200
+                                ]  # Truncate to 200 chars
+            except:
+                pass
+
+            if error_from_jsonl:
+                error_msg = f"Claude Code error: {error_from_jsonl}"
+            elif stdout_msg and not stderr_msg:
+                error_msg = f"Claude Code error: {stdout_msg}"
+            elif stderr_msg and not stdout_msg:
+                error_msg = f"Claude Code error: {stderr_msg}"
+            elif stdout_msg and stderr_msg:
+                error_msg = f"Claude Code error: {stderr_msg}\nStdout: {stdout_msg}"
+            else:
+                error_msg = f"Claude Code error: Command failed with exit code {result.returncode}"
+
+            # Always truncate error messages to prevent huge outputs
+            return AgentPromptResponse(
+                output=truncate_output(error_msg, max_length=800),
+                success=False,
+                session_id=None,
+                retry_code=RetryCode.CLAUDE_CODE_ERROR,
+            )
 
     except subprocess.TimeoutExpired:
         error_msg = "Error: Claude Code command timed out after 5 minutes"
-        print(error_msg, file=sys.stderr)
-        return AgentPromptResponse(output=error_msg, success=False, session_id=None)
+        return AgentPromptResponse(
+            output=error_msg,
+            success=False,
+            session_id=None,
+            retry_code=RetryCode.TIMEOUT_ERROR,
+        )
     except Exception as e:
         error_msg = f"Error executing Claude Code: {e}"
-        print(error_msg, file=sys.stderr)
-        return AgentPromptResponse(output=error_msg, success=False, session_id=None)
+        return AgentPromptResponse(
+            output=error_msg,
+            success=False,
+            session_id=None,
+            retry_code=RetryCode.EXECUTION_ERROR,
+        )
 
 
 def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
-    """Execute a Claude Code template with slash command and arguments."""
-    # Override model based on slash command mapping
-    if request.slash_command in SLASH_COMMAND_MODEL_MAP:
-        mapped_model = SLASH_COMMAND_MODEL_MAP[request.slash_command]
-        request = request.model_copy(update={"model": mapped_model})
-    else:
-        # Use default model of "sonnet" if not in mapping
-        request = request.model_copy(update={"model": "sonnet"})
+    """Execute a Claude Code template with slash command and arguments.
+
+    This function automatically selects the appropriate model based on:
+    1. The slash command being executed
+    2. The model_set stored in the ADW state (base or heavy)
+
+    Example:
+        request = AgentTemplateRequest(
+            agent_name="planner",
+            slash_command="/implement",
+            args=["plan.md"],
+            adw_id="abc12345"
+        )
+        # If state has model_set="heavy", this will use "opus"
+        # If state has model_set="base" or missing, this will use "sonnet"
+        response = execute_template(request)
+    """
+    # Get the appropriate model for this request
+    mapped_model = get_model_for_slash_command(request)
+    request = request.model_copy(update={"model": mapped_model})
 
     # Construct prompt from slash command and args
     prompt = f"{request.slash_command} {' '.join(request.args)}"
@@ -293,7 +554,8 @@ def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
         model=request.model,
         dangerously_skip_permissions=True,
         output_file=output_file,
+        working_dir=request.working_dir,  # Pass through working_dir
     )
 
-    # Execute and return response (prompt_claude_code now handles all parsing)
-    return prompt_claude_code(prompt_request)
+    # Execute with retry logic and return response (prompt_claude_code now handles all parsing)
+    return prompt_claude_code_with_retry(prompt_request)

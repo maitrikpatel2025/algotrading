@@ -3,23 +3,43 @@
 from datetime import datetime
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
+from enum import Enum
+
+
+# Retry codes for Claude Code execution errors
+class RetryCode(str, Enum):
+    """Codes indicating different types of errors that may be retryable."""
+
+    CLAUDE_CODE_ERROR = "claude_code_error"  # General Claude Code CLI error
+    TIMEOUT_ERROR = "timeout_error"  # Command timed out
+    EXECUTION_ERROR = "execution_error"  # Error during execution
+    ERROR_DURING_EXECUTION = "error_during_execution"  # Agent encountered an error
+    NONE = "none"  # No retry needed
+
 
 # Supported slash commands for issue classification
 # These should align with your custom slash commands in .claude/commands that you want to run
 IssueClassSlashCommand = Literal["/chore", "/bug", "/feature"]
 
-# ADW workflow types
+# Model set types for ADW workflows
+ModelSet = Literal["base", "heavy"]
+
+# ADW workflow types (all isolated now)
 ADWWorkflow = Literal[
-    "adw_plan",  # Planning only
-    "adw_build",  # Building only (excluded from webhook)
-    "adw_test",  # Testing only
-    "adw_review",  # Review only
-    "adw_document",  # Documentation only
-    "adw_patch",  # Direct patch from issue
-    "adw_plan_build",  # Plan + Build
-    "adw_plan_build_test",  # Plan + Build + Test
-    "adw_plan_build_test_review",  # Plan + Build + Test + Review
-    "adw_sdlc",  # Complete SDLC: Plan + Build + Test + Review + Document
+    "adw_plan_iso",  # Planning only
+    "adw_patch_iso",  # Direct patch from issue
+    "adw_build_iso",  # Building only (dependent workflow)
+    "adw_test_iso",  # Testing only (dependent workflow)
+    "adw_review_iso",  # Review only (dependent workflow)
+    "adw_document_iso",  # Documentation only (dependent workflow)
+    "adw_ship_iso",  # Ship/deployment workflow
+    "adw_sdlc_ZTE_iso",  # Zero Touch Execution - full SDLC with auto-merge
+    "adw_plan_build_iso",  # Plan + Build
+    "adw_plan_build_test_iso",  # Plan + Build + Test
+    "adw_plan_build_test_review_iso",  # Plan + Build + Test + Review
+    "adw_plan_build_document_iso",  # Plan + Build + Document
+    "adw_plan_build_review_iso",  # Plan + Build + Review
+    "adw_sdlc_iso",  # Complete SDLC: Plan + Build + Test + Review + Document
 ]
 
 # All slash commands used in the ADW system
@@ -43,6 +63,9 @@ SlashCommand = Literal[
     "/review",
     "/patch",
     "/document",
+    "/track_agentic_kpis",
+    # Installation/setup commands
+    "/install_worktree",
 ]
 
 
@@ -130,6 +153,7 @@ class AgentPromptRequest(BaseModel):
     model: Literal["sonnet", "opus"] = "sonnet"
     dangerously_skip_permissions: bool = False
     output_file: str
+    working_dir: Optional[str] = None
 
 
 class AgentPromptResponse(BaseModel):
@@ -138,6 +162,7 @@ class AgentPromptResponse(BaseModel):
     output: str
     success: bool
     session_id: Optional[str] = None
+    retry_code: RetryCode = RetryCode.NONE
 
 
 class AgentTemplateRequest(BaseModel):
@@ -148,6 +173,7 @@ class AgentTemplateRequest(BaseModel):
     args: List[str]
     adw_id: str
     model: Literal["sonnet", "opus"] = "sonnet"
+    working_dir: Optional[str] = None
 
 
 class ClaudeCodeResultMessage(BaseModel):
@@ -201,6 +227,11 @@ class ADWStateData(BaseModel):
     branch_name: Optional[str] = None
     plan_file: Optional[str] = None
     issue_class: Optional[IssueClassSlashCommand] = None
+    worktree_path: Optional[str] = None
+    backend_port: Optional[int] = None
+    frontend_port: Optional[int] = None
+    model_set: Optional[ModelSet] = "base"  # Default to "base" model set
+    all_adws: List[str] = Field(default_factory=list)
 
 
 class ReviewIssue(BaseModel):
@@ -208,7 +239,9 @@ class ReviewIssue(BaseModel):
 
     review_issue_number: int
     screenshot_path: str  # Local file path to screenshot (e.g., "agents/ADW-123/reviewer/review_img/error.png")
-    screenshot_url: Optional[str] = None  # Public URL after upload (e.g., "https://domain.com/adw/ADW-123/review/error.png")
+    screenshot_url: Optional[str] = (
+        None  # Public URL after upload (e.g., "https://domain.com/adw/ADW-123/review/error.png")
+    )
     issue_description: str
     issue_resolution: str
     issue_severity: Literal["skippable", "tech_debt", "blocker"]
@@ -218,10 +251,16 @@ class ReviewResult(BaseModel):
     """Result from reviewing implementation against specification."""
 
     success: bool
-    review_summary: str  # 2-4 sentences describing what was built and whether it matches the spec
+    review_summary: (
+        str  # 2-4 sentences describing what was built and whether it matches the spec
+    )
     review_issues: List[ReviewIssue] = []
-    screenshots: List[str] = []  # Local file paths (e.g., ["agents/ADW-123/reviewer/review_img/ui.png"])
-    screenshot_urls: List[str] = []  # Public URLs after upload, indexed-aligned with screenshots
+    screenshots: List[str] = (
+        []
+    )  # Local file paths (e.g., ["agents/ADW-123/reviewer/review_img/ui.png"])
+    screenshot_urls: List[str] = (
+        []
+    )  # Public URLs after upload, indexed-aligned with screenshots
 
 
 class DocumentationResult(BaseModel):
@@ -231,3 +270,16 @@ class DocumentationResult(BaseModel):
     documentation_created: bool
     documentation_path: Optional[str] = None
     error_message: Optional[str] = None
+
+
+class ADWExtractionResult(BaseModel):
+    """Result from extracting ADW information from text."""
+    
+    workflow_command: Optional[str] = None  # e.g., "adw_plan_iso" (without slash)
+    adw_id: Optional[str] = None  # 8-character ADW ID
+    model_set: Optional[ModelSet] = "base"  # Model set to use, defaults to "base"
+    
+    @property
+    def has_workflow(self) -> bool:
+        """Check if a workflow command was extracted."""
+        return self.workflow_command is not None

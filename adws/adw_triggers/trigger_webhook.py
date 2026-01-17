@@ -7,14 +7,14 @@
 GitHub Webhook Trigger - AI Developer Workflow (ADW)
 
 FastAPI webhook endpoint that receives GitHub issue events and triggers ADW workflows.
-Responds immediately to meet GitHub's 10-second timeout by launching adw_plan_build.py
-in the background.
+Responds immediately to meet GitHub's 10-second timeout by launching workflows
+in the background. Supports both standard and isolated workflows.
 
 Usage: uv run trigger_webhook.py
 
 Environment Requirements:
 - PORT: Server port (default: 8001)
-- All adw_plan_build.py requirements (GITHUB_PAT, ANTHROPIC_API_KEY, etc.)
+- All workflow requirements (GITHUB_PAT, ANTHROPIC_API_KEY, etc.)
 """
 
 import os
@@ -38,6 +38,16 @@ load_dotenv()
 
 # Configuration
 PORT = int(os.getenv("PORT", "8001"))
+
+# Dependent workflows that require existing worktrees
+# These cannot be triggered directly via webhook
+DEPENDENT_WORKFLOWS = [
+    "adw_build_iso",
+    "adw_test_iso",
+    "adw_review_iso",
+    "adw_document_iso",
+    "adw_ship_iso",
+]
 
 # Create FastAPI app
 app = FastAPI(
@@ -68,6 +78,7 @@ async def github_webhook(request: Request):
 
         workflow = None
         provided_adw_id = None
+        model_set = None
         trigger_reason = ""
         content_to_check = ""
 
@@ -76,12 +87,19 @@ async def github_webhook(request: Request):
             issue_body = issue.get("body", "")
             content_to_check = issue_body
 
+            # Ignore issues from ADW bot to prevent loops
+            if ADW_BOT_IDENTIFIER in issue_body:
+                print(f"Ignoring ADW bot issue to prevent loop")
+                workflow = None
             # Check if body contains "adw_"
-            if "adw_" in issue_body.lower():
+            elif "adw_" in issue_body.lower():
                 # Use temporary ID for classification
                 temp_id = make_adw_id()
-                workflow, provided_adw_id = extract_adw_info(issue_body, temp_id)
-                if workflow:
+                extraction_result = extract_adw_info(issue_body, temp_id)
+                if extraction_result.has_workflow:
+                    workflow = extraction_result.workflow_command
+                    provided_adw_id = extraction_result.adw_id
+                    model_set = extraction_result.model_set
                     trigger_reason = f"New issue with {workflow} workflow"
 
         # Check if this is an issue comment
@@ -100,18 +118,32 @@ async def github_webhook(request: Request):
             elif "adw_" in comment_body.lower():
                 # Use temporary ID for classification
                 temp_id = make_adw_id()
-                workflow, provided_adw_id = extract_adw_info(comment_body, temp_id)
-                if workflow:
+                extraction_result = extract_adw_info(comment_body, temp_id)
+                if extraction_result.has_workflow:
+                    workflow = extraction_result.workflow_command
+                    provided_adw_id = extraction_result.adw_id
+                    model_set = extraction_result.model_set
                     trigger_reason = f"Comment with {workflow} workflow"
 
         # Validate workflow constraints
-        if workflow == "adw_build" and not provided_adw_id:
-            print(f"adw_build requires an adw_id, skipping")
-            workflow = None
-
-        if workflow == "adw_document" and not provided_adw_id:
-            print(f"adw_document requires an adw_id, skipping")
-            workflow = None
+        if workflow in DEPENDENT_WORKFLOWS:
+            if not provided_adw_id:
+                print(
+                    f"{workflow} is a dependent workflow that requires an existing ADW ID"
+                )
+                print(f"Cannot trigger {workflow} directly via webhook without ADW ID")
+                workflow = None
+                # Post error comment to issue
+                try:
+                    make_issue_comment(
+                        str(issue_number),
+                        f"❌ Error: `{workflow}` is a dependent workflow that requires an existing ADW ID.\n\n"
+                        f"To run this workflow, you must provide the ADW ID in your comment, for example:\n"
+                        f"`{workflow} adw-12345678`\n\n"
+                        f"The ADW ID should come from a previous workflow run (like `adw_plan_iso` or `adw_patch_iso`).",
+                    )
+                except Exception as e:
+                    print(f"Failed to post error comment: {e}")
 
         if workflow:
             # Use provided ADW ID or generate a new one
@@ -122,12 +154,23 @@ async def github_webhook(request: Request):
                 # Try to load existing state first
                 state = ADWState.load(provided_adw_id)
                 if state:
-                    # Update only the issue_number if state exists
-                    state.update(issue_number=str(issue_number))
+                    # Update issue_number and model_set if state exists
+                    state.update(issue_number=str(issue_number), model_set=model_set)
                 else:
                     # Only create new state if it doesn't exist
                     state = ADWState(provided_adw_id)
-                    state.update(adw_id=provided_adw_id, issue_number=str(issue_number))
+                    state.update(
+                        adw_id=provided_adw_id,
+                        issue_number=str(issue_number),
+                        model_set=model_set,
+                    )
+                state.save("webhook_trigger")
+            else:
+                # Create new state for newly generated ADW ID
+                state = ADWState(adw_id)
+                state.update(
+                    adw_id=adw_id, issue_number=str(issue_number), model_set=model_set
+                )
                 state.save("webhook_trigger")
 
             # Set up logger
@@ -142,8 +185,10 @@ async def github_webhook(request: Request):
             try:
                 make_issue_comment(
                     str(issue_number),
-                    f"{ADW_BOT_IDENTIFIER} 🤖 ADW Webhook: Detected `{workflow}` workflow request\n\n"
+                    f"🤖 ADW Webhook: Detected `{workflow}` workflow request\n\n"
                     f"Starting workflow with ID: `{adw_id}`\n"
+                    f"Workflow: `{workflow}` 🏗️\n"
+                    f"Model Set: `{model_set}` ⚙️\n"
                     f"Reason: {trigger_reason}\n\n"
                     f"Logs will be available at: `agents/{adw_id}/{workflow}/`",
                 )
@@ -167,6 +212,7 @@ async def github_webhook(request: Request):
                 cmd,
                 cwd=repo_root,  # Run from repository root where .claude/commands/ is located
                 env=get_safe_subprocess_env(),  # Pass only required environment variables
+                start_new_session=True,
             )
 
             print(
@@ -180,7 +226,7 @@ async def github_webhook(request: Request):
                 "issue": issue_number,
                 "adw_id": adw_id,
                 "workflow": workflow,
-                "message": f"ADW {workflow} workflow triggered for issue #{issue_number}",
+                "message": f"ADW {workflow} triggered for issue #{issue_number}",
                 "reason": trigger_reason,
                 "logs": f"agents/{adw_id}/{workflow}/",
             }

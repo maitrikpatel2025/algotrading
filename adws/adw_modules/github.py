@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 from .data_types import GitHubIssue, GitHubIssueListItem, GitHubComment
 
 # Bot identifier to prevent webhook loops and filter bot comments
-ADW_BOT_IDENTIFIER = "[ADW-BOT]"
+ADW_BOT_IDENTIFIER = "[ADW-AGENTS]"
 
 
 def get_github_env() -> Optional[dict]:
@@ -128,6 +128,10 @@ def make_issue_comment(issue_id: str, comment: str) -> None:
     # Get repo information from git remote
     github_repo_url = get_repo_url()
     repo_path = extract_repo_path(github_repo_url)
+
+    # Ensure comment has ADW_BOT_IDENTIFIER to prevent webhook loops
+    if not comment.startswith(ADW_BOT_IDENTIFIER):
+        comment = f"{ADW_BOT_IDENTIFIER} {comment}"
 
     # Build command
     cmd = [

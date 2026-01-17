@@ -98,7 +98,7 @@ def should_process_issue(issue_number: int) -> bool:
 def trigger_adw_workflow(issue_number: int) -> bool:
     """Trigger the ADW plan and build workflow for a specific issue."""
     try:
-        script_path = Path(__file__).parent.parent / "adw_plan_build.py"
+        script_path = Path(__file__).parent.parent / "adw_plan_build_iso.py"
         
         print(f"INFO: Triggering ADW workflow for issue #{issue_number}")
         

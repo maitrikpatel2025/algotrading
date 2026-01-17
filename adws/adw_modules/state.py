@@ -34,7 +34,7 @@ class ADWState:
     def update(self, **kwargs):
         """Update state with new key-value pairs."""
         # Filter to only our core fields
-        core_fields = {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class"}
+        core_fields = {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_path", "backend_port", "frontend_port", "model_set", "all_adws"}
         for key, value in kwargs.items():
             if key in core_fields:
                 self.data[key] = value
@@ -42,6 +42,28 @@ class ADWState:
     def get(self, key: str, default=None):
         """Get value from state by key."""
         return self.data.get(key, default)
+
+    def append_adw_id(self, adw_id: str):
+        """Append an ADW ID to the all_adws list if not already present."""
+        all_adws = self.data.get("all_adws", [])
+        if adw_id not in all_adws:
+            all_adws.append(adw_id)
+            self.data["all_adws"] = all_adws
+
+    def get_working_directory(self) -> str:
+        """Get the working directory for this ADW instance.
+        
+        Returns worktree_path if set (for isolated workflows),
+        otherwise returns the main repo path.
+        """
+        worktree_path = self.data.get("worktree_path")
+        if worktree_path:
+            return worktree_path
+        
+        # Return main repo path (parent of adws directory)
+        return os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
 
     def get_state_path(self) -> str:
         """Get path to state file."""
@@ -62,6 +84,11 @@ class ADWState:
             branch_name=self.data.get("branch_name"),
             plan_file=self.data.get("plan_file"),
             issue_class=self.data.get("issue_class"),
+            worktree_path=self.data.get("worktree_path"),
+            backend_port=self.data.get("backend_port"),
+            frontend_port=self.data.get("frontend_port"),
+            model_set=self.data.get("model_set", "base"),
+            all_adws=self.data.get("all_adws", []),
         )
 
         # Save as JSON
@@ -137,5 +164,9 @@ class ADWState:
             "branch_name": self.data.get("branch_name"),
             "plan_file": self.data.get("plan_file"),
             "issue_class": self.data.get("issue_class"),
+            "worktree_path": self.data.get("worktree_path"),
+            "backend_port": self.data.get("backend_port"),
+            "frontend_port": self.data.get("frontend_port"),
+            "all_adws": self.data.get("all_adws", []),
         }
         print(json.dumps(output_data, indent=2))
