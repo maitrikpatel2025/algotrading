@@ -627,6 +627,22 @@ ls -la trees/<adw-id>/
 cat trees/<adw-id>/agents/*/planner/raw_output.jsonl | tail -1 | jq .
 ```
 
+**"Branch already used by worktree"**
+```bash
+# This error occurs when the target branch is already checked out elsewhere
+# Check which worktree has the branch
+git worktree list
+
+# Option 1: Switch the conflicting worktree to main
+cd /path/to/conflicting/worktree && git checkout main
+
+# Option 2: Remove the conflicting worktree
+git worktree remove /path/to/conflicting/worktree
+
+# Option 3: If it's the main repo, switch to main branch
+git checkout main
+```
+
 ### Debug Mode
 ```bash
 export ADW_DEBUG=true

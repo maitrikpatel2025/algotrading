@@ -5,11 +5,46 @@ and allocating unique ports for each isolated instance.
 """
 
 import os
+import re
 import subprocess
 import logging
 import socket
 from typing import Tuple, Optional
 from adw_modules.state import ADWState
+
+
+def get_branch_worktree(branch_name: str) -> Optional[str]:
+    """Check if a branch is already checked out in any worktree.
+
+    Args:
+        branch_name: The branch name to check
+
+    Returns:
+        The worktree path if the branch is checked out, None otherwise
+    """
+    result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        return None
+
+    # Parse porcelain output - format is blocks separated by blank lines:
+    # worktree /path/to/worktree
+    # HEAD abc123
+    # branch refs/heads/branch-name
+    current_worktree = None
+    for line in result.stdout.split('\n'):
+        if line.startswith('worktree '):
+            current_worktree = line[9:]  # Remove 'worktree ' prefix
+        elif line.startswith('branch refs/heads/'):
+            current_branch = line[18:]  # Remove 'branch refs/heads/' prefix
+            if current_branch == branch_name:
+                return current_worktree
+
+    return None
 
 
 def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tuple[str, Optional[str]]:
@@ -40,7 +75,18 @@ def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tu
     if os.path.exists(worktree_path):
         logger.warning(f"Worktree already exists at {worktree_path}")
         return worktree_path, None
-    
+
+    # Check if the branch is already checked out in another worktree
+    conflicting_worktree = get_branch_worktree(branch_name)
+    if conflicting_worktree:
+        error_msg = (
+            f"Branch '{branch_name}' is already checked out at '{conflicting_worktree}'. "
+            f"Please switch that worktree to a different branch (e.g., 'cd {conflicting_worktree} && git checkout main') "
+            f"or remove it with 'git worktree remove {conflicting_worktree}'"
+        )
+        logger.error(error_msg)
+        return None, error_msg
+
     # First, fetch latest changes from origin
     logger.info("Fetching latest changes from origin")
     fetch_result = subprocess.run(
@@ -59,12 +105,24 @@ def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tu
     
     if result.returncode != 0:
         # If branch already exists, try without -b
-        if "already exists" in result.stderr:
+        if "already exists" in result.stderr and "is already used by worktree" not in result.stderr:
             cmd = ["git", "worktree", "add", worktree_path, branch_name]
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
-            
+
         if result.returncode != 0:
-            error_msg = f"Failed to create worktree: {result.stderr}"
+            # Check for the specific "already used by worktree" error
+            if "is already used by worktree" in result.stderr:
+                # Parse out the conflicting path from the error message
+                # Format: "fatal: 'branch' is already used by worktree at '/path'"
+                match = re.search(r"is already used by worktree at '([^']+)'", result.stderr)
+                conflicting_path = match.group(1) if match else "unknown location"
+                error_msg = (
+                    f"Branch '{branch_name}' is already checked out at '{conflicting_path}'. "
+                    f"Please switch that worktree to a different branch (e.g., 'cd {conflicting_path} && git checkout main') "
+                    f"or remove it with 'git worktree remove {conflicting_path}'"
+                )
+            else:
+                error_msg = f"Failed to create worktree: {result.stderr}"
             logger.error(error_msg)
             return None, error_msg
     
