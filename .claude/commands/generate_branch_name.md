@@ -4,9 +4,9 @@ Based on the `Instructions` below, take the `Variables` follow the `Run` section
 
 ## Variables
 
-issue_class: $1
-adw_id: $2
-issue: $3
+issue_class: $ARGUMENT
+adw_id: $ARGUMENT
+issue: $ARGUMENT
 
 ## Instructions
 
@@ -26,11 +26,9 @@ issue: $3
 
 ## Run
 
-Run `git checkout main` to switch to the main branch
-Run `git pull` to pull the latest changes from the main branch
-Run `git checkout -b <branch_name>` to create and switch to the new branch
+Generate the branch name based on the instructions above.
+Do NOT create or checkout any branches - just generate the name.
 
 ## Report
 
-After generating the branch name:
-Return ONLY the branch name that was created (no other text)
+Return ONLY the generated branch name (no other text)

@@ -8,8 +8,8 @@ This command sets up an isolated worktree environment with custom port configura
 - Frontend port: {2}
 
 ## Read
-- ./app/server/env.example (never read .env)
-- ./app/client/env.example (never read .env)
+- ./app/server/env.example (from parent repo, never read .env)
+- ./app/client/env.example (from parent repo, never read .env)
 - .mcp.json (from parent repo)
 - playwright-mcp-config.json (from parent repo)
 
@@ -33,6 +33,8 @@ This command sets up an isolated worktree environment with custom port configura
    - Append `.ports.env` contents to `.env`
    - Copy `app/server/.env` from parent repo if it exists
    - Append `.ports.env` contents to `app/server/.env`
+   - Copy `app/client/.env` from parent repo if it exists
+   - Append `.ports.env` contents to `app/client/.env`
 
 4. **Copy and configure MCP files**
    - Copy `.mcp.json` from parent repo if it exists
@@ -64,11 +66,11 @@ This command sets up an isolated worktree environment with custom port configura
 7. **Update client .env for port configuration** (Optional)
    If the client needs custom API URL:
    ```bash
-   echo "REACT_APP_API_URL=http://localhost:{1}/api" > .env
+   echo "REACT_APP_API_URL=http://localhost:{1}/api" >> .env
    ```
 
 ## Error Handling
-- If parent .env files don't exist, report an error and request manual setup
+- If parent .env files don't exist, create minimal versions from env.example files
 - Ensure all paths are absolute to avoid confusion
 
 ## Report

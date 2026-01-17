@@ -2,7 +2,7 @@
 
 Generate concise markdown documentation for implemented features by analyzing code changes and specifications. This command creates documentation in the `app_docs/` directory based on git diff analysis against the main branch and the original feature specification.
 
-## Variabless
+## Variables
 
 adw_id: $1
 spec_path: $2 if provided, otherwise leave it blank
