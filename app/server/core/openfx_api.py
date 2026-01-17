@@ -274,7 +274,7 @@ class OpenFxApi:
             return None
         return df.iloc[-1].time
 
-    def web_api_candles(self, pair_name: str, granularity: str, count: int) -> Optional[Dict]:
+    def web_api_candles(self, pair_name: str, granularity: str, count: int) -> Dict:
         """
         Get candle data formatted for web API response.
 
@@ -284,19 +284,40 @@ class OpenFxApi:
             count: Number of candles
 
         Returns:
-            Dictionary with candle data for frontend
+            Dictionary with candle data for frontend or error information with 'error' key
         """
+        original_pair = pair_name
         pair_name = pair_name.replace('_', '')
-        df = self.get_candles_df(pair_name, granularity=granularity, count=int(count) * -1)
 
-        if df is None or df.shape[0] == 0:
-            return None
+        try:
+            df = self.get_candles_df(pair_name, granularity=granularity, count=int(count) * -1)
 
-        cols = ['time', 'mid_o', 'mid_h', 'mid_l', 'mid_c']
-        df = df[cols].copy()
-        df['time'] = df.time.dt.strftime("%y-%m-%d %H:%M")
+            if df is None:
+                logger.error(f"Failed to fetch candles for {original_pair}/{granularity} - API returned None")
+                return {
+                    'error': 'api_error',
+                    'message': f'Unable to fetch price data for {original_pair}. The trading API may be unavailable.'
+                }
 
-        return df.to_dict(orient='list')
+            if df.shape[0] == 0:
+                logger.warning(f"No candle data returned for {original_pair}/{granularity}")
+                return {
+                    'error': 'no_data',
+                    'message': f'No price data available for {original_pair} on {granularity} timeframe'
+                }
+
+            cols = ['time', 'mid_o', 'mid_h', 'mid_l', 'mid_c']
+            df = df[cols].copy()
+            df['time'] = df.time.dt.strftime("%y-%m-%d %H:%M")
+
+            return df.to_dict(orient='list')
+
+        except Exception as e:
+            logger.error(f"Error in web_api_candles for {original_pair}/{granularity}: {e}")
+            return {
+                'error': 'unknown_error',
+                'message': f'An unexpected error occurred while fetching price data: {str(e)}'
+            }
 
     # =========================================================================
     # Trading Operations

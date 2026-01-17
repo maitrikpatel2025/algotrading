@@ -319,6 +319,29 @@ async def technicals(pair: str, timeframe: str):
     try:
         data = get_pair_technicals(pair, timeframe)
 
+        # Check if the response contains an error
+        if data is not None and 'error' in data:
+            error_type = data.get('error')
+            error_message = data.get('message', 'Unknown error')
+            logger.warning(f"[WARNING] Technicals error for {pair}/{timeframe}: {error_type} - {error_message}")
+
+            # Return 503 for external service errors, 400 for invalid input
+            if error_type in ['external_service_error', 'timeout', 'connection_error']:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=error_message
+                )
+            elif error_type == 'invalid_pair':
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error_message
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=error_message
+                )
+
         if data is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -352,6 +375,24 @@ async def prices(pair: str, granularity: str, count: str):
     """
     try:
         data = api.web_api_candles(pair, granularity, count)
+
+        # Check if the response contains an error
+        if data is not None and 'error' in data:
+            error_type = data.get('error')
+            error_message = data.get('message', 'Unknown error')
+            logger.warning(f"[WARNING] Prices error for {pair}/{granularity}: {error_type} - {error_message}")
+
+            # Return 503 for API/service errors
+            if error_type in ['api_error', 'no_data']:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=error_message
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=error_message
+                )
 
         if data is None:
             raise HTTPException(
