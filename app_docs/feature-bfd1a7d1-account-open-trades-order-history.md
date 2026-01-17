@@ -1,4 +1,4 @@
-# Account Management - Open Trades & Order History
+# Account Management - Open Trades & Trade History
 
 **ADW ID:** bfd1a7d1
 **Date:** 2026-01-16
@@ -23,13 +23,13 @@ The Account link has been added to the navigation bar for easy access from anywh
 ### Full Account View
 ![Account Page Full View](assets/03_account_page_full.png)
 
-The complete Account page showing both Open Trades and Order History sections with consistent styling.
+The complete Account page showing both Open Trades and Trade History sections with consistent styling.
 
 ## What Was Built
 
 - **Account Page Component** - A dedicated page for viewing trading activity
 - **Open Trades Section** - Displays all currently active trading positions with detailed information
-- **Order History Section** - Displays historical/closed trades (placeholder implementation)
+- **Trade History Section** - Displays historical/closed trades (placeholder implementation)
 - **Backend API Endpoints** - Two new REST endpoints for fetching trading data
 - **Comprehensive Testing** - Unit tests for backend endpoints and E2E tests for UI functionality
 - **Navigation Integration** - Account link added to the main navigation bar
@@ -102,9 +102,9 @@ The Open Trades section displays:
 
 Click the "Refresh" button in the top-right corner to manually update trading data. The button shows a spinning animation during the refresh operation.
 
-### Understanding Order History
+### Understanding Trade History
 
-The Order History section is currently a placeholder due to external API limitations. It displays a message: "Trade history is not available from the current API. This feature requires historical trade data storage."
+The Trade History section is currently a placeholder due to external API limitations. It displays a message: "Trade history is not available from the current API. This feature requires historical trade data storage."
 
 ## Configuration
 

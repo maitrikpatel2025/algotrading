@@ -79,7 +79,7 @@ function Account() {
             <div>
               <h1 className="text-h2 text-foreground">Account</h1>
               <p className="text-muted-foreground">
-                View your open trades and transaction history
+                View your open trades and trade history
               </p>
             </div>
           </div>
@@ -101,7 +101,7 @@ function Account() {
         {/* Open Trades Section */}
         <OpenTrades trades={openTrades} loading={refreshing} />
 
-        {/* Order History Section */}
+        {/* Trade History Section */}
         <OrderHistory
           history={tradeHistory}
           loading={refreshing}

@@ -64,8 +64,8 @@ function OrderHistory({ history = [], loading = false, message = null }) {
               <History className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="card-title">Order History</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Closed trades and transactions</p>
+              <h3 className="card-title">Trade History</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Closed trades and transaction history</p>
             </div>
           </div>
         </div>
@@ -96,8 +96,8 @@ function OrderHistory({ history = [], loading = false, message = null }) {
               <History className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="card-title">Order History</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Closed trades and transactions</p>
+              <h3 className="card-title">Trade History</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Closed trades and transaction history</p>
             </div>
           </div>
           <span className="badge-secondary">{history.length} trades</span>

@@ -215,7 +215,7 @@ async def open_trades():
 @app.get("/api/trades/history", response_model=TradeHistoryResponse, tags=["Trades"])
 async def trade_history():
     """
-    Get trade history (closed trades).
+    Get trade history (closed/completed trades).
 
     Returns:
         JSON object with list of historical trades.

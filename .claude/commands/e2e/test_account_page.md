@@ -1,6 +1,6 @@
 # E2E Test: Account Page
 
-Test the Account page functionality showing open trades and order history in the Forex Trading Dashboard application.
+Test the Account page functionality showing open trades and trade history in the Forex Trading Dashboard application.
 
 ## User Story
 
@@ -19,13 +19,13 @@ So that I can monitor my active positions and review my trading history in one p
 6. Take a screenshot of the Account page
 7. **Verify** the Account page loads with the title "Account"
 8. **Verify** the Open Trades section is visible with appropriate header
-9. **Verify** the Order History section is visible with appropriate header
+9. **Verify** the Trade History section is visible with appropriate header
 
 10. **Verify** Open Trades section displays either:
     - A table with trade data (columns: Instrument, Side, Amount, Entry Price, P/L, Margin, SL, TP)
     - Or an empty state message if no open trades exist
 
-11. **Verify** Order History section displays either:
+11. **Verify** Trade History section displays either:
     - A table with historical trade data
     - Or an empty state message if no history exists
 
@@ -36,7 +36,7 @@ So that I can monitor my active positions and review my trading history in one p
 - Navigation bar includes Account link
 - Account page is accessible via navigation
 - Open Trades section is visible
-- Order History section is visible
+- Trade History section is visible
 - Page displays loading states while fetching data
 - Empty states are shown when no data exists
 - Styling is consistent with application style guide
