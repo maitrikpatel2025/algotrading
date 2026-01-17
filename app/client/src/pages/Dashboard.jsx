@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import endPoints from '../app/api';
-import { COUNTS } from '../app/data';
+import { COUNTS, calculateCandleCount } from '../app/data';
 import Button from '../components/Button';
 import PriceChart from '../components/PriceChart';
 import Select from '../components/Select';
@@ -18,13 +18,35 @@ function Dashboard() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState(null);
 
+  // New state for advanced chart features
+  const [chartType, setChartType] = useState('candlestick');
+  const [showVolume, setShowVolume] = useState(false);
+  const [selectedDateRange, setSelectedDateRange] = useState(null);
+
   useEffect(() => {
     loadOptions();
   }, []);
 
   const handleCountChange = (count) => {
     setSelectedCount(count);
+    setSelectedDateRange(null); // Clear date range when manually setting count
     loadPrices(count);
+  };
+
+  const handleChartTypeChange = (type) => {
+    setChartType(type);
+  };
+
+  const handleVolumeToggle = () => {
+    setShowVolume(!showVolume);
+  };
+
+  const handleDateRangeChange = (dateRange) => {
+    setSelectedDateRange(dateRange);
+    // Calculate the appropriate candle count based on date range and granularity
+    const candleCount = calculateCandleCount(dateRange, selectedGran);
+    setSelectedCount(String(candleCount));
+    loadPrices(String(candleCount));
   };
 
   const loadOptions = async () => {
@@ -117,7 +139,7 @@ function Dashboard() {
         <div className="flex flex-col md:flex-row items-start md:items-end gap-4 flex-wrap">
           {/* Pair & Granularity Selectors */}
           <div className="flex flex-wrap items-end gap-4">
-            <Select 
+            <Select
               name="Currency"
               title="Currency Pair"
               options={options.pairs}
@@ -125,7 +147,7 @@ function Dashboard() {
               onSelected={setSelectedPair}
               className="w-40"
             />
-            <Select 
+            <Select
               name="Granularity"
               title="Timeframe"
               options={options.granularities}
@@ -134,9 +156,9 @@ function Dashboard() {
               className="w-32"
             />
           </div>
-          
+
           {/* Load Button */}
-          <Button 
+          <Button
             text={loadingData ? "Loading..." : "Load Data"}
             handleClick={() => loadTechnicals()}
             disabled={loadingData}
@@ -144,7 +166,7 @@ function Dashboard() {
             className={loadingData ? "[&_svg]:animate-spin" : ""}
           />
         </div>
-        
+
         {/* Selected Info Badge */}
         {selectedPair && selectedGran && (
           <div className="mt-4 pt-4 border-t border-border">
@@ -197,7 +219,7 @@ function Dashboard() {
               <Technicals data={technicalsData} />
             </div>
           )}
-          
+
           {/* Price Chart - Main area */}
           {priceData && (
             <div className="xl:col-span-2 xl:order-1">
@@ -207,6 +229,12 @@ function Dashboard() {
                 selectedGranularity={selectedGran}
                 handleCountChange={handleCountChange}
                 priceData={priceData}
+                chartType={chartType}
+                onChartTypeChange={handleChartTypeChange}
+                showVolume={showVolume}
+                onVolumeToggle={handleVolumeToggle}
+                selectedDateRange={selectedDateRange}
+                onDateRangeChange={handleDateRangeChange}
               />
             </div>
           )}
