@@ -1,0 +1,180 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "cwd": "/Users/maitrikpatel/Documents/Automate With Maitrik/Algotrading",
+    "session_id": "9fa25d38-8285-470b-ade0-f50d7fb94326",
+    "tools": [
+      "Task",
+      "TaskOutput",
+      "Bash",
+      "Glob",
+      "Grep",
+      "ExitPlanMode",
+      "Read",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch",
+      "TodoWrite",
+      "WebSearch",
+      "KillShell",
+      "AskUserQuestion",
+      "Skill",
+      "EnterPlanMode",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_handle_dialog",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_file_upload",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_install",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_navigate_back",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_run_code",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_drag",
+      "mcp__playwright__browser_hover",
+      "mcp__playwright__browser_select_option",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_wait_for"
+    ],
+    "mcp_servers": [
+      {
+        "name": "playwright",
+        "status": "connected"
+      }
+    ],
+    "model": "claude-sonnet-4-5-20250929",
+    "permissionMode": "bypassPermissions",
+    "slash_commands": [
+      "classify_issue",
+      "tools",
+      "test",
+      "feature",
+      "start",
+      "review",
+      "commit",
+      "prime",
+      "chore",
+      "pull_request",
+      "bug",
+      "patch",
+      "conditional_docs",
+      "resolve_failed_test",
+      "classify_adw",
+      "resolve_failed_e2e_test",
+      "install",
+      "test_e2e",
+      "prepare_app",
+      "generate_branch_name",
+      "implement",
+      "document",
+      "e2e:test_account_summary",
+      "e2e:test_api_health",
+      "e2e:test_dashboard_chart_load",
+      "e2e:test_account_page",
+      "e2e:test_market_headlines",
+      "e2e:test_trading_dashboard",
+      "compact",
+      "context",
+      "cost",
+      "init",
+      "pr-comments",
+      "release-notes",
+      "review",
+      "security-review"
+    ],
+    "apiKeySource": "ANTHROPIC_API_KEY",
+    "claude_code_version": "2.1.9",
+    "output_style": "default",
+    "agents": [
+      "Bash",
+      "general-purpose",
+      "statusline-setup",
+      "Explore",
+      "Plan"
+    ],
+    "skills": [],
+    "plugins": [],
+    "uuid": "dbac27ac-b49f-4e95-a744-55ce3e6701bb"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "model": "claude-sonnet-4-5-20250929",
+      "id": "msg_01BDiBNn8sXTZFcARxy35Ys1",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "/feature"
+        }
+      ],
+      "stop_reason": null,
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_input_tokens": 9581,
+        "cache_read_input_tokens": 13916,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 9581,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 1,
+        "service_tier": "standard"
+      },
+      "context_management": null
+    },
+    "parent_tool_use_id": null,
+    "session_id": "9fa25d38-8285-470b-ade0-f50d7fb94326",
+    "uuid": "e4d9233a-4328-4fa3-8762-c38e5ce0c596"
+  },
+  {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 2119,
+    "duration_api_ms": 2047,
+    "num_turns": 1,
+    "result": "/feature",
+    "session_id": "9fa25d38-8285-470b-ade0-f50d7fb94326",
+    "total_cost_usd": 0.040187549999999995,
+    "usage": {
+      "input_tokens": 3,
+      "cache_creation_input_tokens": 9581,
+      "cache_read_input_tokens": 13916,
+      "output_tokens": 5,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 9581
+      }
+    },
+    "modelUsage": {
+      "claude-sonnet-4-5-20250929": {
+        "inputTokens": 3,
+        "outputTokens": 5,
+        "cacheReadInputTokens": 13916,
+        "cacheCreationInputTokens": 9581,
+        "webSearchRequests": 0,
+        "costUSD": 0.040187549999999995,
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    "permission_denials": [],
+    "uuid": "efedc011-7292-489b-8f16-3e6d2dfd8297"
+  }
+]
