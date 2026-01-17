@@ -12,11 +12,12 @@ from adw_modules.data_types import (
     GitHubIssue,
     AgentPromptResponse,
     IssueClassSlashCommand,
+    ADWExtractionResult,
 )
 from adw_modules.agent import execute_template
 from adw_modules.github import get_repo_url, extract_repo_path, ADW_BOT_IDENTIFIER
 from adw_modules.state import ADWState
-from adw_modules.utils import parse_json
+from adw_modules.utils import parse_json, strip_markdown_code_formatting
 
 
 # Agent name constants
@@ -28,16 +29,21 @@ AGENT_PR_CREATOR = "pr_creator"
 
 # Available ADW workflows for runtime validation
 AVAILABLE_ADW_WORKFLOWS = [
-    "adw_plan",
-    "adw_build",
-    "adw_test",
-    "adw_review",
-    "adw_document",
-    "adw_patch",
-    "adw_plan_build",
-    "adw_plan_build_test",
-    "adw_plan_build_test_review",
-    "adw_sdlc",
+    # Isolated workflows (all workflows are now iso-based)
+    "adw_plan_iso",
+    "adw_patch_iso",
+    "adw_build_iso",
+    "adw_test_iso",
+    "adw_review_iso",
+    "adw_document_iso",
+    "adw_ship_iso",
+    "adw_sdlc_ZTE_iso",  # Zero Touch Execution workflow
+    "adw_plan_build_iso",
+    "adw_plan_build_test_iso",
+    "adw_plan_build_test_review_iso",
+    "adw_plan_build_document_iso",
+    "adw_plan_build_review_iso",
+    "adw_sdlc_iso",
 ]
 
 
@@ -51,11 +57,9 @@ def format_issue_message(
     return f"{ADW_BOT_IDENTIFIER} {adw_id}_{agent_name}: {message}"
 
 
-def extract_adw_info(
-    text: str, temp_adw_id: str
-) -> Tuple[Optional[str], Optional[str]]:
-    """Extract ADW workflow and ID from text using classify_adw agent.
-    Returns (workflow_command, adw_id) tuple."""
+def extract_adw_info(text: str, temp_adw_id: str) -> ADWExtractionResult:
+    """Extract ADW workflow, ID, and model_set from text using classify_adw agent.
+    Returns ADWExtractionResult with workflow_command, adw_id, and model_set."""
 
     # Use classify_adw to extract structured info
     request = AgentTemplateRequest(
@@ -70,7 +74,7 @@ def extract_adw_info(
 
         if not response.success:
             print(f"Failed to classify ADW: {response.output}")
-            return None, None
+            return ADWExtractionResult()  # Empty result
 
         # Parse JSON response using utility that handles markdown
         try:
@@ -79,20 +83,25 @@ def extract_adw_info(
                 "/", ""
             )  # Remove slash
             adw_id = data.get("adw_id")
+            model_set = data.get("model_set", "base")  # Default to "base"
 
             # Validate command
             if adw_command and adw_command in AVAILABLE_ADW_WORKFLOWS:
-                return adw_command, adw_id
+                return ADWExtractionResult(
+                    workflow_command=adw_command,
+                    adw_id=adw_id,
+                    model_set=model_set
+                )
 
-            return None, None
+            return ADWExtractionResult()  # Empty result
 
         except ValueError as e:
             print(f"Failed to parse classify_adw response: {e}")
-            return None, None
+            return ADWExtractionResult()  # Empty result
 
     except Exception as e:
         print(f"Error calling classify_adw: {e}")
-        return None, None
+        return ADWExtractionResult()  # Empty result
 
 
 def classify_issue(
@@ -147,7 +156,11 @@ def classify_issue(
 
 
 def build_plan(
-    issue: GitHubIssue, command: str, adw_id: str, logger: logging.Logger
+    issue: GitHubIssue,
+    command: str,
+    adw_id: str,
+    logger: logging.Logger,
+    working_dir: Optional[str] = None,
 ) -> AgentPromptResponse:
     """Build implementation plan for the issue using the specified command."""
     # Use minimal payload like classify_issue does
@@ -160,6 +173,7 @@ def build_plan(
         slash_command=command,
         args=[str(issue.number), adw_id, minimal_issue_json],
         adw_id=adw_id,
+        working_dir=working_dir,
     )
 
     logger.debug(
@@ -176,17 +190,22 @@ def build_plan(
 
 
 def implement_plan(
-    plan_file: str, adw_id: str, logger: logging.Logger, agent_name: Optional[str] = None
+    plan_file: str,
+    adw_id: str,
+    logger: logging.Logger,
+    agent_name: Optional[str] = None,
+    working_dir: Optional[str] = None,
 ) -> AgentPromptResponse:
     """Implement the plan using the /implement command."""
     # Use provided agent_name or default to AGENT_IMPLEMENTOR
     implementor_name = agent_name or AGENT_IMPLEMENTOR
-    
+
     implement_template_request = AgentTemplateRequest(
         agent_name=implementor_name,
         slash_command="/implement",
         args=[plan_file],
         adw_id=adw_id,
+        working_dir=working_dir,
     )
 
     logger.debug(
@@ -208,7 +227,7 @@ def generate_branch_name(
     adw_id: str,
     logger: logging.Logger,
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Generate and create a git branch for the issue.
+    """Generate a git branch name for the issue.
     Returns (branch_name, error_message) tuple."""
     # Remove the leading slash from issue_class for the branch name
     issue_type = issue_class.replace("/", "")
@@ -230,7 +249,8 @@ def generate_branch_name(
     if not response.success:
         return None, response.output
 
-    branch_name = response.output.strip()
+    # Strip markdown code formatting that Claude may add around the branch name
+    branch_name = strip_markdown_code_formatting(response.output)
     logger.info(f"Generated branch name: {branch_name}")
     return branch_name, None
 
@@ -241,6 +261,7 @@ def create_commit(
     issue_class: IssueClassSlashCommand,
     adw_id: str,
     logger: logging.Logger,
+    working_dir: str,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Create a git commit with a properly formatted message.
     Returns (commit_message, error_message) tuple."""
@@ -260,6 +281,7 @@ def create_commit(
         slash_command="/commit",
         args=[agent_name, issue_type, minimal_issue_json],
         adw_id=adw_id,
+        working_dir=working_dir,
     )
 
     response = execute_template(request)
@@ -267,7 +289,8 @@ def create_commit(
     if not response.success:
         return None, response.output
 
-    commit_message = response.output.strip()
+    # Strip markdown code formatting that Claude may add around the commit message
+    commit_message = strip_markdown_code_formatting(response.output)
     logger.info(f"Created commit message: {commit_message}")
     return commit_message, None
 
@@ -277,6 +300,7 @@ def create_pull_request(
     issue: Optional[GitHubIssue],
     state: ADWState,
     logger: logging.Logger,
+    working_dir: str,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Create a pull request for the implemented changes.
     Returns (pr_url, error_message) tuple."""
@@ -313,6 +337,7 @@ def create_pull_request(
         slash_command="/pull_request",
         args=[branch_name, issue_json, plan_file, adw_id],
         adw_id=adw_id,
+        working_dir=working_dir,
     )
 
     response = execute_template(request)
@@ -320,14 +345,15 @@ def create_pull_request(
     if not response.success:
         return None, response.output
 
-    pr_url = response.output.strip()
+    # Strip markdown code formatting that Claude may add around the PR URL
+    pr_url = strip_markdown_code_formatting(response.output)
     logger.info(f"Created pull request: {pr_url}")
     return pr_url, None
 
 
 def ensure_plan_exists(state: ADWState, issue_number: str) -> str:
     """Find or error if no plan exists for issue.
-    Used by adw_build.py in standalone mode."""
+    Used by isolated build workflows in standalone mode."""
     # Check if plan file is in state
     if state.get("plan_file"):
         return state.get("plan_file")
@@ -345,7 +371,9 @@ def ensure_plan_exists(state: ADWState, issue_number: str) -> str:
             return plans[0]
 
     # No plan found
-    raise ValueError(f"No plan found for issue {issue_number}. Run adw_plan.py first.")
+    raise ValueError(
+        f"No plan found for issue {issue_number}. Run adw_plan_iso.py first."
+    )
 
 
 def ensure_adw_id(
@@ -397,12 +425,14 @@ def ensure_adw_id(
 
 
 def find_existing_branch_for_issue(
-    issue_number: str, adw_id: Optional[str] = None
+    issue_number: str, adw_id: Optional[str] = None, cwd: Optional[str] = None
 ) -> Optional[str]:
     """Find an existing branch for the given issue number.
     Returns branch name if found, None otherwise."""
     # List all branches
-    result = subprocess.run(["git", "branch", "-a"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "branch", "-a"], capture_output=True, text=True, cwd=cwd
+    )
 
     if result.returncode != 0:
         return None
@@ -459,7 +489,11 @@ def find_plan_for_issue(
 
 
 def create_or_find_branch(
-    issue_number: str, issue: GitHubIssue, state: ADWState, logger: logging.Logger
+    issue_number: str,
+    issue: GitHubIssue,
+    state: ADWState,
+    logger: logging.Logger,
+    cwd: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
     """Create or find a branch for the given issue.
 
@@ -476,10 +510,13 @@ def create_or_find_branch(
         # Check if we need to checkout
         from adw_modules.git_ops import get_current_branch
 
-        current = get_current_branch()
+        current = get_current_branch(cwd=cwd)
         if current != branch_name:
             result = subprocess.run(
-                ["git", "checkout", branch_name], capture_output=True, text=True
+                ["git", "checkout", branch_name],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
             )
             if result.returncode != 0:
                 # Branch might not exist locally, try to create from remote
@@ -487,6 +524,7 @@ def create_or_find_branch(
                     ["git", "checkout", "-b", branch_name, f"origin/{branch_name}"],
                     capture_output=True,
                     text=True,
+                    cwd=cwd,
                 )
                 if result.returncode != 0:
                     return "", f"Failed to checkout branch: {result.stderr}"
@@ -494,12 +532,15 @@ def create_or_find_branch(
 
     # 2. Look for existing branch
     adw_id = state.get("adw_id")
-    existing_branch = find_existing_branch_for_issue(issue_number, adw_id)
+    existing_branch = find_existing_branch_for_issue(issue_number, adw_id, cwd=cwd)
     if existing_branch:
         logger.info(f"Found existing branch: {existing_branch}")
         # Checkout the branch
         result = subprocess.run(
-            ["git", "checkout", existing_branch], capture_output=True, text=True
+            ["git", "checkout", existing_branch],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
         )
         if result.returncode != 0:
             return "", f"Failed to checkout branch: {result.stderr}"
@@ -524,7 +565,7 @@ def create_or_find_branch(
     # Create the branch
     from adw_modules.git_ops import create_branch
 
-    success, error = create_branch(branch_name)
+    success, error = create_branch(branch_name, cwd=cwd)
     if not success:
         return "", f"Failed to create branch: {error}"
 
@@ -535,26 +576,42 @@ def create_or_find_branch(
 
 
 def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
-    """Find the spec file from state or by examining git diff."""
+    """Find the spec file from state or by examining git diff.
+
+    For isolated workflows, automatically uses worktree_path from state.
+    """
+    # Get worktree path if in isolated workflow
+    worktree_path = state.get("worktree_path")
+
     # Check if spec file is already in state (from plan phase)
     spec_file = state.get("plan_file")
-    if spec_file and os.path.exists(spec_file):
-        logger.info(f"Using spec file from state: {spec_file}")
-        return spec_file
+    if spec_file:
+        # If worktree_path exists and spec_file is relative, make it absolute
+        if worktree_path and not os.path.isabs(spec_file):
+            spec_file = os.path.join(worktree_path, spec_file)
+
+        if os.path.exists(spec_file):
+            logger.info(f"Using spec file from state: {spec_file}")
+            return spec_file
 
     # Otherwise, try to find it from git diff
     logger.info("Looking for spec file in git diff")
     result = subprocess.run(
-        ["git", "diff", "origin/main", "--name-only"], capture_output=True, text=True
+        ["git", "diff", "origin/main", "--name-only"],
+        capture_output=True,
+        text=True,
+        cwd=worktree_path,
     )
 
     if result.returncode == 0:
         files = result.stdout.strip().split("\n")
-        spec_files = [f for f in files if f.startswith("spec/") and f.endswith(".md")]
+        spec_files = [f for f in files if f.startswith("specs/") and f.endswith(".md")]
 
         if spec_files:
             # Use the first spec file found
             spec_file = spec_files[0]
+            if worktree_path:
+                spec_file = os.path.join(worktree_path, spec_file)
             logger.info(f"Found spec file: {spec_file}")
             return spec_file
 
@@ -572,7 +629,11 @@ def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
             # Look for spec files matching the pattern
             import glob
 
-            pattern = f"spec/issue-{issue_num}-adw-{adw_id}*.md"
+            # Use worktree_path if provided, otherwise current directory
+            search_dir = worktree_path if worktree_path else os.getcwd()
+            pattern = os.path.join(
+                search_dir, f"specs/issue-{issue_num}-adw-{adw_id}*.md"
+            )
             spec_files = glob.glob(pattern)
 
             if spec_files:
@@ -592,6 +653,7 @@ def create_and_implement_patch(
     agent_name_implementor: str,
     spec_path: Optional[str] = None,
     issue_screenshots: Optional[str] = None,
+    working_dir: Optional[str] = None,
 ) -> Tuple[Optional[str], AgentPromptResponse]:
     """Create a patch plan and implement it.
     Returns (patch_file_path, implement_response) tuple."""
@@ -615,6 +677,7 @@ def create_and_implement_patch(
         slash_command="/patch",
         args=args,
         adw_id=adw_id,
+        working_dir=working_dir,
     )
 
     logger.debug(
@@ -635,12 +698,11 @@ def create_and_implement_patch(
         )
 
     # Extract the patch plan file path from the response
-    patch_file_path = response.output.strip()
+    # Strip markdown code formatting that Claude may add around the file path
+    patch_file_path = strip_markdown_code_formatting(response.output)
 
     # Validate that it looks like a file path
-    if not patch_file_path.startswith("specs/patch/") or not patch_file_path.endswith(
-        ".md"
-    ):
+    if "specs/patch/" not in patch_file_path or not patch_file_path.endswith(".md"):
         logger.error(f"Invalid patch plan path returned: {patch_file_path}")
         return None, AgentPromptResponse(
             output=f"Invalid patch plan path: {patch_file_path}", success=False
@@ -649,6 +711,8 @@ def create_and_implement_patch(
     logger.info(f"Created patch plan: {patch_file_path}")
 
     # Now implement the patch plan using the provided implementor agent name
-    implement_response = implement_plan(patch_file_path, adw_id, logger, agent_name_implementor)
+    implement_response = implement_plan(
+        patch_file_path, adw_id, logger, agent_name_implementor, working_dir=working_dir
+    )
 
     return patch_file_path, implement_response
