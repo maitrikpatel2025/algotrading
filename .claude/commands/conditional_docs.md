@@ -40,3 +40,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When adding new API endpoints for trading data
     - When working with trading UI components (OpenTrades, OrderHistory)
     - When troubleshooting Account page issues or trade data display
+
+- app_docs/feature-bbdb5a41-trade-history-api.md
+  - Conditions:
+    - When implementing or modifying trade history API endpoints
+    - When integrating with FXOpen Trade History API (/api/v2/tradehistory)
+    - When working with historical trade data or transaction history
+    - When troubleshooting trade history endpoint timeout or error handling issues
+    - When renaming or refactoring TradeHistory component
+    - When adding pagination or date range filtering to trade history
+    - When updating TradeHistoryItem data model or response structure
