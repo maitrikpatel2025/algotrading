@@ -8,6 +8,7 @@ function Account() {
   const [openTrades, setOpenTrades] = useState([]);
   const [tradeHistory, setTradeHistory] = useState([]);
   const [historyMessage, setHistoryMessage] = useState(null);
+  const [historyError, setHistoryError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -20,28 +21,53 @@ function Account() {
       setRefreshing(true);
     }
 
+    // Reset error state
+    setHistoryError(null);
+
     try {
-      const [tradesResponse, historyResponse] = await Promise.all([
+      // Create timeout promise for trade history (15 seconds)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out')), 15000);
+      });
+
+      // Fetch data with Promise.allSettled to handle failures independently
+      const [tradesResult, historyResult] = await Promise.allSettled([
         endPoints.openTrades(),
-        endPoints.tradeHistory()
+        Promise.race([endPoints.tradeHistory(), timeoutPromise])
       ]);
 
-      if (tradesResponse && !tradesResponse.error) {
-        setOpenTrades(tradesResponse.trades || []);
+      // Handle open trades response
+      if (tradesResult.status === 'fulfilled' && tradesResult.value && !tradesResult.value.error) {
+        setOpenTrades(tradesResult.value.trades || []);
       } else {
         setOpenTrades([]);
       }
 
-      if (historyResponse && !historyResponse.error) {
-        setTradeHistory(historyResponse.trades || []);
-        setHistoryMessage(historyResponse.message || null);
+      // Handle trade history response
+      if (historyResult.status === 'fulfilled') {
+        const historyResponse = historyResult.value;
+        if (historyResponse && !historyResponse.error) {
+          setTradeHistory(historyResponse.trades || []);
+          setHistoryMessage(historyResponse.message || null);
+        } else {
+          setTradeHistory([]);
+          setHistoryError(historyResponse?.error || 'Failed to load trade history');
+        }
       } else {
+        // Handle timeout or network error
         setTradeHistory([]);
+        const errorMsg = historyResult.reason?.message || 'Failed to load trade history';
+        if (errorMsg.includes('timed out')) {
+          setHistoryError('Unable to load trade history. The request timed out.');
+        } else {
+          setHistoryError('Unable to load trade history. Please try again later.');
+        }
       }
     } catch (error) {
       console.error('Error loading account data:', error);
       setOpenTrades([]);
       setTradeHistory([]);
+      setHistoryError('An unexpected error occurred.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -106,6 +132,8 @@ function Account() {
           history={tradeHistory}
           loading={refreshing}
           message={historyMessage}
+          error={historyError}
+          onRetry={handleRefresh}
         />
       </div>
     </div>

@@ -16,6 +16,7 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Optional
 
+import requests.exceptions
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -284,6 +285,20 @@ async def trade_history(
         logger.info(f"[SUCCESS] Trade history endpoint returned {len(trades)} records")
         return response
 
+    except requests.exceptions.Timeout as e:
+        logger.warning(f"[TIMEOUT] Trade history request timed out: {str(e)}")
+        return TradeHistoryResponse(
+            trades=[],
+            count=0,
+            message="Trade history request timed out. Please try again later."
+        )
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"[NETWORK_ERROR] Trade history network error: {str(e)}")
+        return TradeHistoryResponse(
+            trades=[],
+            count=0,
+            message="Unable to connect to trade history service. Please try again later."
+        )
     except Exception as e:
         logger.error(f"[ERROR] Trade history fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")

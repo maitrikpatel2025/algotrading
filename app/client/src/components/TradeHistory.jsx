@@ -1,8 +1,8 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { History, TrendingUp, TrendingDown } from 'lucide-react';
+import { History, TrendingUp, TrendingDown, AlertCircle, RefreshCw } from 'lucide-react';
 
-function TradeHistory({ history = [], loading = false, message = null }) {
+function TradeHistory({ history = [], loading = false, message = null, error = null, onRetry = null }) {
   const formatValue = (value, decimals = 2) => {
     if (value === undefined || value === null) return '-';
     if (typeof value !== 'number') return String(value);
@@ -48,6 +48,43 @@ function TradeHistory({ history = [], loading = false, message = null }) {
                 <div className="skeleton h-8 flex-1" />
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="card">
+        <div className="card-header border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/70 shadow-lg shadow-accent/20">
+              <History className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="card-title">Trade History</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Closed trades and transaction history</p>
+            </div>
+          </div>
+        </div>
+        <div className="card-content pt-6">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="p-3 rounded-full bg-destructive/10 mb-3">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <p className="text-destructive font-medium">Error Loading Trade History</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">{error}</p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="btn-outline mt-4 flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </button>
+            )}
           </div>
         </div>
       </div>

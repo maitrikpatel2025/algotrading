@@ -82,13 +82,13 @@ class OpenFxApi:
             response = None
 
             if verb == "get":
-                response = self.session.get(full_url, params=params, data=data, headers=headers)
+                response = self.session.get(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
             elif verb == "post":
-                response = self.session.post(full_url, params=params, data=data, headers=headers)
+                response = self.session.post(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
             elif verb == "put":
-                response = self.session.put(full_url, params=params, data=data, headers=headers)
+                response = self.session.put(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
             elif verb == "delete":
-                response = self.session.delete(full_url, params=params, data=data, headers=headers)
+                response = self.session.delete(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
 
             if response is None:
                 return False, {'error': 'verb not found'}
