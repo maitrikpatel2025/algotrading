@@ -68,3 +68,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting bot process management or subprocess lifecycle issues
     - When modifying bot control UI buttons or confirmation dialogs
     - When working with lock file mechanism or PID tracking
+
+- app_docs/feature-bbcca085-navigation-refactor.md
+  - Conditions:
+    - When working with application navigation or routing
+    - When implementing or modifying the NavigationBar component
+    - When renaming or restructuring pages in the application
+    - When working with the Monitor, Strategy, or Account pages
+    - When troubleshooting route navigation or URL structure
+    - When reorganizing UI components across different pages
+    - When understanding the workflow-based page structure (Monitor/Strategy/Account)
