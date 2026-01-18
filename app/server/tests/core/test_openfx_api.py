@@ -152,6 +152,7 @@ class TestAccountEndpoint:
     def test_client(self):
         """Create a test client for the FastAPI app."""
         from fastapi.testclient import TestClient
+
         from server import app
         return TestClient(app)
 

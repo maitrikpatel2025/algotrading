@@ -94,21 +94,133 @@ class TestOpenTradesEndpoint:
 class TestTradeHistoryEndpoint:
     """Test cases for GET /api/trades/history endpoint."""
 
-    def test_trade_history_returns_empty_with_message(self, client):
-        """Test trade history endpoint returns empty response with message."""
-        response = client.get("/api/trades/history")
+    def test_trade_history_success_with_trades(self, client):
+        """Test successful response with trade history from FXOpen API."""
+        mock_history = {
+            "IsLastReport": True,
+            "TotalReports": 2,
+            "LastId": "abc123",
+            "Records": [
+                {
+                    "Id": "record1",
+                    "TransactionType": "OrderFilled",
+                    "TransactionReason": "ClientRequest",
+                    "TransactionTimestamp": 1704153600000,
+                    "Symbol": "EURUSD",
+                    "TradeId": 769002,
+                    "TradeSide": "Buy",
+                    "TradeType": "Market",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "PositionClosePrice": 1.1100,
+                    "BalanceMovement": 50.0,
+                    "Commission": -2.5,
+                    "Swap": -1.0
+                },
+                {
+                    "Id": "record2",
+                    "TransactionType": "OrderFilled",
+                    "TransactionReason": "ClientRequest",
+                    "TransactionTimestamp": 1704067200000,
+                    "Symbol": "GBPUSD",
+                    "TradeId": 769003,
+                    "TradeSide": "Sell",
+                    "TradeType": "Market",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "PositionClosePrice": 1.2450,
+                    "BalanceMovement": 25.0
+                }
+            ]
+        }
+
+        with patch('server.api.get_trade_history', return_value=mock_history):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 2
+        assert len(data["trades"]) == 2
+        assert data["trades"][0]["instrument"] == "EURUSD"
+        assert data["trades"][0]["side"] == "Buy"
+        assert data["trades"][0]["realized_pl"] == 50.0
+        assert data["error"] is None
+
+    def test_trade_history_success_empty(self, client):
+        """Test successful response with no trade history."""
+        mock_history = {
+            "IsLastReport": True,
+            "TotalReports": 0,
+            "LastId": None,
+            "Records": []
+        }
+
+        with patch('server.api.get_trade_history', return_value=mock_history):
+            response = client.get("/api/trades/history")
 
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 0
         assert len(data["trades"]) == 0
-        assert data["message"] is not None
-        assert "not available" in data["message"].lower()
-        assert data["error"] is None
+        assert "0 trade history records" in data["message"]
+
+    def test_trade_history_api_returns_none(self, client):
+        """Test response when API returns None."""
+        with patch('server.api.get_trade_history', return_value=None):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 0
+        assert len(data["trades"]) == 0
+        assert "Unable to fetch" in data["message"]
+
+    def test_trade_history_with_custom_timestamps(self, client):
+        """Test trade history with custom timestamp range."""
+        mock_history = {
+            "IsLastReport": True,
+            "TotalReports": 1,
+            "Records": [
+                {
+                    "Id": "record1",
+                    "TransactionType": "OrderFilled",
+                    "TransactionTimestamp": 1704153600000,
+                    "Symbol": "EURUSD",
+                    "TradeId": 769002,
+                    "TradeSide": "Buy",
+                    "TradeType": "Market",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050
+                }
+            ]
+        }
+
+        with patch('server.api.get_trade_history', return_value=mock_history):
+            response = client.get(
+                "/api/trades/history?timestamp_from=1704067200000&timestamp_to=1704153600000"
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert len(data["trades"]) == 1
+
+    def test_trade_history_exception_handling(self, client):
+        """Test error handling when an exception occurs."""
+        with patch('server.api.get_trade_history', side_effect=Exception("Connection error")):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 0
+        assert len(data["trades"]) == 0
+        assert "Connection error" in data["error"]
 
     def test_trade_history_response_structure(self, client):
         """Test trade history response has correct structure."""
-        response = client.get("/api/trades/history")
+        mock_history = {"Records": []}
+        with patch('server.api.get_trade_history', return_value=mock_history):
+            response = client.get("/api/trades/history")
 
         assert response.status_code == 200
         data = response.json()

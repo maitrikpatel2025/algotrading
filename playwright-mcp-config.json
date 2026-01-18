@@ -6,7 +6,7 @@
     },
     "contextOptions": {
       "recordVideo": {
-        "dir": "/Users/maitrikpatel/Documents/Automate With Maitrik/Algotrading/trees/0bd04f2b/videos",
+        "dir": "/home/ubuntu/algotrading/trees/bbdb5a41/videos",
         "size": {
           "width": 1920,
           "height": 1080

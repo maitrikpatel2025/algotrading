@@ -7,7 +7,7 @@ Scrapes technical analysis data from Investing.com.
 import datetime as dt
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import requests
 

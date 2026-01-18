@@ -182,6 +182,17 @@ class TradeHistoryItem(BaseModel):
     exit_price: Optional[float] = None
     realized_pl: Optional[float] = None
     closed_at: Optional[datetime] = None
+    transaction_type: Optional[str] = None
+    transaction_reason: Optional[str] = None
+    transaction_timestamp: Optional[int] = None
+    trade_id: Optional[int] = None
+    trade_type: Optional[str] = None
+    position_id: Optional[int] = None
+    position_amount: Optional[float] = None
+    position_close_price: Optional[float] = None
+    balance_movement: Optional[float] = None
+    commission: Optional[float] = None
+    swap: Optional[float] = None
 
 
 class TradeHistoryResponse(BaseModel):

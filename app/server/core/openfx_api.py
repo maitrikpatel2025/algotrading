@@ -82,13 +82,13 @@ class OpenFxApi:
             response = None
 
             if verb == "get":
-                response = self.session.get(full_url, params=params, data=data, headers=headers)
+                response = self.session.get(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
             elif verb == "post":
-                response = self.session.post(full_url, params=params, data=data, headers=headers)
+                response = self.session.post(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
             elif verb == "put":
-                response = self.session.put(full_url, params=params, data=data, headers=headers)
+                response = self.session.put(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
             elif verb == "delete":
-                response = self.session.delete(full_url, params=params, data=data, headers=headers)
+                response = self.session.delete(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
 
             if response is None:
                 return False, {'error': 'verb not found'}
@@ -405,6 +405,41 @@ class OpenFxApi:
             return [OpenTrade(x) for x in response]
 
         return None
+
+    def get_trade_history(
+        self,
+        timestamp_from: int,
+        timestamp_to: int,
+        request_page_size: int = 1000
+    ) -> Optional[Dict]:
+        """
+        Get account trade history.
+
+        Args:
+            timestamp_from: Start timestamp in milliseconds (Unix time)
+            timestamp_to: End timestamp in milliseconds (Unix time)
+            request_page_size: Maximum number of records to return (default: 1000)
+
+        Returns:
+            Trade history report dictionary or None on error
+        """
+        request_body = {
+            "TimestampFrom": timestamp_from,
+            "TimestampTo": timestamp_to,
+            "OrderId": None,
+            "SkipCancelOrder": False,
+            "RequestDirection": "Forward",
+            "RequestPageSize": request_page_size,
+            "RequestLastId": None
+        }
+
+        ok, response = self._make_request("tradehistory", verb="post", data=request_body)
+
+        if ok:
+            return response
+        else:
+            logger.error(f"get_trade_history(): {response}")
+            return None
 
     def close_trade(self, trade_id: int) -> bool:
         """
