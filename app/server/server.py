@@ -331,7 +331,7 @@ async def headlines():
             count=0,
             error=str(e)
         )
-    
+
 @app.get("/api/options", response_model=TradingOptionsResponse, tags=["Trading"])
 async def options():
     """

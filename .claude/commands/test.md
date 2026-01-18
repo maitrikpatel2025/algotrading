@@ -41,7 +41,7 @@ TEST_COMMAND_TIMEOUT: 5 minutes
 
 1. **Python Syntax Check**
    - Preparation Command: None
-   - Command: `cd app/server && uv run python -m py_compile server.py app.py core/*.py`
+   - Command: `cd app/server && uv run python -m py_compile server.py core/*.py`
    - test_name: "python_syntax_check"
    - test_purpose: "Validates Python syntax by compiling source files to bytecode, catching syntax errors like missing colons, invalid indentation, or malformed statements"
 
