@@ -13,7 +13,8 @@ This server provides endpoints for:
 import logging
 import sys
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
@@ -26,6 +27,7 @@ from core.data_models import (
     HeadlinesResponse,
     HealthCheckResponse,
     OpenTradesResponse,
+    TradeHistoryItem,
     TradeHistoryResponse,
     TradeInfo,
     TradingOptionsResponse,
@@ -213,24 +215,75 @@ async def open_trades():
 
 
 @app.get("/api/trades/history", response_model=TradeHistoryResponse, tags=["Trades"])
-async def trade_history():
+async def trade_history(
+    timestamp_from: Optional[int] = None,
+    timestamp_to: Optional[int] = None
+):
     """
-    Get trade history (closed/completed trades).
+    Get trade history (closed/completed trades) from FXOpen API.
+
+    Args:
+        timestamp_from: Start timestamp in milliseconds (Unix time). Defaults to 30 days ago.
+        timestamp_to: End timestamp in milliseconds (Unix time). Defaults to now.
 
     Returns:
-        JSON object with list of historical trades.
-        Note: Trade history may be limited by the external API capabilities.
+        JSON object with list of historical trades from the FXOpen Trade History API.
     """
     try:
-        # The OpenFX API doesn't provide a direct trade history endpoint
-        # Return an empty response with a message indicating this limitation
+        # Default to last 30 days if timestamps not provided
+        if timestamp_to is None:
+            timestamp_to = int(datetime.now().timestamp() * 1000)
+        if timestamp_from is None:
+            timestamp_from = int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
+
+        # Fetch trade history from FXOpen API
+        history_data = api.get_trade_history(timestamp_from, timestamp_to)
+
+        if history_data is None:
+            logger.warning("[WARNING] Trade history returned None from API")
+            return TradeHistoryResponse(
+                trades=[],
+                count=0,
+                message="Unable to fetch trade history from the API."
+            )
+
+        # Parse the response and transform to TradeHistoryItem format
+        records = history_data.get("Records", [])
+        trades = []
+
+        for record in records:
+            # Map FXOpen API fields to our TradeHistoryItem model
+            trade_item = TradeHistoryItem(
+                id=record.get("TradeId", 0),
+                instrument=record.get("Symbol", ""),
+                side=record.get("TradeSide", ""),
+                amount=record.get("TradeAmount", 0),
+                entry_price=record.get("TradePrice", 0.0),
+                exit_price=record.get("PositionClosePrice"),
+                realized_pl=record.get("BalanceMovement"),
+                closed_at=datetime.fromtimestamp(record.get("TransactionTimestamp", 0) / 1000) if record.get("TransactionTimestamp") else None,
+                transaction_type=record.get("TransactionType"),
+                transaction_reason=record.get("TransactionReason"),
+                transaction_timestamp=record.get("TransactionTimestamp"),
+                trade_id=record.get("TradeId"),
+                trade_type=record.get("TradeType"),
+                position_id=record.get("PositionId"),
+                position_amount=record.get("PositionAmount"),
+                position_close_price=record.get("PositionClosePrice"),
+                balance_movement=record.get("BalanceMovement"),
+                commission=record.get("Commission"),
+                swap=record.get("Swap")
+            )
+            trades.append(trade_item)
+
         response = TradeHistoryResponse(
-            trades=[],
-            count=0,
-            message="Trade history is not available from the current API. This feature requires historical trade data storage."
+            trades=trades,
+            count=len(trades),
+            message=f"Retrieved {len(trades)} trade history records."
         )
-        logger.info("[SUCCESS] Trade history endpoint called - returning empty response (API limitation)")
+        logger.info(f"[SUCCESS] Trade history endpoint returned {len(trades)} records")
         return response
+
     except Exception as e:
         logger.error(f"[ERROR] Trade history fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")

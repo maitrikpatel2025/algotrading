@@ -29,7 +29,7 @@ The complete Account page showing both Open Trades and Trade History sections wi
 
 - **Account Page Component** - A dedicated page for viewing trading activity
 - **Open Trades Section** - Displays all currently active trading positions with detailed information
-- **Trade History Section** - Displays historical/closed trades (placeholder implementation)
+- **Trade History Section** - Displays historical/closed trades using FXOpen Trade History API
 - **Backend API Endpoints** - Two new REST endpoints for fetching trading data
 - **Comprehensive Testing** - Unit tests for backend endpoints and E2E tests for UI functionality
 - **Navigation Integration** - Account link added to the main navigation bar
@@ -47,7 +47,7 @@ The complete Account page showing both Open Trades and Trade History sections wi
 **Frontend:**
 - `app/client/src/pages/Account.jsx`: Created new Account page with data fetching and refresh functionality
 - `app/client/src/components/OpenTrades.jsx`: Created component for displaying open trades table (157 lines)
-- `app/client/src/components/OrderHistory.jsx`: Created component for displaying trade history table (168 lines)
+- `app/client/src/components/TradeHistory.jsx`: Created component for displaying trade history table (168 lines, renamed from OrderHistory.jsx)
 - `app/client/src/App.jsx`: Added `/account` route to the router configuration
 - `app/client/src/components/NavigationBar.jsx`: Added Account navigation link
 - `app/client/src/app/api.js`: Added `openTrades()` and `tradeHistory()` API methods
@@ -59,14 +59,14 @@ The complete Account page showing both Open Trades and Trade History sections wi
 
 1. **Backend API Endpoints**: Two new REST endpoints were added to `server.py`:
    - `GET /api/trades/open` - Returns all currently open trades by leveraging the existing `api.get_open_trades()` method
-   - `GET /api/trades/history` - Returns trade history (currently a placeholder due to external API limitations)
+   - `GET /api/trades/history` - Returns trade history from FXOpen POST `/api/v2/tradehistory` endpoint with optional timestamp filters
 
 2. **Data Models**: Reused existing `TradeInfo` model and created response models (`OpenTradesResponse`, `TradeHistoryResponse`) for structured API responses
 
 3. **Frontend Components**: Built three new React components following the application's design system:
    - Account page with loading states, error handling, and refresh functionality
    - OpenTrades table component with conditional styling for profit/loss and buy/sell indicators
-   - OrderHistory table component with date formatting and similar styling patterns
+   - TradeHistory table component with date formatting and similar styling patterns
 
 4. **Testing Coverage**: Added comprehensive unit tests for both endpoints covering success cases, empty responses, API failures, and error handling
 
@@ -104,7 +104,7 @@ Click the "Refresh" button in the top-right corner to manually update trading da
 
 ### Understanding Trade History
 
-The Trade History section is currently a placeholder due to external API limitations. It displays a message: "Trade history is not available from the current API. This feature requires historical trade data storage."
+The Trade History section displays closed trades and historical transactions fetched from the FXOpen Trade History API. It shows the last 30 days of trading activity by default, including executed orders, position closures, and balance movements.
 
 ## Configuration
 
@@ -139,18 +139,18 @@ npm run build
 
 ## Notes
 
-### API Limitations
+### API Integration
 
-The OpenFX API already has a `get_open_trades()` method that was leveraged for the open trades endpoint. However, trade history is not available from the current external API. The `/api/trades/history` endpoint returns an empty response with an informative message indicating this limitation.
+The OpenFX API has a `get_open_trades()` method for current positions and a `get_trade_history()` method that calls the FXOpen POST `/api/v2/tradehistory` endpoint. The trade history endpoint accepts timestamp filters and returns historical trading records including transaction details, position data, and balance movements.
 
 ### Future Enhancements
 
-To enable full trade history functionality, consider:
-- Implementing a database layer to store historical trades
-- Capturing trade close events and persisting them
-- Adding pagination for large trade histories
-- Implementing date range filters for history queries
+To enhance trade history functionality, consider:
+- Adding pagination for large trade histories (currently limited to 1000 records per request)
+- Implementing date range filters in the UI for custom history queries
 - Adding export functionality (CSV, PDF)
+- Implementing a database layer for faster historical queries and caching
+- Adding trade detail views with full transaction information
 
 ### Design Consistency
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import endPoints from '../app/api';
 import OpenTrades from '../components/OpenTrades';
-import OrderHistory from '../components/OrderHistory';
+import TradeHistory from '../components/TradeHistory';
 import { Briefcase, RefreshCw } from 'lucide-react';
 
 function Account() {
@@ -102,7 +102,7 @@ function Account() {
         <OpenTrades trades={openTrades} loading={refreshing} />
 
         {/* Trade History Section */}
-        <OrderHistory
+        <TradeHistory
           history={tradeHistory}
           loading={refreshing}
           message={historyMessage}
