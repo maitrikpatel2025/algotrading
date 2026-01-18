@@ -78,3 +78,12 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting route navigation or URL structure
     - When reorganizing UI components across different pages
     - When understanding the workflow-based page structure (Monitor/Strategy/Account)
+
+- app_docs/feature-fbcb8acc-chart-api-retry-logic.md
+  - Conditions:
+    - When working with the OpenFX API client or openfx_api.py
+    - When implementing or modifying API retry logic or error handling
+    - When troubleshooting 503 errors or transient API failures
+    - When working with the Strategy page chart loading functionality
+    - When modifying the _make_request() method or HTTP request handling
+    - When adding resilience patterns to external API calls
