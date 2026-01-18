@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import endPoints from '../app/api';
+import AccountSummary from '../components/AccountSummary';
 import OpenTrades from '../components/OpenTrades';
 import TradeHistory from '../components/TradeHistory';
 import { Briefcase, RefreshCw } from 'lucide-react';
@@ -105,7 +106,7 @@ function Account() {
             <div>
               <h1 className="text-h2 text-foreground">Account</h1>
               <p className="text-muted-foreground">
-                View your open trades and trade history
+                View your account summary, open trades, and trade history
               </p>
             </div>
           </div>
@@ -124,6 +125,9 @@ function Account() {
 
       {/* Main Content */}
       <div className="space-y-6">
+        {/* Account Summary Section */}
+        <AccountSummary />
+
         {/* Open Trades Section */}
         <OpenTrades trades={openTrades} loading={refreshing} />
 

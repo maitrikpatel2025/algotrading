@@ -4,8 +4,8 @@ import { cn } from '../lib/utils';
 import { Menu, X, TrendingUp } from 'lucide-react';
 
 const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/monitor", label: "Monitor" },
+  { href: "/strategy", label: "Strategy" },
   { href: "/account", label: "Account" },
 ];
 

@@ -7,7 +7,7 @@ import Select from '../components/Select';
 import Technicals from '../components/Technicals';
 import { Play, RefreshCw, BarChart3, AlertTriangle } from 'lucide-react';
 
-function Dashboard() {
+function Strategy() {
   const [selectedPair, setSelectedPair] = useState(null);
   const [selectedGran, setSelectedGran] = useState(null);
   const [technicalsData, setTechnicalsData] = useState(null);
@@ -116,7 +116,7 @@ function Dashboard() {
             <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
             <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
           </div>
-          <p className="text-muted-foreground font-medium">Loading dashboard...</p>
+          <p className="text-muted-foreground font-medium">Loading strategy...</p>
         </div>
       </div>
     );
@@ -127,9 +127,9 @@ function Dashboard() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-h2 text-foreground">Trading Dashboard</h1>
+          <h1 className="text-h2 text-foreground">Strategy</h1>
           <p className="text-muted-foreground">
-            Analyze currency pairs with technical indicators and live charts
+            Analyze currency pairs, timeframes, and technical indicators for trading decisions
           </p>
         </div>
       </div>
@@ -269,4 +269,4 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
+export default Strategy;

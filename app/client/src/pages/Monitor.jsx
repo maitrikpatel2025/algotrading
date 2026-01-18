@@ -1,10 +1,9 @@
 import React from 'react';
-import AccountSummary from '../components/AccountSummary';
 import BotStatus from '../components/BotStatus';
 import Headlines from '../components/Headlines';
 import { TrendingUp, BarChart3, Zap } from 'lucide-react';
 
-function Home() {
+function Monitor() {
   return (
     <div className="py-8 space-y-8 animate-fade-in">
       {/* Hero Section */}
@@ -22,10 +21,10 @@ function Home() {
                 Real-time Trading
               </div>
               <h1 className="text-3xl md:text-4xl font-bold text-white">
-                Welcome to <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Forex Dash</span>
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Monitor</span>
               </h1>
               <p className="text-slate-400 max-w-xl">
-                Professional forex trading dashboard with real-time market data, technical analysis, and comprehensive account management.
+                Real-time monitoring of trading bot status and market news. Stay updated with live bot activity and breaking market headlines.
               </p>
             </div>
             
@@ -56,11 +55,6 @@ function Home() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Account Summary Card */}
-        <div className="lg:col-span-1">
-          <AccountSummary />
-        </div>
-
         {/* Bot Status Card */}
         <div className="lg:col-span-1">
           <BotStatus />
@@ -71,54 +65,8 @@ function Home() {
           <Headlines />
         </div>
       </div>
-      
-      {/* Quick Actions */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <a 
-          href="/dashboard" 
-          className="group p-6 rounded-xl border border-border bg-card hover:bg-muted/50 transition-all duration-200 hover:shadow-lg hover:border-primary/50"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-shadow">
-              <BarChart3 className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                Trading Dashboard
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                View charts & technicals
-              </p>
-            </div>
-          </div>
-        </a>
-        
-        <div className="p-6 rounded-xl border border-border bg-card">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-gradient-to-br from-success to-success/70 shadow-lg shadow-success/20">
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Market Analysis</h3>
-              <p className="text-sm text-muted-foreground">Coming soon</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="p-6 rounded-xl border border-border bg-card">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-gradient-to-br from-accent to-accent/70 shadow-lg shadow-accent/20">
-              <Zap className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Auto Trading</h3>
-              <p className="text-sm text-muted-foreground">Coming soon</p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
 
-export default Home;
+export default Monitor;
