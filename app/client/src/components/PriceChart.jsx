@@ -15,13 +15,14 @@ function PriceChart({
   showVolume,
   onVolumeToggle,
   selectedDateRange,
-  onDateRangeChange
+  onDateRangeChange,
+  loading
 }) {
   useEffect(() => {
-    if (priceData) {
+    if (priceData && !loading) {
       drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume);
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading]);
 
   return (
     <div className="card animate-fade-in">
@@ -103,11 +104,25 @@ function PriceChart({
 
       {/* Chart Container */}
       <div className="p-4">
-        <div
-          id="chartDiv"
-          className="w-full rounded-lg bg-muted/30 min-h-[500px]"
-          style={{ height: 'calc(100vh - 450px)' }}
-        />
+        {loading ? (
+          /* Loading Skeleton State */
+          <div className="w-full rounded-lg bg-muted/30 min-h-[500px] flex items-center justify-center" style={{ height: 'calc(100vh - 450px)' }}>
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
+                <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              </div>
+              <p className="text-muted-foreground font-medium">Loading chart data...</p>
+            </div>
+          </div>
+        ) : (
+          /* Chart Display */
+          <div
+            id="chartDiv"
+            className="w-full rounded-lg bg-muted/30 min-h-[500px]"
+            style={{ height: 'calc(100vh - 450px)' }}
+          />
+        )}
       </div>
     </div>
   );

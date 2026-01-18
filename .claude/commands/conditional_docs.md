@@ -78,3 +78,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting route navigation or URL structure
     - When reorganizing UI components across different pages
     - When understanding the workflow-based page structure (Monitor/Strategy/Account)
+
+- app_docs/feature-dc50bbc5-interactive-ohlc-chart.md
+  - Conditions:
+    - When working with price charts or candlestick visualization
+    - When implementing or modifying the PriceChart component
+    - When working with chart.js or Plotly.js chart rendering
+    - When adding chart types, volume indicators, or date range controls
+    - When troubleshooting chart loading states, empty states, or error handling
+    - When working with the Strategy page chart integration
+    - When implementing interactive chart features (zoom, pan, hover tooltips)
+    - When working with OHLC price data from /api/prices endpoint

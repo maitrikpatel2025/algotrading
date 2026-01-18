@@ -1,9 +1,9 @@
 import Plotly from 'plotly.js-dist';
 
-// Style guide colors for charts
+// Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
-  bullish: '#22C55E',      // Success green
-  bearish: '#EF4444',      // Destructive red
+  bullish: '#22c55e',      // Success green (dark mode: #22C55E)
+  bearish: '#ef4444',      // Destructive red (dark mode: #EF4444)
   grid: 'rgba(228, 228, 231, 0.3)',
   text: '#71717A',         // Muted foreground
   background: 'transparent',
