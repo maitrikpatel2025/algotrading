@@ -2,6 +2,7 @@
 Bot Status Tracker
 ==================
 Singleton class to manage and track trading bot status.
+Integrates with BotController for process-based status tracking.
 """
 
 import json
@@ -14,6 +15,18 @@ from typing import List, Literal, Optional
 from .data_models import ActiveStrategy, BotStatusResponse, MonitoredPair
 
 logger = logging.getLogger(__name__)
+
+# Lazy import to avoid circular dependency
+_bot_controller = None
+
+
+def _get_bot_controller():
+    """Get the bot controller instance (lazy import to avoid circular dependency)."""
+    global _bot_controller
+    if _bot_controller is None:
+        from .bot_controller import bot_controller
+        _bot_controller = bot_controller
+    return _bot_controller
 
 
 class BotStatusTracker:
@@ -34,7 +47,7 @@ class BotStatusTracker:
         if self._initialized:
             return
 
-        self._status: Literal["running", "stopped", "paused", "error"] = "stopped"
+        self._status: Literal["running", "stopped", "paused", "error", "starting", "stopping"] = "stopped"
         self._started_at: Optional[datetime] = None
         self._last_heartbeat: Optional[datetime] = None
         self._last_signal_time: Optional[datetime] = None
@@ -45,6 +58,7 @@ class BotStatusTracker:
         self._signals_today: int = 0
         self._trades_today: int = 0
         self._error_message: Optional[str] = None
+        self._pid: Optional[int] = None
 
         # Load monitored pairs from bot settings
         self._load_monitored_pairs_from_config()
@@ -86,8 +100,30 @@ class BotStatusTracker:
 
     def get_status(self) -> BotStatusResponse:
         """Get current bot status as a response model."""
+        # Check process status from BotController
+        controller = _get_bot_controller()
+        controller_status = controller.get_status()
+
+        # Determine effective status - controller status takes precedence for process state
+        effective_status = self._status
+        pid = self._pid
+        can_start = True
+        can_stop = False
+
+        if controller_status["status"] in ["running", "starting", "stopping"]:
+            effective_status = controller_status["status"]
+            pid = controller_status["pid"]
+            can_start = controller_status["can_start"]
+            can_stop = controller_status["can_stop"]
+        elif controller_status["status"] == "stopped" and self._status == "running":
+            # Process died unexpectedly - update our status
+            self._status = "stopped"
+            self._started_at = None
+            self._pid = None
+            effective_status = "stopped"
+
         return BotStatusResponse(
-            status=self._status,
+            status=effective_status,
             started_at=self._started_at,
             uptime_seconds=self.calculate_uptime(),
             last_heartbeat=self._last_heartbeat,
@@ -99,6 +135,9 @@ class BotStatusTracker:
             signals_today=self._signals_today,
             trades_today=self._trades_today,
             error_message=self._error_message,
+            pid=pid,
+            can_start=can_start,
+            can_stop=can_stop,
         )
 
     def set_running(self, strategy_name: str, strategy_description: str) -> None:
@@ -126,6 +165,18 @@ class BotStatusTracker:
         self._status = "paused"
         self._error_message = None
         logger.info("[BOT_STATUS] Bot set to paused")
+
+    def set_starting(self) -> None:
+        """Set bot status to starting (transitional state)."""
+        self._status = "starting"
+        self._error_message = None
+        logger.info("[BOT_STATUS] Bot set to starting")
+
+    def set_stopping(self) -> None:
+        """Set bot status to stopping (transitional state)."""
+        self._status = "stopping"
+        self._error_message = None
+        logger.info("[BOT_STATUS] Bot set to stopping")
 
     def set_error(self, message: str) -> None:
         """Set bot status to error with message."""

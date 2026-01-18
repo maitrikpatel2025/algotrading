@@ -38,7 +38,8 @@ axios.interceptors.response.use(
 const response = (resp) => resp.data;
 
 const requests = {
-    get: (url) => axios.get(url).then(response)
+    get: (url) => axios.get(url).then(response),
+    post: (url, data) => axios.post(url, data).then(response)
 }
 
 const endPoints = {
@@ -49,7 +50,10 @@ const endPoints = {
     prices: (p, g, c) => requests.get(`/prices/${p}/${g}/${c}`),
     openTrades: () => requests.get("/trades/open"),
     tradeHistory: () => requests.get("/trades/history"),
-    botStatus: () => requests.get("/bot/status")
+    botStatus: () => requests.get("/bot/status"),
+    botStart: (config = {}) => requests.post("/bot/start", config),
+    botStop: () => requests.post("/bot/stop"),
+    botRestart: (config = {}) => requests.post("/bot/restart", config)
 }
 
 export default endPoints;

@@ -23,8 +23,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import get_options
 from config import settings
+from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
 from core.data_models import (
+    BotControlResponse,
+    BotStartRequest,
     BotStatusResponse,
     HeadlineItem,
     HeadlinesResponse,
@@ -332,6 +335,167 @@ async def bot_status():
         return BotStatusResponse(
             status="error",
             error_message=str(e)
+        )
+
+
+@app.post("/api/bot/start", response_model=BotControlResponse, tags=["Bot"])
+async def bot_start(request: BotStartRequest = None):
+    """
+    Start the trading bot.
+
+    Args:
+        request: Optional configuration for the bot (strategy, pairs, timeframe)
+
+    Returns:
+        JSON object with success status, message, and PID if successful
+
+    Status Codes:
+        200: Bot started successfully
+        409: Bot is already running
+        500: Internal server error
+    """
+    try:
+        # Extract configuration from request if provided
+        strategy = request.strategy if request else None
+        pairs = request.pairs if request else None
+        timeframe = request.timeframe if request else None
+
+        logger.info(f"[BOT_CONTROL] Start request received - strategy: {strategy}, pairs: {pairs}, timeframe: {timeframe}")
+
+        result = bot_controller.start_bot(
+            strategy=strategy,
+            pairs=pairs,
+            timeframe=timeframe
+        )
+
+        if result["success"]:
+            # Update bot status tracker
+            bot_status_tracker.set_running(
+                strategy_name=strategy or "Bollinger Bands Strategy",
+                strategy_description="Automated trading strategy"
+            )
+            logger.info(f"[SUCCESS] Bot started: {result['message']}")
+            return BotControlResponse(**result)
+        else:
+            error = result.get("error", "")
+            if error == "conflict":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=result["message"]
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result["message"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Bot start failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.post("/api/bot/stop", response_model=BotControlResponse, tags=["Bot"])
+async def bot_stop():
+    """
+    Stop the trading bot gracefully.
+
+    Returns:
+        JSON object with success status and message
+
+    Status Codes:
+        200: Bot stopped successfully
+        400: Bot is not running
+        500: Internal server error
+    """
+    try:
+        logger.info("[BOT_CONTROL] Stop request received")
+
+        result = bot_controller.stop_bot()
+
+        if result["success"]:
+            # Update bot status tracker
+            bot_status_tracker.set_stopped()
+            logger.info(f"[SUCCESS] Bot stopped: {result['message']}")
+            return BotControlResponse(**result)
+        else:
+            error = result.get("error", "")
+            if error == "not_running":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=result["message"]
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result["message"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Bot stop failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.post("/api/bot/restart", response_model=BotControlResponse, tags=["Bot"])
+async def bot_restart(request: BotStartRequest = None):
+    """
+    Restart the trading bot (stop + start).
+
+    Args:
+        request: Optional configuration for the bot (strategy, pairs, timeframe)
+
+    Returns:
+        JSON object with success status, message, and PID if successful
+
+    Status Codes:
+        200: Bot restarted successfully
+        500: Internal server error
+    """
+    try:
+        # Extract configuration from request if provided
+        strategy = request.strategy if request else None
+        pairs = request.pairs if request else None
+        timeframe = request.timeframe if request else None
+
+        logger.info(f"[BOT_CONTROL] Restart request received - strategy: {strategy}, pairs: {pairs}, timeframe: {timeframe}")
+
+        result = bot_controller.restart_bot(
+            strategy=strategy,
+            pairs=pairs,
+            timeframe=timeframe
+        )
+
+        if result["success"]:
+            # Update bot status tracker
+            bot_status_tracker.set_running(
+                strategy_name=strategy or "Bollinger Bands Strategy",
+                strategy_description="Automated trading strategy"
+            )
+            logger.info(f"[SUCCESS] Bot restarted: {result['message']}")
+            return BotControlResponse(**result)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result["message"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Bot restart failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
         )
 
 

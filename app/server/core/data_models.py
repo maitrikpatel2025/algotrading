@@ -251,7 +251,7 @@ class ActiveStrategy(BaseModel):
 
 class BotStatusResponse(BaseModel):
     """Trading bot status response."""
-    status: Literal["running", "stopped", "paused", "error"]
+    status: Literal["running", "stopped", "paused", "error", "starting", "stopping"]
     started_at: Optional[datetime] = None
     uptime_seconds: Optional[float] = None
     last_heartbeat: Optional[datetime] = None
@@ -263,3 +263,35 @@ class BotStatusResponse(BaseModel):
     signals_today: int = 0
     trades_today: int = 0
     error_message: Optional[str] = None
+    pid: Optional[int] = None
+    can_start: bool = True
+    can_stop: bool = False
+
+
+# =============================================================================
+# Bot Control Models
+# =============================================================================
+
+class BotStartRequest(BaseModel):
+    """Request model for starting the trading bot."""
+    strategy: Optional[str] = Field(
+        default=None,
+        description="Strategy name to use (e.g., 'Bollinger Bands Strategy')"
+    )
+    pairs: Optional[List[str]] = Field(
+        default=None,
+        description="List of trading pairs to monitor (e.g., ['EURUSD', 'GBPJPY'])"
+    )
+    timeframe: Optional[str] = Field(
+        default=None,
+        description="Timeframe for trading (e.g., 'M1', 'H1')"
+    )
+
+
+class BotControlResponse(BaseModel):
+    """Response model for bot control operations (start/stop/restart)."""
+    success: bool
+    message: str
+    status: Literal["running", "stopped", "starting", "stopping", "error"]
+    pid: Optional[int] = None
+    error: Optional[str] = None
