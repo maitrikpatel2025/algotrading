@@ -49,6 +49,18 @@ class OpenFxApi:
             time.sleep(THROTTLE_TIME - elapsed)
         self.last_req_time = dt.datetime.now()
 
+    def _is_transient_error(self, status_code: int) -> bool:
+        """
+        Check if a status code indicates a transient error that should be retried.
+
+        Args:
+            status_code: HTTP status code
+
+        Returns:
+            True if the error is transient (5xx), False otherwise
+        """
+        return 500 <= status_code < 600
+
     def _make_request(
         self,
         url: str,
@@ -56,10 +68,12 @@ class OpenFxApi:
         code: int = 200,
         params: Optional[Dict] = None,
         data: Optional[Dict] = None,
-        headers: Optional[Dict] = None
+        headers: Optional[Dict] = None,
+        max_retries: int = 3,
+        backoff_base: float = 1.0
     ) -> Tuple[bool, Any]:
         """
-        Make an HTTP request to the API.
+        Make an HTTP request to the API with retry logic for transient errors.
 
         Args:
             url: API endpoint path
@@ -68,38 +82,92 @@ class OpenFxApi:
             params: URL parameters
             data: Request body data
             headers: Additional headers
+            max_retries: Maximum number of retry attempts (default: 3)
+            backoff_base: Base time in seconds for exponential backoff (default: 1.0)
 
         Returns:
             Tuple of (success, response_data)
         """
-        self._throttle()
         full_url = f"{settings.OPENFX_URL}/{url}"
 
+        json_data = None
         if data is not None:
-            data = json.dumps(data)
+            json_data = json.dumps(data)
 
-        try:
-            response = None
+        last_error = None
 
-            if verb == "get":
-                response = self.session.get(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
-            elif verb == "post":
-                response = self.session.post(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
-            elif verb == "put":
-                response = self.session.put(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
-            elif verb == "delete":
-                response = self.session.delete(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
+        for attempt in range(max_retries):
+            self._throttle()
 
-            if response is None:
-                return False, {'error': 'verb not found'}
+            try:
+                response = None
 
-            if response.status_code == code:
-                return True, response.json()
-            else:
+                if verb == "get":
+                    response = self.session.get(full_url, params=params, data=json_data, headers=headers, timeout=(5, 10))
+                elif verb == "post":
+                    response = self.session.post(full_url, params=params, data=json_data, headers=headers, timeout=(5, 10))
+                elif verb == "put":
+                    response = self.session.put(full_url, params=params, data=json_data, headers=headers, timeout=(5, 10))
+                elif verb == "delete":
+                    response = self.session.delete(full_url, params=params, data=json_data, headers=headers, timeout=(5, 10))
+
+                if response is None:
+                    return False, {'error': 'verb not found'}
+
+                if response.status_code == code:
+                    return True, response.json()
+
+                # Check if this is a transient error that should be retried
+                if self._is_transient_error(response.status_code):
+                    last_error = response.json()
+                    retries_remaining = max_retries - attempt - 1
+
+                    if retries_remaining > 0:
+                        wait_time = backoff_base * (2 ** attempt)
+                        logger.warning(
+                            f"Transient error {response.status_code} for {url}. "
+                            f"Retry attempt {attempt + 1}/{max_retries}, "
+                            f"waiting {wait_time:.1f}s before next attempt"
+                        )
+                        time.sleep(wait_time)
+                        continue
+
+                # Non-transient error or last retry exhausted
                 return False, response.json()
 
-        except Exception as error:
-            return False, {'Exception': str(error)}
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout,
+                    requests.exceptions.RequestException) as error:
+                last_error = {'Exception': str(error)}
+                retries_remaining = max_retries - attempt - 1
+
+                if retries_remaining > 0:
+                    wait_time = backoff_base * (2 ** attempt)
+                    logger.warning(
+                        f"Connection error for {url}: {error}. "
+                        f"Retry attempt {attempt + 1}/{max_retries}, "
+                        f"waiting {wait_time:.1f}s before next attempt"
+                    )
+                    time.sleep(wait_time)
+                    continue
+
+                # Last retry exhausted
+                logger.error(
+                    f"All {max_retries} retry attempts exhausted for {url}. "
+                    f"Last error: {error}"
+                )
+                return False, last_error
+
+            except Exception as error:
+                # Non-retryable exception
+                return False, {'Exception': str(error)}
+
+        # All retries exhausted for transient HTTP errors
+        logger.error(
+            f"All {max_retries} retry attempts exhausted for {url}. "
+            f"Last error: {last_error}"
+        )
+        return False, last_error
 
     # =========================================================================
     # Account Operations
