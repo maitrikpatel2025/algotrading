@@ -235,6 +235,7 @@ function Strategy() {
                 onVolumeToggle={handleVolumeToggle}
                 selectedDateRange={selectedDateRange}
                 onDateRangeChange={handleDateRangeChange}
+                loading={loadingData}
               />
             </div>
           )}
