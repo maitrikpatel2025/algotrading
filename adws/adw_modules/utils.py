@@ -4,12 +4,16 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import uuid
 from datetime import datetime
-from typing import Any, TypeVar, Type, Union, Dict, Optional
+from typing import Any, TypeVar, Type, Union, Dict, Optional, Tuple, Literal
 
 T = TypeVar('T')
+
+# Authentication mode type
+AuthMode = Literal["oauth", "api_key", "none"]
 
 
 def make_adw_id() -> str:
@@ -158,17 +162,96 @@ def parse_json(text: str, target_type: Type[T] = None) -> Union[T, Any]:
         raise ValueError(f"Failed to parse JSON: {e}. Text was: {json_str[:200]}...")
 
 
+def check_claude_oauth_status() -> Tuple[bool, str]:
+    """Check if Claude Code CLI is authenticated via OAuth (Claude Max subscription).
+    
+    This checks if the user has logged in via `claude login` which uses their
+    Claude Max subscription instead of API key billing.
+    
+    The check is performed by reading the ~/.claude.json config file which contains
+    OAuth credentials when the user is logged in via Claude Max.
+    
+    Returns:
+        Tuple of (is_authenticated, status_message)
+    """
+    # Check the Claude config file for OAuth credentials
+    # This is faster and more reliable than running `claude auth status`
+    claude_config_path = os.path.expanduser("~/.claude.json")
+    
+    try:
+        if os.path.exists(claude_config_path):
+            with open(claude_config_path, "r") as f:
+                config = json.load(f)
+            
+            # Check for OAuth account (Claude Max subscription)
+            if "oauthAccount" in config:
+                oauth_account = config["oauthAccount"]
+                # Try to extract email or account identifier
+                if isinstance(oauth_account, dict):
+                    email = oauth_account.get("emailAddress", oauth_account.get("email", ""))
+                    if email:
+                        return True, f"Logged in as {email}"
+                    return True, "OAuth account configured"
+                elif oauth_account:
+                    return True, "OAuth account configured"
+            
+            # Check for user ID (indicates some form of authentication)
+            if "userID" in config and config["userID"]:
+                return True, f"Authenticated (user: {config['userID'][:8]}...)"
+            
+            return False, "No OAuth account found in config"
+        else:
+            return False, "Claude config file not found (~/.claude.json)"
+            
+    except json.JSONDecodeError as e:
+        return False, f"Error parsing Claude config: {e}"
+    except Exception as e:
+        return False, f"Error checking OAuth status: {e}"
+
+
+def get_auth_mode() -> Tuple[AuthMode, str]:
+    """Determine the current authentication mode for Claude Code.
+    
+    Checks for authentication in this order:
+    1. OAuth (Claude Max subscription) - via `claude auth status`
+    2. API Key - via ANTHROPIC_API_KEY environment variable
+    
+    Returns:
+        Tuple of (auth_mode, description) where auth_mode is one of:
+        - "oauth": Using Claude Max subscription (no API costs)
+        - "api_key": Using ANTHROPIC_API_KEY (API billing)
+        - "none": No authentication configured
+    """
+    # Check for API key first (faster check)
+    has_api_key = bool(os.getenv("ANTHROPIC_API_KEY"))
+    
+    # Check OAuth status
+    oauth_authenticated, oauth_message = check_claude_oauth_status()
+    
+    if oauth_authenticated:
+        return "oauth", f"Claude Max (OAuth): {oauth_message}"
+    elif has_api_key:
+        return "api_key", "API Key: ANTHROPIC_API_KEY configured"
+    else:
+        return "none", "No authentication: Set ANTHROPIC_API_KEY or run 'claude login'"
+
+
 def check_env_vars(logger: Optional[logging.Logger] = None) -> None:
-    """Check that all required environment variables are set.
+    """Check that all required environment variables and authentication are configured.
+    
+    Validates:
+    1. Required environment variables (CLAUDE_CODE_PATH)
+    2. At least one authentication method is available:
+       - OAuth (Claude Max subscription via `claude login`)
+       - API Key (ANTHROPIC_API_KEY environment variable)
     
     Args:
         logger: Optional logger instance for error reporting
         
     Raises:
-        SystemExit: If required environment variables are missing
+        SystemExit: If required configuration is missing
     """
     required_vars = [
-        "ANTHROPIC_API_KEY",
         "CLAUDE_CODE_PATH",
     ]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
@@ -184,6 +267,34 @@ def check_env_vars(logger: Optional[logging.Logger] = None) -> None:
             for var in missing_vars:
                 print(f"  - {var}", file=sys.stderr)
         sys.exit(1)
+    
+    # Check authentication - need either OAuth or API key
+    auth_mode, auth_message = get_auth_mode()
+    
+    if auth_mode == "none":
+        error_msg = "Error: No Claude authentication configured."
+        help_msg = """
+To authenticate, use ONE of these methods:
+
+1. Claude Max subscription (recommended - no API costs):
+   $ claude login
+   
+2. API Key (usage-based billing):
+   $ export ANTHROPIC_API_KEY='your-api-key-here'
+"""
+        if logger:
+            logger.error(error_msg)
+            logger.error(help_msg)
+        else:
+            print(error_msg, file=sys.stderr)
+            print(help_msg, file=sys.stderr)
+        sys.exit(1)
+    else:
+        # Log the authentication mode being used
+        if logger:
+            logger.info(f"Authentication: {auth_message}")
+        else:
+            print(f"Authentication: {auth_message}")
 
 
 def strip_markdown_code_formatting(text: str) -> str:
@@ -239,11 +350,17 @@ def get_safe_subprocess_env() -> Dict[str, str]:
     .env.sample configuration. This prevents accidental exposure of sensitive
     credentials to subprocesses.
     
+    Authentication:
+        - If ANTHROPIC_API_KEY is set, it will be included (API key mode)
+        - If not set, Claude Code will use OAuth authentication (Claude Max mode)
+        - Use `claude login` to authenticate with Claude Max subscription
+    
     Returns:
         Dictionary containing only required environment variables
     """
     safe_env_vars = {
-        # Anthropic Configuration (required)
+        # Anthropic Configuration (optional - if not set, OAuth is used)
+        # When using Claude Max subscription, this is not needed
         "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY"),
         
         # GitHub Configuration (optional)
