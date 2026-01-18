@@ -50,3 +50,12 @@ This prompt helps you determine what documentation you should read based on the 
     - When renaming or refactoring TradeHistory component
     - When adding pagination or date range filtering to trade history
     - When updating TradeHistoryItem data model or response structure
+
+- app_docs/feature-7ce3e5be-trading-bot-status-dashboard.md
+  - Conditions:
+    - When working with trading bot status or operational monitoring
+    - When implementing or modifying the BotStatus component
+    - When working with the /api/bot/status endpoint
+    - When adding new bot metrics or status indicators
+    - When troubleshooting bot status display or auto-refresh issues
+    - When integrating bot state changes with the status tracker
