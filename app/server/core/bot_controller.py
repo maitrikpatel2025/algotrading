@@ -289,7 +289,7 @@ class BotController:
                     # If still running, force kill
                     if self._is_pid_running(self._pid):
                         logger.warning(
-                            f"[BOT_CONTROLLER] Bot didn't stop gracefully, sending SIGKILL"
+                            "[BOT_CONTROLLER] Bot didn't stop gracefully, sending SIGKILL"
                         )
                         os.kill(self._pid, signal.SIGKILL)
                         time.sleep(0.5)

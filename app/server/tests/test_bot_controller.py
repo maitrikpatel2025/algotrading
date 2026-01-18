@@ -6,7 +6,6 @@ Unit tests for the BotController class that manages bot subprocess lifecycle.
 
 import os
 import signal
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
