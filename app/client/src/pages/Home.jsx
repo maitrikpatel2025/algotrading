@@ -1,5 +1,6 @@
 import React from 'react';
 import AccountSummary from '../components/AccountSummary';
+import BotStatus from '../components/BotStatus';
 import Headlines from '../components/Headlines';
 import { TrendingUp, BarChart3, Zap } from 'lucide-react';
 
@@ -59,9 +60,14 @@ function Home() {
         <div className="lg:col-span-1">
           <AccountSummary />
         </div>
-        
-        {/* Headlines Card */}
+
+        {/* Bot Status Card */}
         <div className="lg:col-span-1">
+          <BotStatus />
+        </div>
+
+        {/* Headlines Card */}
+        <div className="lg:col-span-2">
           <Headlines />
         </div>
       </div>

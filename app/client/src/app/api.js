@@ -48,7 +48,8 @@ const endPoints = {
     technicals: (p, g) => requests.get(`/technicals/${p}/${g}`),
     prices: (p, g, c) => requests.get(`/prices/${p}/${g}/${c}`),
     openTrades: () => requests.get("/trades/open"),
-    tradeHistory: () => requests.get("/trades/history")
+    tradeHistory: () => requests.get("/trades/history"),
+    botStatus: () => requests.get("/bot/status")
 }
 
 export default endPoints;

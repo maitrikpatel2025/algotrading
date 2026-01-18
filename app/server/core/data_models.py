@@ -229,3 +229,37 @@ class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+# =============================================================================
+# Bot Status Models
+# =============================================================================
+
+class MonitoredPair(BaseModel):
+    """Monitored trading pair configuration."""
+    symbol: str
+    timeframe: str
+    is_active: bool = True
+
+
+class ActiveStrategy(BaseModel):
+    """Active trading strategy information."""
+    name: str
+    description: str
+    parameters: Optional[Dict[str, Any]] = None
+
+
+class BotStatusResponse(BaseModel):
+    """Trading bot status response."""
+    status: Literal["running", "stopped", "paused", "error"]
+    started_at: Optional[datetime] = None
+    uptime_seconds: Optional[float] = None
+    last_heartbeat: Optional[datetime] = None
+    last_signal_time: Optional[datetime] = None
+    last_signal_pair: Optional[str] = None
+    last_signal_type: Optional[str] = None
+    monitored_pairs: List[MonitoredPair] = []
+    active_strategy: Optional[ActiveStrategy] = None
+    signals_today: int = 0
+    trades_today: int = 0
+    error_message: Optional[str] = None
