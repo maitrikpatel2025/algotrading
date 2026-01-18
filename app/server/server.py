@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import get_options
 from config import settings
 from core.data_models import (
+    BotStatusResponse,
     HeadlineItem,
     HeadlinesResponse,
     HealthCheckResponse,
@@ -33,6 +34,7 @@ from core.data_models import (
     TradeInfo,
     TradingOptionsResponse,
 )
+from core.bot_status import bot_status_tracker
 from core.openfx_api import OpenFxApi
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
@@ -306,6 +308,30 @@ async def trade_history(
             trades=[],
             count=0,
             error=str(e)
+        )
+
+
+@app.get("/api/bot/status", response_model=BotStatusResponse, tags=["Bot"])
+async def bot_status():
+    """
+    Get trading bot operational status.
+
+    Returns:
+        JSON object with bot status including:
+        - status (running/stopped/paused/error)
+        - uptime, last signal time, signals today, trades today
+        - monitored pairs and active strategy
+    """
+    try:
+        status = bot_status_tracker.get_status()
+        logger.info(f"[SUCCESS] Bot status fetched: {status.status}")
+        return status
+    except Exception as e:
+        logger.error(f"[ERROR] Bot status fetch failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return BotStatusResponse(
+            status="error",
+            error_message=str(e)
         )
 
 
