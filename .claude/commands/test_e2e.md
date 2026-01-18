@@ -7,8 +7,9 @@ Execute end-to-end (E2E) tests for the Forex Trading Dashboard application using
 The Forex Trading Dashboard is a full-stack application for forex trading with:
 
 - **Frontend (React 18)**: `app/client/` - React with React Router v6, Tailwind CSS, Plotly.js charts
-  - Routes: Home (`/`), Dashboard (`/dashboard`)
-  - Components: AccountSummary, Headlines, PriceChart, Technicals, NavigationBar, Select
+  - Routes: Monitor (`/monitor`), Strategy (`/strategy`), Account (`/account`)
+  - Note: `/` redirects to `/monitor`
+  - Components: BotStatus, Headlines (Monitor), PriceChart, Technicals, Select (Strategy), AccountSummary, OpenTrades, TradeHistory (Account), NavigationBar
   
 - **Backend (FastAPI)**: `app/server/` - Python FastAPI with UV package manager
   - Health: `/api/test`, `/api/health`
@@ -75,7 +76,7 @@ Save screenshots to the designated directory with descriptive names:
 
 Example for `test_trading_dashboard.md` with `adw_id=abc12345` and `agent_name=e2e_tester`:
 ```
-/path/to/codebase/agents/abc12345/e2e_tester/img/trading_dashboard/01_initial_home_page.png
+/path/to/codebase/agents/abc12345/e2e_tester/img/trading_dashboard/01_initial_strategy_page.png
 ```
 
 Use `pwd` or equivalent to get the absolute path to the codebase for correct screenshot paths.
@@ -86,7 +87,7 @@ If you encounter an error:
 1. Mark the test as **failed** immediately
 2. Report the exact step where the failure occurred
 3. Include the specific error message
-4. Example: `(Step 3 ❌) Failed to find element with selector "pair-selector" on page "http://localhost:3000/dashboard"`
+4. Example: `(Step 3 ❌) Failed to find element with selector "pair-selector" on page "http://localhost:3000/strategy"`
 
 ## Common Test Scenarios
 
@@ -94,13 +95,16 @@ If you encounter an error:
 
 | Element | Selector Hints | Pages |
 |---------|----------------|-------|
-| Navigation Bar | nav links, Home/Dashboard | All |
-| Account Summary | balance, margin, P/L fields | Home |
-| Headlines | headline items, links | Home |
-| Pair Selector | dropdown with EUR_USD, GBP_JPY, etc. | Dashboard |
-| Timeframe Selector | M5, M15, H1, H4, D options | Dashboard |
-| Price Chart | Plotly candlestick chart | Dashboard |
-| Technicals | support/resistance levels | Dashboard |
+| Navigation Bar | nav links (Monitor, Strategy, Account) | All |
+| Bot Status | status badge, metrics, controls | Monitor |
+| Headlines | headline items, links | Monitor |
+| Pair Selector | dropdown with EUR_USD, GBP_JPY, etc. | Strategy |
+| Timeframe Selector | M5, M15, H1, H4, D options | Strategy |
+| Price Chart | Plotly candlestick chart | Strategy |
+| Technicals | support/resistance levels | Strategy |
+| Account Summary | balance, margin, P/L fields | Account |
+| Open Trades | active positions table | Account |
+| Trade History | past trades table | Account |
 
 ### API Endpoints to Test
 

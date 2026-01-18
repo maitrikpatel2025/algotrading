@@ -1,18 +1,18 @@
-# E2E Test: Market Headlines and Account Summary
+# E2E Test: Market Headlines
 
-Test the home page functionality including market headlines and account summary in the Forex Trading Dashboard.
+Test the Monitor page functionality including market headlines in the Forex Trading Dashboard.
 
 ## User Story
 
 As a trader  
-I want to see market headlines and my account summary  
-So that I can stay informed about market news and my trading position
+I want to see market headlines and bot status  
+So that I can stay informed about market news and my trading bot activity
 
 ## Test Steps
 
-1. Navigate to the `Application URL` (Home page)
+1. Navigate to the `Application URL` (redirects to Monitor page)
 2. Take a screenshot of the initial state
-3. **Verify** the page title or header contains "Forex Trading" or similar branding
+3. **Verify** the page title or header contains "Forex" or "Monitor" branding
 
 4. **Verify** the Headlines section is present:
    - Headlines section header is visible
@@ -20,24 +20,22 @@ So that I can stay informed about market news and my trading position
    
 5. Take a screenshot of the headlines section
 
-6. **Verify** the Account Summary section is present with:
-   - Account Balance field
-   - Margin Used field
-   - Unrealized P/L field
-   - Free Margin field
+6. **Verify** the Bot Status section is present with:
+   - Status badge (Running/Stopped)
+   - Metrics cards (Uptime, Last Signal, etc.)
 
-7. Take a screenshot of the account summary section
-8. **Verify** the values are formatted as numbers (currency values)
+7. Take a screenshot of the Bot Status section
+8. **Verify** the metrics display correctly
 
 9. **Verify** navigation options are available:
-   - Link or button to Dashboard
+   - Links to Strategy and Account pages
 
-10. Take a screenshot of the complete home page
+10. Take a screenshot of the complete Monitor page
 
 ## Success Criteria
-- Home page loads successfully
+- Monitor page loads successfully (via redirect from `/`)
 - Headlines section is present and functional
-- Account summary displays financial information
+- Bot Status displays correctly
 - Navigation to other pages is accessible
 - All values display correctly (not errors or "undefined")
 - 4 screenshots are taken

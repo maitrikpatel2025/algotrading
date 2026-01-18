@@ -1,6 +1,6 @@
-# E2E Test: Dashboard Chart Load
+# E2E Test: Strategy Chart Load
 
-Test the dashboard chart loading functionality in the Forex Trading Dashboard application, including error handling for failed data loads.
+Test the strategy page chart loading functionality in the Forex Trading Dashboard application, including error handling for failed data loads.
 
 ## User Story
 
@@ -10,13 +10,13 @@ So that I can analyze market data for trading decisions, even when external data
 
 ## Test Steps
 
-1. Navigate to the `Application URL`
-2. Take a screenshot of the initial state (Home page)
+1. Navigate to the `Application URL` (redirects to Monitor page)
+2. Take a screenshot of the initial state (Monitor page)
 3. **Verify** the page loads successfully
 
-4. Click on "Dashboard" in the navigation
-5. Take a screenshot of the Dashboard page
-6. **Verify** the Dashboard page loads with:
+4. Click on "Strategy" in the navigation
+5. Take a screenshot of the Strategy page
+6. **Verify** the Strategy page loads with:
    - Currency pair selector dropdown
    - Timeframe selector dropdown
    - "Load Data" button
@@ -39,10 +39,10 @@ So that I can analyze market data for trading decisions, even when external data
     - There is helpful text indicating external data sources may be unavailable
     - The application does NOT crash or show a blank page
 
-15. Take a final screenshot of the complete dashboard state
+15. Take a final screenshot of the complete Strategy page state
 
 ## Success Criteria
-- Dashboard page loads without errors
+- Strategy page loads without errors
 - Pair and timeframe selectors are functional
 - Load Data button triggers data loading
 - On success: Chart and/or technical data displays correctly

@@ -10,13 +10,13 @@ So that I can analyze price movements more effectively and make better-informed 
 
 ## Test Steps
 
-1. Navigate to the `Application URL`
-2. Take a screenshot of the initial state (Home page)
+1. Navigate to the `Application URL` (redirects to Monitor page)
+2. Take a screenshot of the initial state (Monitor page)
 3. **Verify** the page loads successfully
 
-4. Click on "Dashboard" in the navigation
-5. Take a screenshot of the Dashboard page
-6. **Verify** the Dashboard page loads
+4. Click on "Strategy" in the navigation
+5. Take a screenshot of the Strategy page
+6. **Verify** the Strategy page loads
 
 7. Select a currency pair (e.g., "EUR/USD") from the dropdown
 8. Select a timeframe (e.g., "H1")
@@ -85,7 +85,7 @@ So that I can analyze price movements more effectively and make better-informed 
 46. Take a final screenshot of the chart
 
 ## Success Criteria
-- Dashboard loads with chart type selector showing 4 options
+- Strategy page loads with chart type selector showing 4 options
 - Date range buttons (1D, 5D, 1M, 3M, 6M, YTD, 1Y, All) are visible and functional
 - All 4 chart types render correctly (Candlestick, OHLC, Line, Area)
 - Volume indicator can be toggled on/off

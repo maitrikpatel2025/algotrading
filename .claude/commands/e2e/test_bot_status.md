@@ -1,6 +1,6 @@
 # E2E Test: Bot Status
 
-Test the trading bot status dashboard functionality in the Forex Trading Dashboard application.
+Test the trading bot status functionality in the Forex Trading Dashboard application.
 
 ## User Story
 
@@ -10,10 +10,10 @@ So that I can verify the bot is operational, monitor which pairs it's tracking, 
 
 ## Test Steps
 
-1. Navigate to the `Application URL`
-2. Take a screenshot of the initial state (Home page)
+1. Navigate to the `Application URL` (redirects to Monitor page)
+2. Take a screenshot of the initial state (Monitor page)
 3. **Verify** the page loads successfully
-4. **Verify** the BotStatus component is visible on the Home page
+4. **Verify** the BotStatus component is visible on the Monitor page
 
 5. **Verify** the status badge is displayed with one of the following states:
    - "Running" (green with pulse animation)
@@ -45,7 +45,7 @@ So that I can verify the bot is operational, monitor which pairs it's tracking, 
 
 ## Success Criteria
 
-- Home page loads with BotStatus component visible
+- Monitor page loads with BotStatus component visible
 - Status badge displays correctly with appropriate styling
 - Metrics cards (Uptime, Last Signal, Signals Today, Trades Today) are present
 - Active Strategy section displays strategy information

@@ -5,15 +5,15 @@ Test the trading bot start/stop control functionality in the Forex Trading Dashb
 ## User Story
 
 As a trader
-I want to start and stop my trading bot from the dashboard UI
+I want to start and stop my trading bot from the Monitor UI
 So that I can quickly respond to market conditions and manage my automated trading without needing terminal access
 
 ## Test Steps
 
-1. Navigate to the `Application URL`
-2. Take a screenshot of the initial state (Home page with BotStatus component)
+1. Navigate to the `Application URL` (redirects to Monitor page)
+2. Take a screenshot of the initial state (Monitor page with BotStatus component)
 3. **Verify** the page loads successfully
-4. **Verify** the BotStatus component is visible on the Home page
+4. **Verify** the BotStatus component is visible on the Monitor page
 
 5. **Verify** the control buttons are visible:
    - Start Bot button (with Play icon)
@@ -94,7 +94,7 @@ So that I can quickly respond to market conditions and manage my automated tradi
 
 ## Success Criteria
 
-- Home page loads with BotStatus component visible
+- Monitor page loads with BotStatus component visible
 - Start/Stop buttons are present and styled correctly
 - Button states update based on bot status (enabled/disabled)
 - Configuration panel expands/collapses correctly when bot is stopped
