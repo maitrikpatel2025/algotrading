@@ -4,10 +4,12 @@ Tests for Bot Status API Endpoint
 Unit tests for the trading bot status endpoint.
 """
 
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from core.bot_controller import BotController
 from core.bot_status import BotStatusTracker, bot_status_tracker
 from core.data_models import MonitoredPair
 from server import app
@@ -21,7 +23,10 @@ def client():
 
 @pytest.fixture
 def reset_tracker():
-    """Reset the bot status tracker to default state before each test."""
+    """Reset the bot status tracker and controller to default state before each test."""
+    # Reset the bot controller singleton
+    BotController._instance = None
+
     bot_status_tracker.set_stopped()
     bot_status_tracker._signals_today = 0
     bot_status_tracker._trades_today = 0
@@ -29,9 +34,11 @@ def reset_tracker():
     bot_status_tracker._last_signal_pair = None
     bot_status_tracker._last_signal_type = None
     bot_status_tracker._error_message = None
+    bot_status_tracker._pid = None
     yield
     # Cleanup after test
     bot_status_tracker.set_stopped()
+    BotController._instance = None
 
 
 class TestBotStatusEndpoint:
@@ -52,9 +59,21 @@ class TestBotStatusEndpoint:
 
     def test_bot_status_running_state(self, client, reset_tracker):
         """Test bot status when bot is running."""
-        bot_status_tracker.set_running("Test Strategy", "A test trading strategy")
+        # Mock the bot controller to report running status
+        mock_controller_status = {
+            "status": "running",
+            "pid": 12345,
+            "started_at": None,
+            "can_start": False,
+            "can_stop": True,
+        }
+        with patch("core.bot_status._get_bot_controller") as mock_get_controller:
+            mock_controller = mock_get_controller.return_value
+            mock_controller.get_status.return_value = mock_controller_status
 
-        response = client.get("/api/bot/status")
+            bot_status_tracker.set_running("Test Strategy", "A test trading strategy")
+
+            response = client.get("/api/bot/status")
 
         assert response.status_code == 200
         data = response.json()
@@ -124,15 +143,27 @@ class TestBotStatusEndpoint:
 
     def test_bot_status_uptime_calculation(self, client, reset_tracker):
         """Test that uptime is calculated correctly."""
-        bot_status_tracker.set_running("Test", "Test strategy")
+        # Mock the bot controller to report running status
+        mock_controller_status = {
+            "status": "running",
+            "pid": 12345,
+            "started_at": None,
+            "can_start": False,
+            "can_stop": True,
+        }
+        with patch("core.bot_status._get_bot_controller") as mock_get_controller:
+            mock_controller = mock_get_controller.return_value
+            mock_controller.get_status.return_value = mock_controller_status
 
-        # First request
-        response1 = client.get("/api/bot/status")
-        uptime1 = response1.json()["uptime_seconds"]
+            bot_status_tracker.set_running("Test", "Test strategy")
 
-        # Small delay (implicit in test execution)
-        response2 = client.get("/api/bot/status")
-        uptime2 = response2.json()["uptime_seconds"]
+            # First request
+            response1 = client.get("/api/bot/status")
+            uptime1 = response1.json()["uptime_seconds"]
+
+            # Small delay (implicit in test execution)
+            response2 = client.get("/api/bot/status")
+            uptime2 = response2.json()["uptime_seconds"]
 
         assert uptime1 is not None
         assert uptime2 is not None
