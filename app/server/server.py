@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import get_options
 from config import settings
+from core.bot_status import bot_status_tracker
 from core.data_models import (
     BotStatusResponse,
     HeadlineItem,
@@ -34,7 +35,6 @@ from core.data_models import (
     TradeInfo,
     TradingOptionsResponse,
 )
-from core.bot_status import bot_status_tracker
 from core.openfx_api import OpenFxApi
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals

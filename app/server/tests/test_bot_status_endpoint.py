@@ -4,14 +4,12 @@ Tests for Bot Status API Endpoint
 Unit tests for the trading bot status endpoint.
 """
 
-from datetime import datetime
-from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from core.bot_status import BotStatusTracker, bot_status_tracker
-from core.data_models import ActiveStrategy, MonitoredPair
+from core.data_models import MonitoredPair
 from server import app
 
 
