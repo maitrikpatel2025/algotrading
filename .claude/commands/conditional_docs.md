@@ -59,3 +59,12 @@ This prompt helps you determine what documentation you should read based on the 
     - When adding new bot metrics or status indicators
     - When troubleshooting bot status display or auto-refresh issues
     - When integrating bot state changes with the status tracker
+
+- app_docs/feature-edc8ccb5-bot-start-stop-control.md
+  - Conditions:
+    - When working with bot start/stop functionality
+    - When implementing or modifying the BotController class
+    - When working with /api/bot/start, /api/bot/stop, or /api/bot/restart endpoints
+    - When troubleshooting bot process management or subprocess lifecycle issues
+    - When modifying bot control UI buttons or confirmation dialogs
+    - When working with lock file mechanism or PID tracking
