@@ -6,7 +6,7 @@
         "@playwright/mcp@latest",
         "--isolated",
         "--config",
-        "/home/ubuntu/algotrading/trees/bbcca085/playwright-mcp-config.json"
+        "/home/ubuntu/algotrading/trees/fbcb8acc/playwright-mcp-config.json"
       ]
     }
   }
