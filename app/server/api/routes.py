@@ -8,7 +8,6 @@ from typing import Any, Dict
 
 from config import settings
 
-
 # Human-readable display labels for timeframe codes
 GRANULARITY_LABELS: Dict[str, str] = {
     "M1": "1 Min",

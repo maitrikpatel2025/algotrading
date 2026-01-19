@@ -4,9 +4,8 @@ Tests for API Routes
 Unit tests for the trading API routes module.
 """
 
-import pytest
 
-from api.routes import make_option, get_options, GRANULARITY_LABELS
+from api.routes import GRANULARITY_LABELS, get_options, make_option
 from config import settings
 
 
