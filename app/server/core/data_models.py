@@ -310,3 +310,86 @@ class SpreadResponse(BaseModel):
     ask: Optional[float] = Field(None, description="Current ask price")
     timestamp: Optional[datetime] = Field(None, description="Price timestamp")
     error: Optional[str] = Field(None, description="Error message if fetch failed")
+
+
+# =============================================================================
+# Strategy Persistence Models
+# =============================================================================
+
+class StrategyIndicator(BaseModel):
+    """Indicator instance in a strategy."""
+    id: str = Field(..., description="Indicator type ID (e.g., 'sma', 'ema')")
+    instance_id: str = Field(..., description="Unique instance ID")
+    params: Optional[Dict[str, Any]] = Field(None, description="Indicator parameters")
+    color: Optional[str] = Field(None, description="Indicator color")
+    line_width: Optional[int] = Field(None, description="Line width")
+    line_style: Optional[str] = Field(None, description="Line style (solid, dashed)")
+    fill_opacity: Optional[float] = Field(None, description="Fill opacity for area indicators")
+
+
+class StrategyCondition(BaseModel):
+    """Condition in a strategy."""
+    id: str = Field(..., description="Unique condition ID")
+    section: Literal["entry", "exit"] = Field(..., description="Condition section")
+    left_operand: Dict[str, Any] = Field(..., description="Left operand configuration")
+    operator: str = Field(..., description="Comparison operator")
+    right_operand: Optional[Dict[str, Any]] = Field(None, description="Right operand configuration")
+    indicator_instance_id: Optional[str] = Field(None, description="Associated indicator instance ID")
+    pattern_instance_id: Optional[str] = Field(None, description="Associated pattern instance ID")
+    is_pattern_condition: Optional[bool] = Field(False, description="Whether this is a pattern condition")
+
+
+class StrategyConfig(BaseModel):
+    """Complete strategy configuration."""
+    name: str = Field(..., description="Strategy name")
+    description: Optional[str] = Field(None, description="Strategy description")
+    trade_direction: Literal["long", "short", "both"] = Field(
+        default="both",
+        description="Trade direction: long, short, or both"
+    )
+    pair: Optional[str] = Field(None, description="Currency pair")
+    timeframe: Optional[str] = Field(None, description="Timeframe")
+    indicators: List[StrategyIndicator] = Field(default=[], description="Indicator instances")
+    conditions: List[StrategyCondition] = Field(default=[], description="Trading conditions")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+
+
+class SaveStrategyRequest(BaseModel):
+    """Request to save a strategy."""
+    strategy: StrategyConfig = Field(..., description="Strategy configuration to save")
+
+
+class SaveStrategyResponse(BaseModel):
+    """Response from saving a strategy."""
+    success: bool = Field(..., description="Whether the save was successful")
+    strategy_id: Optional[str] = Field(None, description="ID of the saved strategy")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class LoadStrategyResponse(BaseModel):
+    """Response from loading a strategy."""
+    success: bool = Field(..., description="Whether the load was successful")
+    strategy: Optional[StrategyConfig] = Field(None, description="Loaded strategy configuration")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class StrategyListItem(BaseModel):
+    """Strategy list item for browsing."""
+    id: str = Field(..., description="Strategy ID")
+    name: str = Field(..., description="Strategy name")
+    description: Optional[str] = Field(None, description="Strategy description")
+    trade_direction: Literal["long", "short", "both"] = Field(..., description="Trade direction")
+    pair: Optional[str] = Field(None, description="Currency pair")
+    timeframe: Optional[str] = Field(None, description="Timeframe")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+
+
+class ListStrategiesResponse(BaseModel):
+    """Response from listing strategies."""
+    success: bool = Field(..., description="Whether the list was successful")
+    strategies: List[StrategyListItem] = Field(default=[], description="List of strategies")
+    count: int = Field(0, description="Number of strategies")
+    error: Optional[str] = Field(None, description="Error details if failed")

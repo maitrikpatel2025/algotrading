@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import ConditionBlock from './ConditionBlock';
 import { CONDITION_SECTIONS } from '../app/conditionDefaults';
+import { TRADE_DIRECTIONS } from '../app/constants';
 
 // localStorage key for panel state
 const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
@@ -28,6 +29,7 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  * @param {Function} onConditionMove - Callback when condition is moved between sections
  * @param {Function} onIndicatorHover - Callback when hovering over condition block
  * @param {string} highlightedIndicatorId - ID of indicator to highlight
+ * @param {string} tradeDirection - Trade direction: 'long', 'short', or 'both'
  */
 function LogicPanel({
   conditions = [],
@@ -38,6 +40,7 @@ function LogicPanel({
   onConditionMove,
   onIndicatorHover,
   highlightedIndicatorId,
+  tradeDirection = TRADE_DIRECTIONS.BOTH,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -67,6 +70,10 @@ function LogicPanel({
   // Filter conditions by section
   const entryConditions = conditions.filter(c => c.section === CONDITION_SECTIONS.ENTRY);
   const exitConditions = conditions.filter(c => c.section === CONDITION_SECTIONS.EXIT);
+
+  // Determine which sections to show based on trade direction
+  const showEntrySection = tradeDirection === TRADE_DIRECTIONS.LONG || tradeDirection === TRADE_DIRECTIONS.BOTH;
+  const showExitSection = tradeDirection === TRADE_DIRECTIONS.SHORT || tradeDirection === TRADE_DIRECTIONS.BOTH;
 
   // Get indicator/pattern color for a condition
   const getConditionColor = useCallback((condition) => {
@@ -176,15 +183,16 @@ function LogicPanel({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         {/* Entry Conditions Section */}
-        <div
-          className={cn(
-            "border-b border-border",
-            dragOverSection === CONDITION_SECTIONS.ENTRY && "bg-primary/5 ring-2 ring-inset ring-primary/30"
-          )}
-          onDragOver={(e) => handleDragOver(e, CONDITION_SECTIONS.ENTRY)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, CONDITION_SECTIONS.ENTRY)}
-        >
+        {showEntrySection && (
+          <div
+            className={cn(
+              "border-b border-border",
+              dragOverSection === CONDITION_SECTIONS.ENTRY && "bg-primary/5 ring-2 ring-inset ring-primary/30"
+            )}
+            onDragOver={(e) => handleDragOver(e, CONDITION_SECTIONS.ENTRY)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, CONDITION_SECTIONS.ENTRY)}
+          >
           {/* Section Header */}
           <div className="flex items-center gap-2 px-4 py-2.5 bg-success/10">
             <LogIn className="h-4 w-4 text-success" />
@@ -224,16 +232,18 @@ function LogicPanel({
             )}
           </div>
         </div>
+        )}
 
         {/* Exit Conditions Section */}
-        <div
-          className={cn(
-            dragOverSection === CONDITION_SECTIONS.EXIT && "bg-primary/5 ring-2 ring-inset ring-primary/30"
-          )}
-          onDragOver={(e) => handleDragOver(e, CONDITION_SECTIONS.EXIT)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, CONDITION_SECTIONS.EXIT)}
-        >
+        {showExitSection && (
+          <div
+            className={cn(
+              dragOverSection === CONDITION_SECTIONS.EXIT && "bg-primary/5 ring-2 ring-inset ring-primary/30"
+            )}
+            onDragOver={(e) => handleDragOver(e, CONDITION_SECTIONS.EXIT)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, CONDITION_SECTIONS.EXIT)}
+          >
           {/* Section Header */}
           <div className="flex items-center gap-2 px-4 py-2.5 bg-destructive/10">
             <LogOut className="h-4 w-4 text-destructive" />
@@ -273,6 +283,7 @@ function LogicPanel({
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Panel Footer */}
