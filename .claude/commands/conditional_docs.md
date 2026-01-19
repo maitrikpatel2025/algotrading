@@ -150,3 +150,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing indicator limits or undo functionality
     - When troubleshooting indicator drag-drop or chart rendering issues
     - When adding new technical indicator types to the system
+
+- app_docs/feature-41bf1b05-auto-condition-block.md
+  - Conditions:
+    - When working with the Logic Panel or condition blocks
+    - When implementing or modifying trading condition functionality
+    - When working with indicator-condition relationships
+    - When implementing confirmation dialogs for indicator/condition deletion
+    - When working with condition dropdowns or operand selection
+    - When modifying the Strategy page right sidebar
+    - When troubleshooting condition creation or auto-population issues
+    - When implementing visual connections between chart and logic panel

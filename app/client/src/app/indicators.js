@@ -11,6 +11,51 @@
 export const INDICATOR_CATEGORIES = ['Trend', 'Momentum', 'Volatility', 'Volume', 'Custom'];
 
 /**
+ * Generate display name for an indicator instance based on its parameters
+ * @param {Object} indicator - Indicator definition
+ * @param {Object} params - Indicator parameters
+ * @returns {string} Display name like "EMA (50)" or "BB (20, 2)"
+ */
+export function getIndicatorDisplayName(indicator, params = {}) {
+  const mergedParams = { ...indicator.defaultParams, ...params };
+  const shortName = indicator.shortName;
+
+  switch (indicator.id) {
+    case 'sma':
+    case 'ema':
+    case 'rsi':
+    case 'cci':
+    case 'williams_r':
+    case 'atr':
+    case 'adx':
+      return `${shortName} (${mergedParams.period})`;
+
+    case 'macd':
+      return `${shortName} (${mergedParams.fastPeriod}, ${mergedParams.slowPeriod}, ${mergedParams.signalPeriod})`;
+
+    case 'stochastic':
+      return `${shortName} (${mergedParams.kPeriod}, ${mergedParams.dPeriod})`;
+
+    case 'bollinger_bands':
+      return `${shortName} (${mergedParams.period}, ${mergedParams.stdDev})`;
+
+    case 'keltner_channel':
+      return `${shortName} (${mergedParams.period}, ${mergedParams.atrMultiplier})`;
+
+    case 'obv':
+      return shortName;
+
+    case 'volume_profile':
+      return `${shortName} (${mergedParams.bins})`;
+
+    default:
+      // Fallback: show all numeric params
+      const paramValues = Object.values(mergedParams).filter(v => typeof v === 'number');
+      return paramValues.length > 0 ? `${shortName} (${paramValues.join(', ')})` : shortName;
+  }
+}
+
+/**
  * Category icon mapping (Lucide icon names)
  */
 export const CATEGORY_ICONS = {
@@ -54,6 +99,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.OVERLAY,
     defaultParams: { period: 20 },
     color: '#3B82F6', // Blue
+    components: null, // Single line indicator
+    defaultConditionTemplate: {
+      leftOperand: 'close',
+      operator: 'crosses_above',
+      rightOperand: 'indicator', // Will reference this indicator
+    },
   },
   {
     id: 'ema',
@@ -64,6 +115,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.OVERLAY,
     defaultParams: { period: 20 },
     color: '#F97316', // Orange
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'close',
+      operator: 'crosses_above',
+      rightOperand: 'indicator',
+    },
   },
   {
     id: 'macd',
@@ -74,6 +131,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
     color: '#22C55E', // Green
+    components: ['MACD Line', 'Signal Line', 'Histogram'],
+    defaultConditionTemplate: {
+      leftOperand: 'indicator:MACD Line',
+      operator: 'crosses_above',
+      rightOperand: 'indicator:Signal Line',
+    },
   },
   {
     id: 'adx',
@@ -84,6 +147,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { period: 14 },
     color: '#A855F7', // Purple
+    components: ['ADX', '+DI', '-DI'],
+    defaultConditionTemplate: {
+      leftOperand: 'indicator:ADX',
+      operator: 'is_above',
+      rightOperand: 'value:25',
+    },
   },
 
   // Momentum Indicators
@@ -96,6 +165,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { period: 14 },
     color: '#8B5CF6', // Violet
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'indicator',
+      operator: 'is_above',
+      rightOperand: 'value:70',
+    },
   },
   {
     id: 'stochastic',
@@ -106,6 +181,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { kPeriod: 14, dPeriod: 3 },
     color: '#EC4899', // Pink
+    components: ['%K', '%D'],
+    defaultConditionTemplate: {
+      leftOperand: 'indicator:%K',
+      operator: 'crosses_above',
+      rightOperand: 'indicator:%D',
+    },
   },
   {
     id: 'cci',
@@ -116,6 +197,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { period: 20 },
     color: '#14B8A6', // Teal
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'indicator',
+      operator: 'is_above',
+      rightOperand: 'value:100',
+    },
   },
   {
     id: 'williams_r',
@@ -126,6 +213,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { period: 14 },
     color: '#F59E0B', // Amber
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'indicator',
+      operator: 'is_above',
+      rightOperand: 'value:-20',
+    },
   },
 
   // Volatility Indicators
@@ -138,6 +231,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.OVERLAY,
     defaultParams: { period: 20, stdDev: 2 },
     color: '#6B7280', // Gray
+    components: ['Upper Band', 'Middle Band', 'Lower Band'],
+    defaultConditionTemplate: {
+      leftOperand: 'close',
+      operator: 'crosses_above',
+      rightOperand: 'indicator:Upper Band',
+    },
   },
   {
     id: 'atr',
@@ -148,6 +247,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { period: 14 },
     color: '#EF4444', // Red
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'indicator',
+      operator: 'is_above',
+      rightOperand: 'value:0.001',
+    },
   },
   {
     id: 'keltner_channel',
@@ -158,6 +263,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.OVERLAY,
     defaultParams: { period: 20, atrMultiplier: 2 },
     color: '#06B6D4', // Cyan
+    components: ['Upper Channel', 'Middle Channel', 'Lower Channel'],
+    defaultConditionTemplate: {
+      leftOperand: 'close',
+      operator: 'crosses_above',
+      rightOperand: 'indicator:Upper Channel',
+    },
   },
 
   // Volume Indicators
@@ -170,6 +281,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: {},
     color: '#84CC16', // Lime
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'indicator',
+      operator: 'is_above',
+      rightOperand: 'value:0',
+    },
   },
   {
     id: 'volume_profile',
@@ -180,6 +297,12 @@ export const INDICATORS = [
     type: INDICATOR_TYPES.SUBCHART,
     defaultParams: { bins: 24 },
     color: '#0EA5E9', // Sky
+    components: null,
+    defaultConditionTemplate: {
+      leftOperand: 'indicator',
+      operator: 'is_above',
+      rightOperand: 'value:0',
+    },
   },
 ];
 

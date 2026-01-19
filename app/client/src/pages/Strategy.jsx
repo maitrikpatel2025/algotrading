@@ -7,9 +7,12 @@ import PairSelector from '../components/PairSelector';
 import Select from '../components/Select';
 import Technicals from '../components/Technicals';
 import IndicatorLibrary from '../components/IndicatorLibrary';
+import LogicPanel from '../components/LogicPanel';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { cn } from '../lib/utils';
-import { Play, RefreshCw, BarChart3, AlertTriangle, Info } from 'lucide-react';
-import { INDICATOR_TYPES } from '../app/indicators';
+import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucide-react';
+import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
+import { createConditionFromIndicator } from '../app/conditionDefaults';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
@@ -50,6 +53,25 @@ function Strategy() {
   const [activeIndicators, setActiveIndicators] = useState([]);
   const [indicatorHistory, setIndicatorHistory] = useState([]);
   const [indicatorError, setIndicatorError] = useState(null);
+
+  // Condition state management
+  const [conditions, setConditions] = useState([]);
+  const [conditionHistory, setConditionHistory] = useState([]);
+
+  // Hover highlight state for visual connections
+  const [highlightedIndicatorId, setHighlightedIndicatorId] = useState(null);
+
+  // Logic Panel mobile state
+  const [isLogicPanelMobileOpen, setIsLogicPanelMobileOpen] = useState(false);
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    actions: [],
+    variant: 'warning',
+  });
 
   // Debounce timer ref for timeframe changes
   const debounceTimerRef = useRef(null);
@@ -244,6 +266,11 @@ function Strategy() {
     });
   }, []);
 
+  // Helper to get indicator display name
+  const getDisplayName = useCallback((indicator) => {
+    return getIndicatorDisplayName(indicator, indicator.defaultParams);
+  }, []);
+
   // Handle indicator drop from IndicatorLibrary
   const handleIndicatorDrop = useCallback((indicator) => {
     // Check limits based on indicator type
@@ -266,26 +293,134 @@ function Strategy() {
       instanceId: `${indicator.id}-${Date.now()}`,
     };
 
+    // Create display name for the indicator
+    const displayName = getIndicatorDisplayName(newIndicator, newIndicator.defaultParams);
+
+    // Create a condition for the indicator
+    const newCondition = createConditionFromIndicator(newIndicator, displayName);
+
     setActiveIndicators(prev => [...prev, newIndicator]);
-    setIndicatorHistory(prev => [...prev, newIndicator]);
+    setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
+    setConditions(prev => [...prev, newCondition]);
+    setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
     setIndicatorError(null);
   }, [activeIndicators]);
 
-  // Handle indicator removal
+  // Handle indicator removal with confirmation
   const handleRemoveIndicator = useCallback((instanceId) => {
-    setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== instanceId));
+    // Find conditions using this indicator
+    const relatedConditions = conditions.filter(c => c.indicatorInstanceId === instanceId);
+    const indicator = activeIndicators.find(ind => ind.instanceId === instanceId);
+    const displayName = indicator ? getDisplayName(indicator) : 'this indicator';
+
+    if (relatedConditions.length > 0) {
+      // Show confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Remove Indicator',
+        message: `"${displayName}" is used in ${relatedConditions.length} condition${relatedConditions.length !== 1 ? 's' : ''}. What would you like to do?`,
+        variant: 'warning',
+        actions: [
+          {
+            label: 'Remove All',
+            variant: 'danger',
+            onClick: () => {
+              setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== instanceId));
+              setConditions(prev => prev.filter(c => c.indicatorInstanceId !== instanceId));
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+          {
+            label: 'Keep Conditions',
+            variant: 'secondary',
+            onClick: () => {
+              setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== instanceId));
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+        ],
+      });
+    } else {
+      // No related conditions, just remove
+      setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== instanceId));
+    }
     setIndicatorError(null);
+  }, [conditions, activeIndicators, getDisplayName]);
+
+  // Handle condition update
+  const handleConditionUpdate = useCallback((updatedCondition) => {
+    setConditions(prev => prev.map(c =>
+      c.id === updatedCondition.id ? updatedCondition : c
+    ));
   }, []);
 
-  // Handle undo (Ctrl+Z)
-  const handleUndoIndicator = useCallback(() => {
-    if (indicatorHistory.length === 0) return;
+  // Handle condition deletion with confirmation
+  const handleConditionDelete = useCallback((conditionId) => {
+    const condition = conditions.find(c => c.id === conditionId);
+    const indicator = activeIndicators.find(ind => ind.instanceId === condition?.indicatorInstanceId);
+    const displayName = indicator ? getDisplayName(indicator) : 'the indicator';
 
-    const lastIndicator = indicatorHistory[indicatorHistory.length - 1];
-    setIndicatorHistory(prev => prev.slice(0, -1));
-    setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== lastIndicator.instanceId));
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remove Condition',
+      message: `Remove this condition? "${displayName}" will remain on the chart.`,
+      variant: 'warning',
+      actions: [
+        {
+          label: 'Remove Condition',
+          variant: 'danger',
+          onClick: () => {
+            setConditions(prev => prev.filter(c => c.id !== conditionId));
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          },
+        },
+      ],
+    });
+  }, [conditions, activeIndicators, getDisplayName]);
+
+  // Handle moving condition between sections
+  const handleConditionMove = useCallback((conditionId, targetSection) => {
+    setConditions(prev => prev.map(c =>
+      c.id === conditionId ? { ...c, section: targetSection } : c
+    ));
+  }, []);
+
+  // Handle hover for visual connections
+  const handleIndicatorHover = useCallback((instanceId) => {
+    setHighlightedIndicatorId(instanceId);
+  }, []);
+
+  // Close confirmation dialog
+  const closeConfirmDialog = useCallback(() => {
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle undo (Ctrl+Z) - supports both indicators and conditions
+  const handleUndo = useCallback(() => {
+    // Check condition history first (most recent action)
+    if (conditionHistory.length > 0) {
+      const lastEntry = conditionHistory[conditionHistory.length - 1];
+      setConditionHistory(prev => prev.slice(0, -1));
+
+      if (lastEntry.type === 'condition') {
+        setConditions(prev => prev.filter(c => c.id !== lastEntry.item.id));
+      }
+    }
+
+    // Then check indicator history
+    if (indicatorHistory.length > 0) {
+      const lastEntry = indicatorHistory[indicatorHistory.length - 1];
+      setIndicatorHistory(prev => prev.slice(0, -1));
+
+      if (lastEntry.type === 'indicator') {
+        setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== lastEntry.item.instanceId));
+        // Also remove related conditions
+        setConditions(prev => prev.filter(c => c.indicatorInstanceId !== lastEntry.item.instanceId));
+      }
+    }
+
     setIndicatorError(null);
-  }, [indicatorHistory]);
+  }, [indicatorHistory, conditionHistory]);
 
   // Clear indicator error after 5 seconds
   useEffect(() => {
@@ -308,13 +443,13 @@ function Strategy() {
       // Ctrl+Z or Cmd+Z for undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
-        handleUndoIndicator();
+        handleUndo();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndoIndicator]);
+  }, [handleUndo]);
 
   // Loading state
   if (loading) {
@@ -372,21 +507,35 @@ function Strategy() {
         </div>
       </div>
 
-      {/* Mobile Panel Toggle Button */}
-      <button
-        type="button"
-        onClick={handlePanelToggle}
-        className={cn(
-          "md:hidden fixed left-4 bottom-4 z-40",
-          "flex items-center justify-center w-12 h-12",
-          "bg-primary text-primary-foreground rounded-full shadow-lg",
-          "hover:bg-primary/90 transition-colors",
-          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        )}
-        aria-label="Toggle indicator library"
-      >
-        <BarChart3 className="h-5 w-5" />
-      </button>
+      {/* Mobile Panel Toggle Buttons */}
+      <div className="md:hidden fixed bottom-4 z-40 flex gap-3 left-4 right-4 justify-between">
+        <button
+          type="button"
+          onClick={handlePanelToggle}
+          className={cn(
+            "flex items-center justify-center w-12 h-12",
+            "bg-primary text-primary-foreground rounded-full shadow-lg",
+            "hover:bg-primary/90 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          )}
+          aria-label="Toggle indicator library"
+        >
+          <BarChart3 className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsLogicPanelMobileOpen(true)}
+          className={cn(
+            "flex items-center justify-center w-12 h-12",
+            "bg-accent text-accent-foreground rounded-full shadow-lg",
+            "hover:bg-accent/90 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+          )}
+          aria-label="Toggle logic panel"
+        >
+          <Sparkles className="h-5 w-5" />
+        </button>
+      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 py-8 px-4 md:px-6 space-y-6">
@@ -581,6 +730,62 @@ function Strategy() {
           </div>
         )}
       </div>
+
+      {/* Logic Panel - Right Sidebar (Desktop) */}
+      <div className="hidden md:flex flex-shrink-0">
+        <LogicPanel
+          conditions={conditions}
+          activeIndicators={activeIndicators}
+          getIndicatorDisplayName={getDisplayName}
+          onConditionUpdate={handleConditionUpdate}
+          onConditionDelete={handleConditionDelete}
+          onConditionMove={handleConditionMove}
+          onIndicatorHover={handleIndicatorHover}
+          highlightedIndicatorId={highlightedIndicatorId}
+        />
+      </div>
+
+      {/* Mobile Logic Panel - Overlay */}
+      <div
+        className={cn(
+          "md:hidden fixed inset-0 z-50 transition-opacity duration-200",
+          isLogicPanelMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => setIsLogicPanelMobileOpen(false)}
+        />
+        {/* Panel */}
+        <div
+          className={cn(
+            "absolute right-0 top-0 h-full transition-transform duration-200",
+            isLogicPanelMobileOpen ? "translate-x-0" : "translate-x-full"
+          )}
+        >
+          <LogicPanel
+            conditions={conditions}
+            activeIndicators={activeIndicators}
+            getIndicatorDisplayName={getDisplayName}
+            onConditionUpdate={handleConditionUpdate}
+            onConditionDelete={handleConditionDelete}
+            onConditionMove={handleConditionMove}
+            onIndicatorHover={handleIndicatorHover}
+            highlightedIndicatorId={highlightedIndicatorId}
+          />
+        </div>
+      </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={closeConfirmDialog}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        actions={confirmDialog.actions}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }
