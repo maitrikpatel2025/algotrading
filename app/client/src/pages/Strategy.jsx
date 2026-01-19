@@ -439,9 +439,22 @@ function Strategy() {
       return;
     }
 
-    // Run pattern detection
+    // Validate pattern object integrity
+    if (!pattern || !pattern.id || !pattern.name) {
+      console.error('Invalid pattern object received:', pattern);
+      setIndicatorError('Invalid pattern data. Please try again.');
+      return;
+    }
+
+    // Log pattern being processed (development debugging)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Pattern drop - processing pattern:', { id: pattern.id, name: pattern.name });
+    }
+
+    // Run pattern detection with validated pattern ID
+    const patternId = pattern.id;
     const detectedPatterns = detectPattern(
-      pattern.id,
+      patternId,
       priceData.mid_o,
       priceData.mid_h,
       priceData.mid_l,
@@ -449,12 +462,18 @@ function Strategy() {
     );
 
     // Create pattern instance with detected patterns
+    // IMPORTANT: Spread pattern first, then override with our values
     const newPattern = {
       ...pattern,
-      instanceId: `${pattern.id}-${Date.now()}`,
+      instanceId: `${patternId}-${Date.now()}`,
       detectedPatterns: detectedPatterns,
       detectedCount: detectedPatterns.length,
     };
+
+    // Verify pattern integrity after creation
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Pattern drop - created newPattern:', { id: newPattern.id, name: newPattern.name, count: newPattern.detectedCount });
+    }
 
     // Create a condition for the pattern
     const newCondition = createConditionFromPattern(newPattern);

@@ -188,9 +188,17 @@ function PriceChart({
     try {
       const itemData = JSON.parse(e.dataTransfer.getData('application/json'));
       if (itemData) {
-        // Check if it's a pattern or indicator
-        if (itemData.isPattern && onPatternDrop) {
-          onPatternDrop(itemData);
+        // Validate pattern data integrity before passing to handler
+        if (itemData.isPattern) {
+          if (!itemData.id || !itemData.name) {
+            console.error('Pattern drop error: Missing id or name in pattern data', itemData);
+            return;
+          }
+          // Create a defensive copy to prevent any mutation
+          const patternData = { ...itemData };
+          if (onPatternDrop) {
+            onPatternDrop(patternData);
+          }
         } else if (onIndicatorDrop) {
           onIndicatorDrop(itemData);
         }

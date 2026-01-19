@@ -468,6 +468,12 @@ export function detectPattern(patternId, opens, highs, lows, closes) {
     return [];
   }
 
+  // Validate patternId
+  if (!patternId || typeof patternId !== 'string') {
+    console.error('detectPattern: Invalid patternId received:', patternId);
+    return [];
+  }
+
   switch (patternId) {
     case 'doji':
       return detectDoji(opens, highs, lows, closes);
@@ -488,7 +494,7 @@ export function detectPattern(patternId, opens, highs, lows, closes) {
     case 'three_black_crows':
       return detectThreeBlackCrows(opens, highs, lows, closes);
     default:
-      console.warn(`Unknown pattern: ${patternId}`);
+      console.warn(`detectPattern: Unknown pattern ID: "${patternId}"`);
       return [];
   }
 }
