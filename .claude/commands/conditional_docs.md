@@ -161,3 +161,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When modifying the Strategy page right sidebar
     - When troubleshooting condition creation or auto-population issues
     - When implementing visual connections between chart and logic panel
+
+- app_docs/feature-b11af5b7-strategy-page-layout-redesign.md
+  - Conditions:
+    - When working with the Strategy page layout or responsive design
+    - When implementing or modifying spacing, padding, or margins on the Strategy page
+    - When troubleshooting visual crowding or layout density issues
+    - When working with the chart and technicals section layout
+    - When modifying mobile floating action buttons or mobile UX on Strategy page
+    - When implementing responsive breakpoints for Strategy page components
+    - When following the UI style guide for dashboard layouts
+    - When reorganizing Strategy page component hierarchy or grid layouts
