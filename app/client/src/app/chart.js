@@ -16,6 +16,7 @@ import {
 import { INDICATOR_TYPES } from './indicators';
 import { detectPattern } from './patternDetection';
 import { PATTERN_TYPES } from './patterns';
+import { PREVIEW_LINE_DASH, PREVIEW_OPACITY, PREVIEW_LABEL_SUFFIX } from './chartConstants';
 
 // Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
@@ -29,6 +30,39 @@ const CHART_COLORS = {
   line: '#3B82F6',         // Blue for line chart
   areaFill: 'rgba(59, 130, 246, 0.2)',      // Semi-transparent blue
 };
+
+/**
+ * Apply preview styling to a trace
+ * @param {Object} trace - Plotly trace object
+ * @param {boolean} isPreview - Whether this is a preview indicator
+ * @returns {Object} Modified trace with preview styling
+ */
+function applyPreviewStyling(trace, isPreview) {
+  if (!isPreview) {
+    return trace;
+  }
+
+  // Apply preview styling: dashed lines and reduced opacity
+  const styledTrace = { ...trace };
+
+  // Apply dashed line style
+  if (styledTrace.line) {
+    styledTrace.line = {
+      ...styledTrace.line,
+      dash: PREVIEW_LINE_DASH,
+    };
+  }
+
+  // Apply reduced opacity
+  styledTrace.opacity = PREVIEW_OPACITY;
+
+  // Append "(Preview)" suffix to trace name
+  if (styledTrace.name) {
+    styledTrace.name = styledTrace.name + PREVIEW_LABEL_SUFFIX;
+  }
+
+  return styledTrace;
+}
 
 /**
  * Calculate the number of visible candles based on X-axis range
@@ -418,11 +452,12 @@ function createOverlayIndicatorTraces(chartData, indicator) {
   const lows = chartData.mid_l;
   // Use custom params if available, otherwise fall back to defaultParams
   const params = indicator.params || indicator.defaultParams || {};
+  const isPreview = indicator.isPreview || false;
 
   switch (indicator.id) {
     case 'sma': {
       const smaValues = calculateSMA(closes, params.period || 20);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: smaValues,
         type: 'scatter',
@@ -433,12 +468,13 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
         hoverlabel: { bgcolor: indicator.color },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'ema': {
       const emaValues = calculateEMA(closes, params.period || 20);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: emaValues,
         type: 'scatter',
@@ -448,7 +484,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `EMA: %{y:.5f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'bollinger_bands': {
@@ -456,7 +493,7 @@ function createOverlayIndicatorTraces(chartData, indicator) {
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       // Upper band
-      traces.push({
+      const upperTrace = applyPreviewStyling({
         x: chartData.time,
         y: bb.upper,
         type: 'scatter',
@@ -466,9 +503,10 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `BB Upper: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(upperTrace);
       // Middle band (SMA)
-      traces.push({
+      const middleTrace = applyPreviewStyling({
         x: chartData.time,
         y: bb.middle,
         type: 'scatter',
@@ -478,9 +516,10 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `BB Middle: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(middleTrace);
       // Lower band
-      traces.push({
+      const lowerTrace = applyPreviewStyling({
         x: chartData.time,
         y: bb.lower,
         type: 'scatter',
@@ -492,7 +531,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `BB Lower: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(lowerTrace);
       break;
     }
     case 'keltner_channel': {
@@ -500,7 +540,7 @@ function createOverlayIndicatorTraces(chartData, indicator) {
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       // Upper channel
-      traces.push({
+      const upperTrace = applyPreviewStyling({
         x: chartData.time,
         y: kc.upper,
         type: 'scatter',
@@ -510,9 +550,10 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `KC Upper: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(upperTrace);
       // Middle (EMA)
-      traces.push({
+      const middleTrace = applyPreviewStyling({
         x: chartData.time,
         y: kc.middle,
         type: 'scatter',
@@ -522,9 +563,10 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `KC Middle: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(middleTrace);
       // Lower channel
-      traces.push({
+      const lowerTrace = applyPreviewStyling({
         x: chartData.time,
         y: kc.lower,
         type: 'scatter',
@@ -536,7 +578,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         hovertemplate: `KC Lower: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(lowerTrace);
       break;
     }
     default:
@@ -557,11 +600,12 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
   const lows = chartData.mid_l;
   // Use custom params if available, otherwise fall back to defaultParams
   const params = indicator.params || indicator.defaultParams || {};
+  const isPreview = indicator.isPreview || false;
 
   switch (indicator.id) {
     case 'rsi': {
       const rsiValues = calculateRSI(closes, params.period || 14);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: rsiValues,
         type: 'scatter',
@@ -572,7 +616,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `RSI: %{y:.2f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'macd': {
@@ -585,7 +630,7 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       // MACD line
-      traces.push({
+      const macdTrace = applyPreviewStyling({
         x: chartData.time,
         y: macd.macd,
         type: 'scatter',
@@ -596,9 +641,10 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `MACD: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(macdTrace);
       // Signal line
-      traces.push({
+      const signalTrace = applyPreviewStyling({
         x: chartData.time,
         y: macd.signal,
         type: 'scatter',
@@ -609,9 +655,10 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `Signal: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(signalTrace);
       // Histogram
-      traces.push({
+      const histTrace = applyPreviewStyling({
         x: chartData.time,
         y: macd.histogram,
         type: 'bar',
@@ -623,14 +670,15 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `Hist: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(histTrace);
       break;
     }
     case 'stochastic': {
       const stoch = calculateStochastic(highs, lows, closes, params.kPeriod || 14, params.dPeriod || 3);
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
-      traces.push({
+      const kTrace = applyPreviewStyling({
         x: chartData.time,
         y: stoch.k,
         type: 'scatter',
@@ -641,8 +689,9 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `%K: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
-      traces.push({
+      }, isPreview);
+      traces.push(kTrace);
+      const dTrace = applyPreviewStyling({
         x: chartData.time,
         y: stoch.d,
         type: 'scatter',
@@ -653,12 +702,13 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `%D: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(dTrace);
       break;
     }
     case 'cci': {
       const cciValues = calculateCCI(highs, lows, closes, params.period || 20);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: cciValues,
         type: 'scatter',
@@ -669,12 +719,13 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `CCI: %{y:.2f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'williams_r': {
       const wrValues = calculateWilliamsR(highs, lows, closes, params.period || 14);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: wrValues,
         type: 'scatter',
@@ -685,14 +736,15 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `%R: %{y:.2f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'adx': {
       const adx = calculateADX(highs, lows, closes, params.period || 14);
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
-      traces.push({
+      const adxTrace = applyPreviewStyling({
         x: chartData.time,
         y: adx.adx,
         type: 'scatter',
@@ -703,8 +755,9 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `ADX: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
-      traces.push({
+      }, isPreview);
+      traces.push(adxTrace);
+      const plusDITrace = applyPreviewStyling({
         x: chartData.time,
         y: adx.plusDI,
         type: 'scatter',
@@ -715,8 +768,9 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `+DI: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
-      traces.push({
+      }, isPreview);
+      traces.push(plusDITrace);
+      const minusDITrace = applyPreviewStyling({
         x: chartData.time,
         y: adx.minusDI,
         type: 'scatter',
@@ -727,12 +781,13 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `-DI: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
-      });
+      }, isPreview);
+      traces.push(minusDITrace);
       break;
     }
     case 'atr': {
       const atrValues = calculateATR(highs, lows, closes, params.period || 14);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: atrValues,
         type: 'scatter',
@@ -743,12 +798,13 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `ATR: %{y:.5f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'obv': {
       const obvValues = calculateOBV(closes, chartData.volume, highs, lows);
-      traces.push({
+      const trace = applyPreviewStyling({
         x: chartData.time,
         y: obvValues,
         type: 'scatter',
@@ -759,7 +815,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         hovertemplate: `OBV: %{y:,.0f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
-      });
+      }, isPreview);
+      traces.push(trace);
       break;
     }
     case 'volume_profile': {

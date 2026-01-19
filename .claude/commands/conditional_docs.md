@@ -206,3 +206,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting indicator click detection or hit-testing issues
     - When working with viewport-aware positioning for overlays or menus
     - When implementing click-to-configure patterns for chart elements
+
+- app_docs/feature-a5444a1e-realtime-parameter-preview.md
+  - Conditions:
+    - When implementing or modifying real-time preview functionality for indicators
+    - When working with debounced parameter updates or the useDebounce hook
+    - When implementing preview visual styling (dashed lines, opacity changes)
+    - When working with performance monitoring or the usePerformanceMonitor hook
+    - When implementing before/after comparison mode for indicators
+    - When working with preview state management in Strategy.jsx
+    - When modifying chart rendering to support preview indicators
+    - When troubleshooting preview calculation performance issues
+    - When implementing apply/cancel logic for parameter changes
+    - When working with chartConstants.js preview styling constants

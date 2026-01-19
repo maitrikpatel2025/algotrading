@@ -90,6 +90,10 @@ function Strategy() {
     initialColor: null,
   });
 
+  // Preview mode state for real-time parameter adjustment
+  const [previewIndicator, setPreviewIndicator] = useState(null);
+  const [comparisonMode, setComparisonMode] = useState(false);
+
   // Debounce timer ref for timeframe changes
   const debounceTimerRef = useRef(null);
   // Previous timeframe for zoom context preservation
@@ -329,6 +333,7 @@ function Strategy() {
             ...ind,
             params: params,
             color: color,
+            isPreview: false, // Ensure preview flag is removed
           };
           return updatedIndicator;
         }
@@ -367,6 +372,10 @@ function Strategy() {
       setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
     }
 
+    // Clear preview state
+    setPreviewIndicator(null);
+    setComparisonMode(false);
+
     // Close dialog
     setSettingsDialog(prev => ({ ...prev, isOpen: false }));
   }, [settingsDialog, activeIndicators]);
@@ -374,6 +383,34 @@ function Strategy() {
   // Handle settings dialog close/cancel
   const handleSettingsCancel = useCallback(() => {
     setSettingsDialog(prev => ({ ...prev, isOpen: false }));
+    // Clear preview state when dialog is closed
+    setPreviewIndicator(null);
+    setComparisonMode(false);
+  }, []);
+
+  // Handle preview update - called when parameters change in real-time
+  const handlePreviewUpdate = useCallback((previewParams, previewColor) => {
+    if (!settingsDialog.isEditMode || !settingsDialog.editingInstanceId) {
+      return;
+    }
+
+    const indicator = activeIndicators.find(ind => ind.instanceId === settingsDialog.editingInstanceId);
+    if (!indicator) return;
+
+    // Create preview indicator instance with updated params
+    const preview = {
+      ...indicator,
+      params: previewParams,
+      color: previewColor,
+      isPreview: true,
+    };
+
+    setPreviewIndicator(preview);
+  }, [settingsDialog.isEditMode, settingsDialog.editingInstanceId, activeIndicators]);
+
+  // Handle comparison mode toggle
+  const handleComparisonToggle = useCallback(() => {
+    setComparisonMode(prev => !prev);
   }, []);
 
   // Handle edit indicator - open settings dialog with existing values
@@ -923,6 +960,8 @@ function Strategy() {
                   onIndicatorClick={handleIndicatorClick}
                   onIndicatorConfigure={handleIndicatorConfigure}
                   onIndicatorDuplicate={handleIndicatorDuplicate}
+                  previewIndicator={previewIndicator}
+                  comparisonMode={comparisonMode}
                 />
               </div>
             )}
@@ -1027,6 +1066,9 @@ function Strategy() {
         initialParams={settingsDialog.initialParams}
         initialColor={settingsDialog.initialColor}
         isEditMode={settingsDialog.isEditMode}
+        onPreviewUpdate={handlePreviewUpdate}
+        comparisonMode={comparisonMode}
+        onComparisonToggle={handleComparisonToggle}
       />
     </div>
   );

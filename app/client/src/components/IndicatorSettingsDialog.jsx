@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '../lib/utils';
-import { X, Settings2 } from 'lucide-react';
+import { X, Settings2, Eye, EyeOff } from 'lucide-react';
+import { useDebounce } from '../hooks/useDebounce';
+import { usePerformanceMonitor } from '../hooks/usePerformanceMonitor';
+import { PREVIEW_DEBOUNCE_DELAY, PERFORMANCE_THRESHOLD_GOOD, PERFORMANCE_THRESHOLD_WARNING } from '../app/chartConstants';
 
 // Predefined color palette for indicators (from UI style guide)
 const INDICATOR_COLORS = [
@@ -61,6 +64,9 @@ const INDICATOR_PARAM_CONFIG = {
  * @param {Object} initialParams - Initial parameter values (for edit mode)
  * @param {string} initialColor - Initial color value (for edit mode)
  * @param {boolean} isEditMode - Whether editing existing indicator vs adding new
+ * @param {Function} onPreviewUpdate - Callback for real-time preview updates (params, color)
+ * @param {boolean} comparisonMode - Whether before/after comparison is enabled
+ * @param {Function} onComparisonToggle - Callback to toggle comparison mode
  */
 function IndicatorSettingsDialog({
   isOpen,
@@ -70,6 +76,9 @@ function IndicatorSettingsDialog({
   initialParams = null,
   initialColor = null,
   isEditMode = false,
+  onPreviewUpdate = null,
+  comparisonMode = false,
+  onComparisonToggle = null,
 }) {
   const dialogRef = useRef(null);
   const firstInputRef = useRef(null);
@@ -78,6 +87,13 @@ function IndicatorSettingsDialog({
   const [params, setParams] = useState({});
   const [selectedColor, setSelectedColor] = useState(null);
   const [errors, setErrors] = useState({});
+
+  // Performance monitoring for preview calculations
+  const { startTimer, stopTimer, elapsedTime } = usePerformanceMonitor();
+
+  // Debounce params and color for preview updates
+  const debouncedParams = useDebounce(params, PREVIEW_DEBOUNCE_DELAY);
+  const debouncedColor = useDebounce(selectedColor, PREVIEW_DEBOUNCE_DELAY);
 
   // Reset state when indicator changes or dialog opens
   useEffect(() => {
@@ -96,36 +112,6 @@ function IndicatorSettingsDialog({
       setErrors({});
     }
   }, [isOpen, indicator, initialParams, initialColor]);
-
-  // Focus management and escape key handler
-  useEffect(() => {
-    if (isOpen) {
-      // Focus first input when dialog opens
-      setTimeout(() => {
-        firstInputRef.current?.focus();
-      }, 50);
-
-      // Handle escape key
-      const handleKeyDown = (e) => {
-        if (e.key === 'Escape') {
-          onClose();
-        }
-      };
-
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, onClose]);
-
-  // Prevent body scroll when dialog is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isOpen]);
 
   // Handle parameter change with validation
   const handleParamChange = useCallback((key, value, config) => {
@@ -183,6 +169,66 @@ function IndicatorSettingsDialog({
     onConfirm(params, selectedColor);
   }, [indicator, params, selectedColor, onConfirm]);
 
+  // Focus management and escape key handler
+  useEffect(() => {
+    if (isOpen) {
+      // Focus first input when dialog opens
+      setTimeout(() => {
+        firstInputRef.current?.focus();
+      }, 50);
+
+      // Handle escape and enter keys
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        } else if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'TEXTAREA') {
+          // Only handle Enter if not in a textarea and no modifier keys
+          e.preventDefault();
+          handleSubmit(e);
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose, handleSubmit]);
+
+  // Prevent body scroll when dialog is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
+  // Trigger preview update when debounced params or color change
+  useEffect(() => {
+    if (isOpen && isEditMode && onPreviewUpdate) {
+      // Validate params before triggering preview
+      const paramConfig = INDICATOR_PARAM_CONFIG[indicator?.id] || [];
+      let hasErrors = false;
+
+      paramConfig.forEach(config => {
+        const value = debouncedParams[config.key];
+        if (value === '' || value === undefined || isNaN(value) || value < config.min || value > config.max) {
+          hasErrors = true;
+        }
+      });
+
+      // Only trigger preview if all params are valid
+      if (!hasErrors && Object.keys(debouncedParams).length > 0) {
+        startTimer();
+        onPreviewUpdate(debouncedParams, debouncedColor);
+        // Stop timer after a frame to allow chart to render
+        requestAnimationFrame(() => {
+          stopTimer();
+        });
+      }
+    }
+  }, [isOpen, isEditMode, debouncedParams, debouncedColor, onPreviewUpdate, indicator, startTimer, stopTimer]);
+
   if (!isOpen || !indicator) return null;
 
   const paramConfig = INDICATOR_PARAM_CONFIG[indicator.id] || [];
@@ -237,12 +283,19 @@ function IndicatorSettingsDialog({
               <Settings2 className="h-5 w-5" style={{ color: selectedColor }} />
             </div>
             <div className="flex-1">
-              <h2
-                id="indicator-settings-title"
-                className="text-lg font-semibold text-foreground"
-              >
-                {isEditMode ? 'Edit' : 'Configure'} {indicator.name}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2
+                  id="indicator-settings-title"
+                  className="text-lg font-semibold text-foreground"
+                >
+                  {isEditMode ? 'Edit' : 'Configure'} {indicator.name}
+                </h2>
+                {isEditMode && onPreviewUpdate && (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    Preview Mode
+                  </span>
+                )}
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {indicator.description}
               </p>
@@ -329,31 +382,80 @@ function IndicatorSettingsDialog({
             </div>
           </div>
 
+          {/* Performance Indicator */}
+          {isEditMode && onPreviewUpdate && elapsedTime !== null && (
+            <div className="mb-4 p-2 rounded-md bg-muted/30 border border-border">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Calculation time:</span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    elapsedTime < PERFORMANCE_THRESHOLD_GOOD
+                      ? "text-green-600 dark:text-green-400"
+                      : elapsedTime < PERFORMANCE_THRESHOLD_WARNING
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-red-600 dark:text-red-400"
+                  )}
+                >
+                  {elapsedTime}ms
+                </span>
+                {elapsedTime >= PERFORMANCE_THRESHOLD_WARNING && (
+                  <span className="text-muted-foreground">
+                    (Preview calculation is slow. Consider reducing candle count.)
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md",
-                "bg-muted text-foreground",
-                "hover:bg-muted/80 transition-colors",
-                "focus:outline-none focus:ring-2 focus:ring-primary/50"
-              )}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                "bg-primary text-primary-foreground",
-                "hover:bg-primary/90",
-                "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
-              )}
-            >
-              {isEditMode ? 'Update' : 'Add Indicator'}
-            </button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2">
+            {/* Left side - Comparison toggle */}
+            {isEditMode && onComparisonToggle && (
+              <button
+                type="button"
+                onClick={onComparisonToggle}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                  "border border-border",
+                  comparisonMode
+                    ? "bg-primary/10 text-primary border-primary/50"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/50",
+                  "flex items-center gap-2 justify-center sm:justify-start"
+                )}
+              >
+                {comparisonMode ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                {comparisonMode ? 'Comparison On' : 'Compare Before/After'}
+              </button>
+            )}
+
+            {/* Right side - Cancel and Apply buttons */}
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md",
+                  "bg-muted text-foreground",
+                  "hover:bg-muted/80 transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                )}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  "bg-primary text-primary-foreground",
+                  "hover:bg-primary/90",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+                )}
+              >
+                {isEditMode ? 'Apply' : 'Add Indicator'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

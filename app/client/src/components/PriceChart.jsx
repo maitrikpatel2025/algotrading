@@ -32,6 +32,8 @@ function PriceChart({
   onIndicatorClick,
   onIndicatorConfigure,
   onIndicatorDuplicate,
+  previewIndicator = null,
+  comparisonMode = false,
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
@@ -61,7 +63,22 @@ function PriceChart({
   // Draw chart and set up zoom event listener
   useEffect(() => {
     if (priceData && !loading) {
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, activeIndicators, activePatterns);
+      // Prepare indicators to render based on preview mode
+      let indicatorsToRender = [...activeIndicators];
+
+      if (previewIndicator) {
+        if (comparisonMode) {
+          // In comparison mode, show both original and preview
+          indicatorsToRender = [...activeIndicators, previewIndicator];
+        } else {
+          // In preview mode without comparison, replace the editing indicator with preview
+          indicatorsToRender = activeIndicators.map(ind =>
+            ind.instanceId === previewIndicator.instanceId ? previewIndicator : ind
+          );
+        }
+      }
+
+      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns);
 
       // Get chart element reference
       const chartElement = document.getElementById('chartDiv');
@@ -167,7 +184,7 @@ function PriceChart({
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
@@ -391,28 +408,40 @@ function PriceChart({
               <span className="text-xs text-muted-foreground mr-2">Active:</span>
               {activeIndicators.map((indicator) => {
                 const displayName = getIndicatorDisplayName(indicator, indicator.params || indicator.defaultParams);
+                const isPreview = indicator.isPreview;
+                const isBeingPreviewed = previewIndicator && previewIndicator.instanceId === indicator.instanceId && !comparisonMode;
+
+                // Skip rendering the original if it's being replaced by preview
+                if (isBeingPreviewed && !indicator.isPreview) {
+                  return null;
+                }
+
                 return (
                   <span
                     key={indicator.instanceId}
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground",
+                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
+                      isPreview
+                        ? "bg-amber-500/20 text-foreground border border-amber-500/30 border-dashed"
+                        : "bg-muted text-foreground",
                       onEditIndicator && "cursor-pointer hover:bg-muted/80 transition-colors group"
                     )}
                     style={{ borderLeft: `3px solid ${indicator.color}` }}
                     onClick={(e) => {
                       // Don't trigger edit when clicking the remove button
                       if (e.target.closest('button')) return;
-                      if (onEditIndicator) {
+                      if (onEditIndicator && !isPreview) {
                         onEditIndicator(indicator.instanceId);
                       }
                     }}
-                    title={onEditIndicator ? `Click to edit ${displayName}` : displayName}
+                    title={onEditIndicator && !isPreview ? `Click to edit ${displayName}` : displayName}
                   >
                     {displayName}
-                    {onEditIndicator && (
+                    {isPreview && <span className="text-amber-600 dark:text-amber-400">(Preview)</span>}
+                    {onEditIndicator && !isPreview && (
                       <Settings className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     )}
-                    {onRemoveIndicator && (
+                    {onRemoveIndicator && !isPreview && (
                       <button
                         type="button"
                         onClick={(e) => {
