@@ -7,6 +7,7 @@ import { getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { LineChart, BarChart2, X, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
+import IndicatorContextMenu from './IndicatorContextMenu';
 
 function PriceChart({
   priceData,
@@ -27,13 +28,22 @@ function PriceChart({
   onRemoveIndicator,
   onEditIndicator,
   onPatternDrop,
-  onRemovePattern
+  onRemovePattern,
+  onIndicatorClick,
+  onIndicatorConfigure,
+  onIndicatorDuplicate,
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
   const [showInteractionHint, setShowInteractionHint] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [contextMenu, setContextMenu] = useState({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    indicatorInstanceId: null,
+    indicatorName: '',
+  });
 
   // Touch device detection and interaction hint initialization
   useEffect(() => {
@@ -57,6 +67,14 @@ function PriceChart({
       const chartElement = document.getElementById('chartDiv');
       chartRef.current = chartElement;
 
+      // DIAGNOSTIC: Verify indicator metadata integrity
+      console.log('[PriceChart] Indicators passed to drawChart:', activeIndicators);
+      if (chartElement && chartElement.data) {
+        console.log('[PriceChart] Chart traces after render:', chartElement.data);
+        const tracesWithMetadata = chartElement.data.filter(trace => trace.meta && trace.meta.instanceId);
+        console.log(`[PriceChart] Traces with metadata: ${tracesWithMetadata.length} out of ${chartElement.data.length}`);
+      }
+
       if (chartElement) {
         // Set initial candle count
         setVisibleCandleCount(priceData.time ? priceData.time.length : 0);
@@ -68,13 +86,88 @@ function PriceChart({
 
         chartElement.addEventListener('chartZoomUpdate', handleZoomUpdate);
 
+        // Handle left-click on indicator traces
+        const handlePlotlyClick = (eventData) => {
+          if (!eventData.points || eventData.points.length === 0) return;
+
+          const point = eventData.points[0];
+          // Check if the clicked trace has indicator metadata
+          if (point.data && point.data.meta && point.data.meta.instanceId) {
+            const instanceId = point.data.meta.instanceId;
+            if (onIndicatorClick) {
+              onIndicatorClick(instanceId);
+            }
+          }
+        };
+
+        // Handle right-click on indicator traces
+        const handleContextMenu = (event) => {
+          console.log('Context menu event triggered');
+
+          // Use Plotly.Fx.hover() to trigger a synthetic hover event at the exact cursor position
+          // This ensures accurate hit-testing instead of relying on stale hover data
+          try {
+            // Calculate cursor position relative to the chart element
+            const rect = chartElement.getBoundingClientRect();
+            const xPos = event.clientX - rect.left;
+            const yPos = event.clientY - rect.top;
+
+            // Trigger Plotly hover at the right-click coordinates
+            if (window.Plotly && window.Plotly.Fx && window.Plotly.Fx.hover) {
+              window.Plotly.Fx.hover(chartElement, [{ curveNumber: 0, pointNumber: 0 }], [xPos, yPos]);
+            }
+
+            // Now check if hover data contains an indicator trace
+            let indicatorAtPosition = null;
+            if (chartElement._hoverdata && chartElement._hoverdata.length > 0) {
+              const hoverPoint = chartElement._hoverdata[0];
+              if (hoverPoint.data && hoverPoint.data.meta && hoverPoint.data.meta.instanceId) {
+                indicatorAtPosition = {
+                  instanceId: hoverPoint.data.meta.instanceId,
+                  name: hoverPoint.data.name,
+                };
+              }
+            }
+
+            if (indicatorAtPosition) {
+              console.log('Indicator found at position:', indicatorAtPosition);
+              event.preventDefault();
+              setContextMenu({
+                isOpen: true,
+                position: { x: event.clientX, y: event.clientY },
+                indicatorInstanceId: indicatorAtPosition.instanceId,
+                indicatorName: indicatorAtPosition.name,
+              });
+            } else {
+              console.log('No indicator found at cursor position. Hover data:', chartElement._hoverdata);
+            }
+          } catch (error) {
+            console.error('Error in context menu hit-testing:', error);
+          }
+        };
+
+        // Attach both Plotly click and contextmenu event listeners after a short delay
+        // to ensure Plotly has fully rendered and won't replace DOM elements
+        setTimeout(() => {
+          if (chartElement.on) {
+            chartElement.on('plotly_click', handlePlotlyClick);
+          }
+          console.log('Attaching contextmenu listener to chartElement');
+          chartElement.addEventListener('contextmenu', handleContextMenu);
+        }, 100);
+
         // Cleanup
         return () => {
           chartElement.removeEventListener('chartZoomUpdate', handleZoomUpdate);
+          chartElement.removeEventListener('contextmenu', handleContextMenu);
+          // Remove Plotly event listener if it exists
+          if (chartElement.removeAllListeners) {
+            chartElement.removeAllListeners('plotly_click');
+          }
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
@@ -459,6 +552,29 @@ function PriceChart({
           </div>
         )}
       </div>
+
+      {/* Indicator Context Menu */}
+      <IndicatorContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        indicatorName={contextMenu.indicatorName}
+        onConfigure={() => {
+          if (onIndicatorConfigure) {
+            onIndicatorConfigure(contextMenu.indicatorInstanceId);
+          }
+        }}
+        onRemove={() => {
+          if (onRemoveIndicator) {
+            onRemoveIndicator(contextMenu.indicatorInstanceId);
+          }
+        }}
+        onDuplicate={() => {
+          if (onIndicatorDuplicate) {
+            onIndicatorDuplicate(contextMenu.indicatorInstanceId);
+          }
+        }}
+        onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
+      />
     </div>
   );
 }

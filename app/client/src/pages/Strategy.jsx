@@ -391,6 +391,40 @@ function Strategy() {
     });
   }, [activeIndicators]);
 
+  // Handle indicator click from chart - opens settings dialog
+  const handleIndicatorClick = useCallback((instanceId) => {
+    handleEditIndicator(instanceId);
+  }, [handleEditIndicator]);
+
+  // Handle indicator configure from context menu - same as click
+  const handleIndicatorConfigure = useCallback((instanceId) => {
+    handleEditIndicator(instanceId);
+  }, [handleEditIndicator]);
+
+  // Handle indicator duplicate from context menu
+  const handleIndicatorDuplicate = useCallback((instanceId) => {
+    const indicator = activeIndicators.find(ind => ind.instanceId === instanceId);
+    if (!indicator) return;
+
+    // Create a new instance with same params and color but new unique instanceId
+    const newIndicator = {
+      ...indicator,
+      instanceId: `${indicator.id}-${Date.now()}`,
+      params: indicator.params || indicator.defaultParams,
+    };
+
+    // Add to active indicators
+    setActiveIndicators(prev => [...prev, newIndicator]);
+    setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
+
+    // Auto-create a condition for the new instance
+    const newCondition = createConditionFromIndicator(newIndicator);
+    setConditions(prev => [...prev, newCondition]);
+    setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
+
+    setIndicatorError(null);
+  }, [activeIndicators]);
+
   // Handle indicator removal with confirmation
   const handleRemoveIndicator = useCallback((instanceId) => {
     // Find conditions using this indicator
@@ -886,6 +920,9 @@ function Strategy() {
                   onEditIndicator={handleEditIndicator}
                   onPatternDrop={handlePatternDrop}
                   onRemovePattern={handleRemovePattern}
+                  onIndicatorClick={handleIndicatorClick}
+                  onIndicatorConfigure={handleIndicatorConfigure}
+                  onIndicatorDuplicate={handleIndicatorDuplicate}
                 />
               </div>
             )}

@@ -430,6 +430,9 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         name: `SMA(${params.period || 20})`,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `SMA: %{y:.5f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
+        hoverlabel: { bgcolor: indicator.color },
       });
       break;
     }
@@ -443,11 +446,15 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         name: `EMA(${params.period || 20})`,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `EMA: %{y:.5f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
       });
       break;
     }
     case 'bollinger_bands': {
       const bb = calculateBollingerBands(closes, params.period || 20, params.stdDev || 2);
+      const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
+      const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       // Upper band
       traces.push({
         x: chartData.time,
@@ -457,6 +464,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         name: 'BB Upper',
         line: { color: indicator.color, width: 1, dash: 'dot' },
         hovertemplate: `BB Upper: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       // Middle band (SMA)
       traces.push({
@@ -467,6 +476,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         name: 'BB Middle',
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `BB Middle: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       // Lower band
       traces.push({
@@ -479,11 +490,15 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         fill: 'tonexty',
         fillcolor: `${indicator.color}15`,
         hovertemplate: `BB Lower: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       break;
     }
     case 'keltner_channel': {
       const kc = calculateKeltnerChannel(highs, lows, closes, params.period || 20, params.atrMultiplier || 2);
+      const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
+      const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       // Upper channel
       traces.push({
         x: chartData.time,
@@ -493,6 +508,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         name: 'KC Upper',
         line: { color: indicator.color, width: 1, dash: 'dot' },
         hovertemplate: `KC Upper: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       // Middle (EMA)
       traces.push({
@@ -503,6 +520,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         name: 'KC Middle',
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `KC Middle: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       // Lower channel
       traces.push({
@@ -515,6 +534,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         fill: 'tonexty',
         fillcolor: `${indicator.color}15`,
         hovertemplate: `KC Lower: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       break;
     }
@@ -549,6 +570,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `RSI: %{y:.2f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
       });
       break;
     }
@@ -559,6 +582,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         params.slowPeriod || 26,
         params.signalPeriod || 9
       );
+      const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
+      const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       // MACD line
       traces.push({
         x: chartData.time,
@@ -569,6 +594,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `MACD: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       // Signal line
       traces.push({
@@ -580,6 +607,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: '#EF4444', width: 1 },
         hovertemplate: `Signal: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       // Histogram
       traces.push({
@@ -592,11 +621,15 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
           color: macd.histogram.map(v => v >= 0 ? '#22C55E' : '#EF4444'),
         },
         hovertemplate: `Hist: %{y:.5f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       break;
     }
     case 'stochastic': {
       const stoch = calculateStochastic(highs, lows, closes, params.kPeriod || 14, params.dPeriod || 3);
+      const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
+      const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       traces.push({
         x: chartData.time,
         y: stoch.k,
@@ -606,6 +639,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `%K: %{y:.2f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       traces.push({
         x: chartData.time,
@@ -616,6 +651,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: '#EF4444', width: 1 },
         hovertemplate: `%D: %{y:.2f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       break;
     }
@@ -630,6 +667,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `CCI: %{y:.2f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
       });
       break;
     }
@@ -644,11 +683,15 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `%R: %{y:.2f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
       });
       break;
     }
     case 'adx': {
       const adx = calculateADX(highs, lows, closes, params.period || 14);
+      const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
+      const customdata = Array(chartData.time.length).fill(indicator.instanceId);
       traces.push({
         x: chartData.time,
         y: adx.adx,
@@ -658,6 +701,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `ADX: %{y:.2f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       traces.push({
         x: chartData.time,
@@ -668,6 +713,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: '#22C55E', width: 1 },
         hovertemplate: `+DI: %{y:.2f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       traces.push({
         x: chartData.time,
@@ -678,6 +725,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: '#EF4444', width: 1 },
         hovertemplate: `-DI: %{y:.2f}<extra></extra>`,
+        customdata: customdata,
+        meta: metadata,
       });
       break;
     }
@@ -692,6 +741,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `ATR: %{y:.5f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
       });
       break;
     }
@@ -706,6 +757,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         yaxis: yAxisName,
         line: { color: indicator.color, width: 1.5 },
         hovertemplate: `OBV: %{y:,.0f}<extra></extra>`,
+        customdata: Array(chartData.time.length).fill(indicator.instanceId),
+        meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
       });
       break;
     }
