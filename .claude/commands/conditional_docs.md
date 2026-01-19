@@ -232,3 +232,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing Reset to Default functionality for indicator styling
     - When extending preview system to show styling changes
     - When working with indicator default styling properties in indicators.js
+
+- app_docs/feature-45c86c3e-trade-direction.md
+  - Conditions:
+    - When working with trade direction configuration or the TradeDirectionSelector component
+    - When implementing or modifying the Logic Panel section visibility (Entry/Exit conditions)
+    - When working with trade direction state management or localStorage persistence
+    - When implementing strategy persistence or StrategyConfig data models
+    - When working with condition section filtering based on trade direction
+    - When modifying auto-created condition logic for indicators and patterns
+    - When implementing confirmation dialogs for direction changes
+    - When troubleshooting trade direction persistence or section rendering issues
+    - When extending strategy configuration with directional constraints
+    - When working with constants.js trade direction constants (TRADE_DIRECTIONS, TRADE_DIRECTION_LABELS, TRADE_DIRECTION_ICONS)
