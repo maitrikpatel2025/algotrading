@@ -165,11 +165,17 @@ function PriceChart({
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/70 shadow-lg shadow-accent/20">
               <LineChart className="h-5 w-5 text-white" />
             </div>
-            <div>
-              <h3 className="card-title">Price Chart</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {selectedPair} • {selectedGranularity}
-              </p>
+            <div className="flex items-center gap-2">
+              <div>
+                <h3 className="card-title">Price Chart</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {selectedPair}
+                </p>
+              </div>
+              {/* Timeframe Badge Pill */}
+              <span className="ml-2 px-2 py-1 rounded-md bg-primary text-primary-foreground text-xs font-bold">
+                {selectedGranularity}
+              </span>
             </div>
           </div>
 

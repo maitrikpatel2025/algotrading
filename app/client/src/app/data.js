@@ -35,12 +35,15 @@ export const DATE_RANGES = [
 ];
 
 // Timeframe to seconds mapping (matches server TFS)
-const GRANULARITY_SECONDS = {
+export const GRANULARITY_SECONDS = {
+    "M1": 60,
     "M5": 300,
     "M15": 900,
+    "M30": 1800,
     "H1": 3600,
     "H4": 14400,
-    "D": 86400
+    "D": 86400,
+    "W1": 604800
 };
 
 /**
