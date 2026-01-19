@@ -89,3 +89,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with the Strategy page chart integration
     - When implementing interactive chart features (zoom, pan, hover tooltips)
     - When working with OHLC price data from /api/prices endpoint
+
+- app_docs/feature-947a25d2-chart-zoom-scroll-controls.md
+  - Conditions:
+    - When implementing or modifying chart zoom and scroll functionality
+    - When working with keyboard navigation for charts (zoom in/out, scroll left/right)
+    - When implementing zoom constraints or boundary detection in charts
+    - When adding zoom level indicators or interaction hints to charts
+    - When working with cursor-centered zooming or touch device support
+    - When troubleshooting chart interaction issues (keyboard focus, zoom limits)
+    - When optimizing chart performance with requestAnimationFrame or Plotly transitions
+    - When implementing plotly_relayout event handlers or custom chart events
