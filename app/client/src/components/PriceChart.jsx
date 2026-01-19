@@ -7,6 +7,7 @@ import { getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { LineChart, BarChart2, X, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
+import IndicatorContextMenu from './IndicatorContextMenu';
 
 function PriceChart({
   priceData,
@@ -27,13 +28,22 @@ function PriceChart({
   onRemoveIndicator,
   onEditIndicator,
   onPatternDrop,
-  onRemovePattern
+  onRemovePattern,
+  onIndicatorClick,
+  onIndicatorConfigure,
+  onIndicatorDuplicate,
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
   const [showInteractionHint, setShowInteractionHint] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [contextMenu, setContextMenu] = useState({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    indicatorInstanceId: null,
+    indicatorName: '',
+  });
 
   // Touch device detection and interaction hint initialization
   useEffect(() => {
@@ -68,13 +78,76 @@ function PriceChart({
 
         chartElement.addEventListener('chartZoomUpdate', handleZoomUpdate);
 
+        // Handle left-click on indicator traces
+        const handlePlotlyClick = (eventData) => {
+          if (!eventData.points || eventData.points.length === 0) return;
+
+          const point = eventData.points[0];
+          // Check if the clicked trace has indicator metadata
+          if (point.data && point.data.meta && point.data.meta.instanceId) {
+            const instanceId = point.data.meta.instanceId;
+            if (onIndicatorClick) {
+              onIndicatorClick(instanceId);
+            }
+          }
+        };
+
+        chartElement.on('plotly_click', handlePlotlyClick);
+
+        // Handle right-click on indicator traces
+        const handleContextMenu = (event) => {
+          // Use Plotly's hover event to determine what's under the cursor
+          // We'll check if there's an indicator trace at this position
+          let indicatorAtPosition = null;
+
+          // Try to find the hovered trace by checking the latest hover data
+          if (chartElement._fullData) {
+            for (let i = 0; i < chartElement._fullData.length; i++) {
+              const trace = chartElement._fullData[i];
+              if (trace.meta && trace.meta.instanceId) {
+                // This is an indicator trace
+                // We'll use a simple heuristic: if the user right-clicked on the chart
+                // and there's indicator metadata in any trace, we consider it a candidate
+                // Plotly doesn't provide easy hit-testing for right-click, so we'll
+                // use the last hovered element if available
+                if (chartElement._hoverdata && chartElement._hoverdata.length > 0) {
+                  const hoverPoint = chartElement._hoverdata[0];
+                  if (hoverPoint.data && hoverPoint.data.meta && hoverPoint.data.meta.instanceId) {
+                    indicatorAtPosition = {
+                      instanceId: hoverPoint.data.meta.instanceId,
+                      name: hoverPoint.data.name,
+                    };
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (indicatorAtPosition) {
+            event.preventDefault();
+            setContextMenu({
+              isOpen: true,
+              position: { x: event.clientX, y: event.clientY },
+              indicatorInstanceId: indicatorAtPosition.instanceId,
+              indicatorName: indicatorAtPosition.name,
+            });
+          }
+        };
+
+        chartElement.addEventListener('contextmenu', handleContextMenu);
+
         // Cleanup
         return () => {
           chartElement.removeEventListener('chartZoomUpdate', handleZoomUpdate);
+          chartElement.removeEventListener('contextmenu', handleContextMenu);
+          if (chartElement.removeAllListeners) {
+            chartElement.removeAllListeners('plotly_click');
+          }
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
@@ -459,6 +532,29 @@ function PriceChart({
           </div>
         )}
       </div>
+
+      {/* Indicator Context Menu */}
+      <IndicatorContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        indicatorName={contextMenu.indicatorName}
+        onConfigure={() => {
+          if (onIndicatorConfigure) {
+            onIndicatorConfigure(contextMenu.indicatorInstanceId);
+          }
+        }}
+        onRemove={() => {
+          if (onRemoveIndicator) {
+            onRemoveIndicator(contextMenu.indicatorInstanceId);
+          }
+        }}
+        onDuplicate={() => {
+          if (onIndicatorDuplicate) {
+            onIndicatorDuplicate(contextMenu.indicatorInstanceId);
+          }
+        }}
+        onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
+      />
     </div>
   );
 }
