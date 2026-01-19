@@ -131,3 +131,12 @@ This prompt helps you determine what documentation you should read based on the 
     - When fixing errors that occur during candle count changes on Strategy page
     - When adding defensive programming to chart zoom/scroll functions
     - When working with Date.toISOString() calls in chart code
+
+- app_docs/feature-4f076469-indicator-library-panel.md
+  - Conditions:
+    - When working with the indicator library panel or IndicatorLibrary component
+    - When adding or modifying technical indicators in the catalog
+    - When working with the Strategy page left sidebar
+    - When implementing indicator selection or chart overlay functionality
+    - When troubleshooting indicator search or category filtering
+    - When modifying indicator data structure or categories
