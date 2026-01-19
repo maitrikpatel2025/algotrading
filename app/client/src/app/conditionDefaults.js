@@ -14,6 +14,7 @@ export const OPERATORS = [
   { id: 'is_above', label: 'is above', description: 'Value is greater than' },
   { id: 'is_below', label: 'is below', description: 'Value is less than' },
   { id: 'equals', label: 'equals', description: 'Value is equal to' },
+  { id: 'is_detected', label: 'is detected', description: 'Pattern is detected on the chart' },
 ];
 
 /**
@@ -148,6 +149,31 @@ export function createConditionFromIndicator(indicatorInstance, displayName) {
     rightOperand,
     section: CONDITION_SECTIONS.ENTRY,
     isNew: true, // Flag for animation
+  };
+}
+
+/**
+ * Create a condition from a pattern's detection
+ * @param {Object} patternInstance - The pattern instance with id, name, instanceId, detectedCount
+ * @returns {Object} A new condition object
+ */
+export function createConditionFromPattern(patternInstance) {
+  return {
+    id: generateConditionId(),
+    patternInstanceId: patternInstance.instanceId,
+    isPatternCondition: true,
+    leftOperand: {
+      type: 'pattern',
+      instanceId: patternInstance.instanceId,
+      label: patternInstance.name,
+      patternType: patternInstance.patternType,
+      color: patternInstance.color,
+    },
+    operator: 'is_detected',
+    rightOperand: null, // Pattern conditions don't have a right operand
+    section: CONDITION_SECTIONS.ENTRY,
+    isNew: true, // Flag for animation
+    patternDisplayName: patternInstance.name,
   };
 }
 

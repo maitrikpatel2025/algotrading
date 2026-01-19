@@ -4,6 +4,7 @@ import Select from './Select';
 import { COUNTS, CHART_TYPES, DATE_RANGES } from '../app/data';
 import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
 import { getIndicatorDisplayName } from '../app/indicators';
+import { getPatternDisplayName } from '../app/patterns';
 import { LineChart, BarChart2, X, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -21,9 +22,12 @@ function PriceChart({
   onDateRangeChange,
   loading,
   activeIndicators = [],
+  activePatterns = [],
   onIndicatorDrop,
   onRemoveIndicator,
-  onEditIndicator
+  onEditIndicator,
+  onPatternDrop,
+  onRemovePattern
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
@@ -47,7 +51,7 @@ function PriceChart({
   // Draw chart and set up zoom event listener
   useEffect(() => {
     if (priceData && !loading) {
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, activeIndicators);
+      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, activeIndicators, activePatterns);
 
       // Get chart element reference
       const chartElement = document.getElementById('chartDiv');
@@ -70,7 +74,7 @@ function PriceChart({
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
@@ -182,14 +186,19 @@ function PriceChart({
     setIsDragOver(false);
 
     try {
-      const indicatorData = JSON.parse(e.dataTransfer.getData('application/json'));
-      if (indicatorData && onIndicatorDrop) {
-        onIndicatorDrop(indicatorData);
+      const itemData = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (itemData) {
+        // Check if it's a pattern or indicator
+        if (itemData.isPattern && onPatternDrop) {
+          onPatternDrop(itemData);
+        } else if (onIndicatorDrop) {
+          onIndicatorDrop(itemData);
+        }
       }
     } catch (err) {
-      console.error('Failed to parse indicator data:', err);
+      console.error('Failed to parse dropped item data:', err);
     }
-  }, [onIndicatorDrop]);
+  }, [onIndicatorDrop, onPatternDrop]);
 
   return (
     <div className="card animate-fade-in">
@@ -308,6 +317,46 @@ function PriceChart({
                         onClick={(e) => {
                           e.stopPropagation();
                           onRemoveIndicator(indicator.instanceId);
+                        }}
+                        className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
+                        title={`Remove ${displayName}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Active Patterns */}
+        {activePatterns.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground mr-2">Patterns:</span>
+              {activePatterns.map((pattern) => {
+                const displayName = getPatternDisplayName(pattern);
+                const patternCount = pattern.detectedCount || 0;
+                return (
+                  <span
+                    key={pattern.instanceId}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground"
+                    style={{ borderLeft: `3px solid ${pattern.color}` }}
+                    title={`${displayName} - ${patternCount} detected`}
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: pattern.color }}
+                    />
+                    Found {patternCount} {displayName}
+                    {onRemovePattern && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemovePattern(pattern.instanceId);
                         }}
                         className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
                         title={`Remove ${displayName}`}

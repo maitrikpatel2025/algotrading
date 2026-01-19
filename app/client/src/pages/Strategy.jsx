@@ -13,7 +13,9 @@ import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
 import { cn } from '../lib/utils';
 import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
-import { createConditionFromIndicator } from '../app/conditionDefaults';
+import { getPatternDisplayName } from '../app/patterns';
+import { detectPattern } from '../app/patternDetection';
+import { createConditionFromIndicator, createConditionFromPattern } from '../app/conditionDefaults';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
@@ -54,6 +56,10 @@ function Strategy() {
   const [activeIndicators, setActiveIndicators] = useState([]);
   const [indicatorHistory, setIndicatorHistory] = useState([]);
   const [indicatorError, setIndicatorError] = useState(null);
+
+  // Pattern state management
+  const [activePatterns, setActivePatterns] = useState([]);
+  const [patternHistory, setPatternHistory] = useState([]);
 
   // Condition state management
   const [conditions, setConditions] = useState([]);
@@ -426,6 +432,80 @@ function Strategy() {
     setIndicatorError(null);
   }, [conditions, activeIndicators, getDisplayName]);
 
+  // Handle pattern drop from IndicatorLibrary
+  const handlePatternDrop = useCallback((pattern) => {
+    if (!priceData) {
+      setIndicatorError('Load price data first to detect patterns.');
+      return;
+    }
+
+    // Run pattern detection
+    const detectedPatterns = detectPattern(
+      pattern.id,
+      priceData.mid_o,
+      priceData.mid_h,
+      priceData.mid_l,
+      priceData.mid_c
+    );
+
+    // Create pattern instance with detected patterns
+    const newPattern = {
+      ...pattern,
+      instanceId: `${pattern.id}-${Date.now()}`,
+      detectedPatterns: detectedPatterns,
+      detectedCount: detectedPatterns.length,
+    };
+
+    // Create a condition for the pattern
+    const newCondition = createConditionFromPattern(newPattern);
+
+    setActivePatterns(prev => [...prev, newPattern]);
+    setPatternHistory(prev => [...prev, { type: 'pattern', item: newPattern }]);
+    setConditions(prev => [...prev, newCondition]);
+    setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
+    setIndicatorError(null);
+  }, [priceData]);
+
+  // Handle pattern removal
+  const handleRemovePattern = useCallback((instanceId) => {
+    // Find conditions using this pattern
+    const relatedConditions = conditions.filter(c => c.patternInstanceId === instanceId);
+    const pattern = activePatterns.find(p => p.instanceId === instanceId);
+    const displayName = pattern ? getPatternDisplayName(pattern) : 'this pattern';
+
+    if (relatedConditions.length > 0) {
+      // Show confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Remove Pattern',
+        message: `"${displayName}" is used in ${relatedConditions.length} condition${relatedConditions.length !== 1 ? 's' : ''}. What would you like to do?`,
+        variant: 'warning',
+        actions: [
+          {
+            label: 'Remove All',
+            variant: 'danger',
+            onClick: () => {
+              setActivePatterns(prev => prev.filter(p => p.instanceId !== instanceId));
+              setConditions(prev => prev.filter(c => c.patternInstanceId !== instanceId));
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+          {
+            label: 'Keep Conditions',
+            variant: 'secondary',
+            onClick: () => {
+              setActivePatterns(prev => prev.filter(p => p.instanceId !== instanceId));
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+        ],
+      });
+    } else {
+      // No related conditions, just remove
+      setActivePatterns(prev => prev.filter(p => p.instanceId !== instanceId));
+    }
+  }, [conditions, activePatterns]);
+
   // Handle condition update
   const handleConditionUpdate = useCallback((updatedCondition) => {
     setConditions(prev => prev.map(c =>
@@ -474,7 +554,7 @@ function Strategy() {
     setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   }, []);
 
-  // Handle undo (Ctrl+Z) - supports both indicators and conditions
+  // Handle undo (Ctrl+Z) - supports indicators, patterns, and conditions
   const handleUndo = useCallback(() => {
     // Check condition history first (most recent action)
     if (conditionHistory.length > 0) {
@@ -483,6 +563,18 @@ function Strategy() {
 
       if (lastEntry.type === 'condition') {
         setConditions(prev => prev.filter(c => c.id !== lastEntry.item.id));
+      }
+    }
+
+    // Check pattern history
+    if (patternHistory.length > 0) {
+      const lastEntry = patternHistory[patternHistory.length - 1];
+      setPatternHistory(prev => prev.slice(0, -1));
+
+      if (lastEntry.type === 'pattern') {
+        setActivePatterns(prev => prev.filter(p => p.instanceId !== lastEntry.item.instanceId));
+        // Also remove related conditions
+        setConditions(prev => prev.filter(c => c.patternInstanceId !== lastEntry.item.instanceId));
       }
     }
 
@@ -499,7 +591,7 @@ function Strategy() {
     }
 
     setIndicatorError(null);
-  }, [indicatorHistory, conditionHistory]);
+  }, [indicatorHistory, conditionHistory, patternHistory]);
 
   // Clear indicator error after 5 seconds
   useEffect(() => {
@@ -769,9 +861,12 @@ function Strategy() {
                   onDateRangeChange={handleDateRangeChange}
                   loading={loadingData}
                   activeIndicators={activeIndicators}
+                  activePatterns={activePatterns}
                   onIndicatorDrop={handleIndicatorDrop}
                   onRemoveIndicator={handleRemoveIndicator}
                   onEditIndicator={handleEditIndicator}
+                  onPatternDrop={handlePatternDrop}
+                  onRemovePattern={handleRemovePattern}
                 />
               </div>
             )}

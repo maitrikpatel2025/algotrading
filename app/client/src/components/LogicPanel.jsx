@@ -68,8 +68,13 @@ function LogicPanel({
   const entryConditions = conditions.filter(c => c.section === CONDITION_SECTIONS.ENTRY);
   const exitConditions = conditions.filter(c => c.section === CONDITION_SECTIONS.EXIT);
 
-  // Get indicator color for a condition
-  const getIndicatorColor = useCallback((condition) => {
+  // Get indicator/pattern color for a condition
+  const getConditionColor = useCallback((condition) => {
+    // Check if it's a pattern condition
+    if (condition.isPatternCondition && condition.leftOperand?.color) {
+      return condition.leftOperand.color;
+    }
+    // Otherwise look up indicator color
     const indicator = activeIndicators.find(ind => ind.instanceId === condition.indicatorInstanceId);
     return indicator?.color;
   }, [activeIndicators]);
@@ -212,8 +217,8 @@ function LogicPanel({
                   onUpdate={onConditionUpdate}
                   onDelete={onConditionDelete}
                   onHover={onIndicatorHover}
-                  isHighlighted={highlightedIndicatorId === condition.indicatorInstanceId}
-                  indicatorColor={getIndicatorColor(condition)}
+                  isHighlighted={highlightedIndicatorId === (condition.indicatorInstanceId || condition.patternInstanceId)}
+                  indicatorColor={getConditionColor(condition)}
                 />
               ))
             )}
@@ -261,8 +266,8 @@ function LogicPanel({
                   onUpdate={onConditionUpdate}
                   onDelete={onConditionDelete}
                   onHover={onIndicatorHover}
-                  isHighlighted={highlightedIndicatorId === condition.indicatorInstanceId}
-                  indicatorColor={getIndicatorColor(condition)}
+                  isHighlighted={highlightedIndicatorId === (condition.indicatorInstanceId || condition.patternInstanceId)}
+                  indicatorColor={getConditionColor(condition)}
                 />
               ))
             )}
