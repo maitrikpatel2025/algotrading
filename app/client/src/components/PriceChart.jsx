@@ -67,6 +67,14 @@ function PriceChart({
       const chartElement = document.getElementById('chartDiv');
       chartRef.current = chartElement;
 
+      // DIAGNOSTIC: Verify indicator metadata integrity
+      console.log('[PriceChart] Indicators passed to drawChart:', activeIndicators);
+      if (chartElement && chartElement.data) {
+        console.log('[PriceChart] Chart traces after render:', chartElement.data);
+        const tracesWithMetadata = chartElement.data.filter(trace => trace.meta && trace.meta.instanceId);
+        console.log(`[PriceChart] Traces with metadata: ${tracesWithMetadata.length} out of ${chartElement.data.length}`);
+      }
+
       if (chartElement) {
         // Set initial candle count
         setVisibleCandleCount(priceData.time ? priceData.time.length : 0);
@@ -92,55 +100,67 @@ function PriceChart({
           }
         };
 
-        chartElement.on('plotly_click', handlePlotlyClick);
-
         // Handle right-click on indicator traces
         const handleContextMenu = (event) => {
-          // Use Plotly's hover event to determine what's under the cursor
-          // We'll check if there's an indicator trace at this position
-          let indicatorAtPosition = null;
+          console.log('Context menu event triggered');
 
-          // Try to find the hovered trace by checking the latest hover data
-          if (chartElement._fullData) {
-            for (let i = 0; i < chartElement._fullData.length; i++) {
-              const trace = chartElement._fullData[i];
-              if (trace.meta && trace.meta.instanceId) {
-                // This is an indicator trace
-                // We'll use a simple heuristic: if the user right-clicked on the chart
-                // and there's indicator metadata in any trace, we consider it a candidate
-                // Plotly doesn't provide easy hit-testing for right-click, so we'll
-                // use the last hovered element if available
-                if (chartElement._hoverdata && chartElement._hoverdata.length > 0) {
-                  const hoverPoint = chartElement._hoverdata[0];
-                  if (hoverPoint.data && hoverPoint.data.meta && hoverPoint.data.meta.instanceId) {
-                    indicatorAtPosition = {
-                      instanceId: hoverPoint.data.meta.instanceId,
-                      name: hoverPoint.data.name,
-                    };
-                    break;
-                  }
-                }
+          // Use Plotly.Fx.hover() to trigger a synthetic hover event at the exact cursor position
+          // This ensures accurate hit-testing instead of relying on stale hover data
+          try {
+            // Calculate cursor position relative to the chart element
+            const rect = chartElement.getBoundingClientRect();
+            const xPos = event.clientX - rect.left;
+            const yPos = event.clientY - rect.top;
+
+            // Trigger Plotly hover at the right-click coordinates
+            if (window.Plotly && window.Plotly.Fx && window.Plotly.Fx.hover) {
+              window.Plotly.Fx.hover(chartElement, [{ curveNumber: 0, pointNumber: 0 }], [xPos, yPos]);
+            }
+
+            // Now check if hover data contains an indicator trace
+            let indicatorAtPosition = null;
+            if (chartElement._hoverdata && chartElement._hoverdata.length > 0) {
+              const hoverPoint = chartElement._hoverdata[0];
+              if (hoverPoint.data && hoverPoint.data.meta && hoverPoint.data.meta.instanceId) {
+                indicatorAtPosition = {
+                  instanceId: hoverPoint.data.meta.instanceId,
+                  name: hoverPoint.data.name,
+                };
               }
             }
-          }
 
-          if (indicatorAtPosition) {
-            event.preventDefault();
-            setContextMenu({
-              isOpen: true,
-              position: { x: event.clientX, y: event.clientY },
-              indicatorInstanceId: indicatorAtPosition.instanceId,
-              indicatorName: indicatorAtPosition.name,
-            });
+            if (indicatorAtPosition) {
+              console.log('Indicator found at position:', indicatorAtPosition);
+              event.preventDefault();
+              setContextMenu({
+                isOpen: true,
+                position: { x: event.clientX, y: event.clientY },
+                indicatorInstanceId: indicatorAtPosition.instanceId,
+                indicatorName: indicatorAtPosition.name,
+              });
+            } else {
+              console.log('No indicator found at cursor position. Hover data:', chartElement._hoverdata);
+            }
+          } catch (error) {
+            console.error('Error in context menu hit-testing:', error);
           }
         };
 
-        chartElement.addEventListener('contextmenu', handleContextMenu);
+        // Attach both Plotly click and contextmenu event listeners after a short delay
+        // to ensure Plotly has fully rendered and won't replace DOM elements
+        setTimeout(() => {
+          if (chartElement.on) {
+            chartElement.on('plotly_click', handlePlotlyClick);
+          }
+          console.log('Attaching contextmenu listener to chartElement');
+          chartElement.addEventListener('contextmenu', handleContextMenu);
+        }, 100);
 
         // Cleanup
         return () => {
           chartElement.removeEventListener('chartZoomUpdate', handleZoomUpdate);
           chartElement.removeEventListener('contextmenu', handleContextMenu);
+          // Remove Plotly event listener if it exists
           if (chartElement.removeAllListeners) {
             chartElement.removeAllListeners('plotly_click');
           }
