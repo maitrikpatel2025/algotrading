@@ -111,6 +111,17 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting timeframe persistence or validation issues
     - When modifying the Select component active state styling
 
+- app_docs/feature-93082afa-searchable-pair-selector.md
+  - Conditions:
+    - When working with currency pair selection or the PairSelector component
+    - When implementing or modifying searchable dropdown components
+    - When working with pair categorization (Major, Minor, Exotic)
+    - When implementing localStorage persistence for recent selections
+    - When working with the /api/spread endpoint or spread data display
+    - When adding keyboard navigation to dropdown components
+    - When implementing confirmation dialogs for data-changing actions
+    - When troubleshooting pair selector or spread fetching issues
+
 - app_docs/bug-31ea75f5-strategy-candles-error-fix.md
   - Conditions:
     - When troubleshooting "Invalid time value" errors in chart functionality

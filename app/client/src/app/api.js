@@ -48,6 +48,7 @@ const endPoints = {
     options: () => requests.get("/options"),
     technicals: (p, g) => requests.get(`/technicals/${p}/${g}`),
     prices: (p, g, c) => requests.get(`/prices/${p}/${g}/${c}`),
+    spread: (pair) => requests.get(`/spread/${pair}`),
     openTrades: () => requests.get("/trades/open"),
     tradeHistory: () => requests.get("/trades/history"),
     botStatus: () => requests.get("/bot/status"),
