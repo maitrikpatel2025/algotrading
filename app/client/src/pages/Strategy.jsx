@@ -508,14 +508,14 @@ function Strategy() {
       </div>
 
       {/* Mobile Panel Toggle Buttons */}
-      <div className="md:hidden fixed bottom-4 z-40 flex gap-3 left-4 right-4 justify-between">
+      <div className="md:hidden fixed bottom-6 z-40 flex gap-4 left-4 right-4 justify-between pointer-events-none">
         <button
           type="button"
           onClick={handlePanelToggle}
           className={cn(
-            "flex items-center justify-center w-12 h-12",
-            "bg-primary text-primary-foreground rounded-full shadow-lg",
-            "hover:bg-primary/90 transition-colors",
+            "flex items-center justify-center w-14 h-14 pointer-events-auto",
+            "bg-primary text-primary-foreground rounded-full shadow-xl",
+            "hover:bg-primary/90 transition-all hover:scale-105 active:scale-95",
             "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           )}
           aria-label="Toggle indicator library"
@@ -526,9 +526,9 @@ function Strategy() {
           type="button"
           onClick={() => setIsLogicPanelMobileOpen(true)}
           className={cn(
-            "flex items-center justify-center w-12 h-12",
-            "bg-accent text-accent-foreground rounded-full shadow-lg",
-            "hover:bg-accent/90 transition-colors",
+            "flex items-center justify-center w-14 h-14 pointer-events-auto",
+            "bg-accent text-accent-foreground rounded-full shadow-xl",
+            "hover:bg-accent/90 transition-all hover:scale-105 active:scale-95",
             "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
           )}
           aria-label="Toggle logic panel"
@@ -538,10 +538,10 @@ function Strategy() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 py-8 px-4 md:px-6 space-y-6">
+      <div className="flex-1 min-w-0 py-8 px-4 md:px-6 lg:px-8 space-y-8">
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
             <h1 className="text-h2 text-foreground">Strategy</h1>
             <p className="text-muted-foreground">
               Analyze currency pairs, timeframes, and technical indicators for trading decisions
@@ -550,8 +550,8 @@ function Strategy() {
         </div>
 
         {/* Controls Section */}
-        <div className="card p-6">
-          <div className="flex flex-col md:flex-row items-start md:items-end gap-4 flex-wrap">
+        <div className="card p-6 lg:p-8">
+          <div className="flex flex-col md:flex-row items-start md:items-end gap-6 flex-wrap">
             {/* Pair & Granularity Selectors */}
             <div className="flex flex-wrap items-end gap-4">
               <PairSelector
@@ -583,8 +583,8 @@ function Strategy() {
 
           {/* Selected Info Badge */}
           {selectedPair && selectedGran && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="mt-6 pt-6 border-t border-border">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <BarChart3 className="h-4 w-4" />
                 <span>
                   Analyzing <span className="font-semibold text-foreground">{selectedPair}</span> on{' '}
@@ -597,8 +597,8 @@ function Strategy() {
 
         {/* Error Display */}
         {error && (
-          <div className="card p-4 border-destructive bg-destructive/10">
-            <div className="flex items-start gap-3">
+          <div className="card p-5 border-destructive bg-destructive/10">
+            <div className="flex items-start gap-4">
               <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-destructive mb-1">
@@ -626,8 +626,8 @@ function Strategy() {
 
         {/* Indicator Error Display */}
         {indicatorError && (
-          <div className="card p-4 border-amber-500 bg-amber-500/10">
-            <div className="flex items-start gap-3">
+          <div className="card p-5 border-amber-500 bg-amber-500/10">
+            <div className="flex items-start gap-4">
               <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-foreground">
@@ -649,8 +649,8 @@ function Strategy() {
 
         {/* Info Message Display (for insufficient data etc.) */}
         {infoMessage && (
-          <div className="card p-4 border-info bg-info/10">
-            <div className="flex items-start gap-3">
+          <div className="card p-5 border-info bg-info/10">
+            <div className="flex items-start gap-4">
               <Info className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">
@@ -672,17 +672,10 @@ function Strategy() {
 
         {/* Main Content */}
         {(technicalsData || priceData) ? (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Technicals - Sidebar on large screens */}
-            {technicalsData && (
-              <div className="xl:col-span-1 xl:order-2">
-                <Technicals data={technicalsData} />
-              </div>
-            )}
-
-            {/* Price Chart - Main area */}
+          <div className="space-y-8">
+            {/* Price Chart - Full Width Priority */}
             {priceData && (
-              <div className="xl:col-span-2 xl:order-1">
+              <div>
                 <PriceChart
                   selectedCount={selectedCount}
                   selectedPair={selectedPair}
@@ -702,21 +695,28 @@ function Strategy() {
                 />
               </div>
             )}
+
+            {/* Technicals - Full Width Below Chart */}
+            {technicalsData && (
+              <div>
+                <Technicals data={technicalsData} />
+              </div>
+            )}
           </div>
         ) : (
           /* Empty State */
           <div className="card">
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="p-4 rounded-full bg-muted mb-4">
-                <BarChart3 className="h-8 w-8 text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-20 lg:py-24 px-6 text-center">
+              <div className="p-5 rounded-full bg-muted mb-6">
+                <BarChart3 className="h-10 w-10 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">
+              <h3 className="text-xl font-semibold text-foreground mb-3">
                 Ready to Analyze
               </h3>
-              <p className="text-muted-foreground max-w-md mb-6">
+              <p className="text-muted-foreground max-w-md mb-8">
                 Select a currency pair and timeframe above, then click "Load Data" to view technical analysis and price charts.
               </p>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
                   Real-time data
