@@ -245,3 +245,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting trade direction persistence or section rendering issues
     - When extending strategy configuration with directional constraints
     - When working with constants.js trade direction constants (TRADE_DIRECTIONS, TRADE_DIRECTION_LABELS, TRADE_DIRECTION_ICONS)
+
+- app_docs/feature-a73d36d3-logic-builder-panel.md
+  - Conditions:
+    - When working with the Logic Panel four-section layout (Long Entry, Long Exit, Short Entry, Short Exit)
+    - When implementing or modifying LogicPanel.jsx component
+    - When working with condition section types (CONDITION_SECTIONS_V2)
+    - When implementing panel resize functionality or draggable borders
+    - When working with trade direction-based section filtering
+    - When migrating legacy condition sections to V2 format
+    - When adding or modifying "Add Condition" button functionality
+    - When troubleshooting Logic Panel collapse/expand or resize issues
+    - When working with condition section color coding (green for long, red for short)
+    - When implementing drag-and-drop between condition sections

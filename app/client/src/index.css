@@ -373,6 +373,20 @@
   .animate-fade-in {
     animation: fade-in 200ms ease-out;
   }
+
+  /* Resize Handle for Panels */
+  .resize-handle {
+    @apply cursor-ew-resize;
+  }
+
+  .resize-handle:hover,
+  .resize-handle:active {
+    @apply bg-primary/30;
+  }
+
+  .resize-handle:active {
+    @apply bg-primary/50;
+  }
 }
 
 /* Keyframe Animations */
