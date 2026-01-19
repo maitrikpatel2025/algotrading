@@ -9,6 +9,7 @@ import Technicals from '../components/Technicals';
 import IndicatorLibrary from '../components/IndicatorLibrary';
 import LogicPanel from '../components/LogicPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
+import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
 import { cn } from '../lib/utils';
 import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
@@ -71,6 +72,16 @@ function Strategy() {
     message: '',
     actions: [],
     variant: 'warning',
+  });
+
+  // Indicator settings dialog state
+  const [settingsDialog, setSettingsDialog] = useState({
+    isOpen: false,
+    indicator: null,
+    isEditMode: false,
+    editingInstanceId: null,
+    initialParams: null,
+    initialColor: null,
   });
 
   // Debounce timer ref for timeframe changes
@@ -266,12 +277,13 @@ function Strategy() {
     });
   }, []);
 
-  // Helper to get indicator display name
+  // Helper to get indicator display name - use custom params if available
   const getDisplayName = useCallback((indicator) => {
-    return getIndicatorDisplayName(indicator, indicator.defaultParams);
+    const params = indicator.params || indicator.defaultParams;
+    return getIndicatorDisplayName(indicator, params);
   }, []);
 
-  // Handle indicator drop from IndicatorLibrary
+  // Handle indicator drop from IndicatorLibrary - opens settings dialog
   const handleIndicatorDrop = useCallback((indicator) => {
     // Check limits based on indicator type
     const overlayCount = activeIndicators.filter(ind => ind.type === INDICATOR_TYPES.OVERLAY).length;
@@ -287,23 +299,90 @@ function Strategy() {
       return;
     }
 
-    // Create a new indicator instance with unique ID
-    const newIndicator = {
-      ...indicator,
-      instanceId: `${indicator.id}-${Date.now()}`,
-    };
-
-    // Create display name for the indicator
-    const displayName = getIndicatorDisplayName(newIndicator, newIndicator.defaultParams);
-
-    // Create a condition for the indicator
-    const newCondition = createConditionFromIndicator(newIndicator, displayName);
-
-    setActiveIndicators(prev => [...prev, newIndicator]);
-    setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
-    setConditions(prev => [...prev, newCondition]);
-    setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
+    // Open settings dialog instead of immediately adding
+    setSettingsDialog({
+      isOpen: true,
+      indicator: indicator,
+      isEditMode: false,
+      editingInstanceId: null,
+      initialParams: null,
+      initialColor: null,
+    });
     setIndicatorError(null);
+  }, [activeIndicators]);
+
+  // Handle settings dialog confirm - add indicator with custom params
+  const handleSettingsConfirm = useCallback((params, color) => {
+    const indicator = settingsDialog.indicator;
+
+    if (settingsDialog.isEditMode && settingsDialog.editingInstanceId) {
+      // Edit mode - update existing indicator
+      setActiveIndicators(prev => prev.map(ind => {
+        if (ind.instanceId === settingsDialog.editingInstanceId) {
+          const updatedIndicator = {
+            ...ind,
+            params: params,
+            color: color,
+          };
+          return updatedIndicator;
+        }
+        return ind;
+      }));
+
+      // Update related conditions with new display name
+      const updatedIndicator = activeIndicators.find(ind => ind.instanceId === settingsDialog.editingInstanceId);
+      if (updatedIndicator) {
+        const displayName = getIndicatorDisplayName({ ...updatedIndicator, params, color }, params);
+        setConditions(prev => prev.map(c => {
+          if (c.indicatorInstanceId === settingsDialog.editingInstanceId) {
+            return { ...c, indicatorDisplayName: displayName };
+          }
+          return c;
+        }));
+      }
+    } else {
+      // Add mode - create new indicator instance
+      const newIndicator = {
+        ...indicator,
+        instanceId: `${indicator.id}-${Date.now()}`,
+        params: params,
+        color: color,
+      };
+
+      // Create display name for the indicator using custom params
+      const displayName = getIndicatorDisplayName(newIndicator, params);
+
+      // Create a condition for the indicator
+      const newCondition = createConditionFromIndicator(newIndicator, displayName);
+
+      setActiveIndicators(prev => [...prev, newIndicator]);
+      setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
+      setConditions(prev => [...prev, newCondition]);
+      setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
+    }
+
+    // Close dialog
+    setSettingsDialog(prev => ({ ...prev, isOpen: false }));
+  }, [settingsDialog, activeIndicators]);
+
+  // Handle settings dialog close/cancel
+  const handleSettingsCancel = useCallback(() => {
+    setSettingsDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle edit indicator - open settings dialog with existing values
+  const handleEditIndicator = useCallback((instanceId) => {
+    const indicator = activeIndicators.find(ind => ind.instanceId === instanceId);
+    if (!indicator) return;
+
+    setSettingsDialog({
+      isOpen: true,
+      indicator: indicator,
+      isEditMode: true,
+      editingInstanceId: instanceId,
+      initialParams: indicator.params || indicator.defaultParams,
+      initialColor: indicator.color,
+    });
   }, [activeIndicators]);
 
   // Handle indicator removal with confirmation
@@ -692,6 +771,7 @@ function Strategy() {
                   activeIndicators={activeIndicators}
                   onIndicatorDrop={handleIndicatorDrop}
                   onRemoveIndicator={handleRemoveIndicator}
+                  onEditIndicator={handleEditIndicator}
                 />
               </div>
             )}
@@ -785,6 +865,17 @@ function Strategy() {
         message={confirmDialog.message}
         actions={confirmDialog.actions}
         variant={confirmDialog.variant}
+      />
+
+      {/* Indicator Settings Dialog */}
+      <IndicatorSettingsDialog
+        isOpen={settingsDialog.isOpen}
+        onClose={handleSettingsCancel}
+        onConfirm={handleSettingsConfirm}
+        indicator={settingsDialog.indicator}
+        initialParams={settingsDialog.initialParams}
+        initialColor={settingsDialog.initialColor}
+        isEditMode={settingsDialog.isEditMode}
       />
     </div>
   );

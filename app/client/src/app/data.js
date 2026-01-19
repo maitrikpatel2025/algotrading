@@ -11,7 +11,10 @@ export const GRANULARITIES = [
 export const COUNTS = [
     { key: "50", text: "50", value:  "50" },
     { key: "100", text: "100", value:  "100" },
-    { key: "200", text: "200", value:  "200" }
+    { key: "200", text: "200", value:  "200" },
+    { key: "500", text: "500", value:  "500" },
+    { key: "1000", text: "1000", value:  "1000" },
+    { key: "2000", text: "2000", value:  "2000" }
 ];
 
 // Chart type options for the chart type selector
@@ -85,7 +88,7 @@ export function calculateCandleCount(dateRange, granularity) {
             break;
         case "All":
             // Return a large number for "All" to get maximum available data
-            return 1000;
+            return 2000;
         default:
             return 100;
     }
@@ -93,7 +96,7 @@ export function calculateCandleCount(dateRange, granularity) {
     // Calculate the number of seconds between start and now
     const durationSeconds = (now.getTime() - startDate.getTime()) / 1000;
 
-    // Calculate candle count and ensure minimum of 10 and maximum of 1000
+    // Calculate candle count and ensure minimum of 10 and maximum of 2000
     const candleCount = Math.floor(durationSeconds / secondsPerGranularity);
-    return Math.max(10, Math.min(1000, candleCount));
+    return Math.max(10, Math.min(2000, candleCount));
 }

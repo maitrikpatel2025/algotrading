@@ -3,7 +3,8 @@ import Plotly from 'plotly.js-dist';
 import Select from './Select';
 import { COUNTS, CHART_TYPES, DATE_RANGES } from '../app/data';
 import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
-import { LineChart, BarChart2, X } from 'lucide-react';
+import { getIndicatorDisplayName } from '../app/indicators';
+import { LineChart, BarChart2, X, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 function PriceChart({
@@ -21,7 +22,8 @@ function PriceChart({
   loading,
   activeIndicators = [],
   onIndicatorDrop,
-  onRemoveIndicator
+  onRemoveIndicator,
+  onEditIndicator
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
@@ -277,25 +279,45 @@ function PriceChart({
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground mr-2">Active:</span>
-              {activeIndicators.map((indicator) => (
-                <span
-                  key={indicator.instanceId}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground"
-                  style={{ borderLeft: `3px solid ${indicator.color}` }}
-                >
-                  {indicator.shortName}
-                  {onRemoveIndicator && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveIndicator(indicator.instanceId)}
-                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-                      title={`Remove ${indicator.shortName}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </span>
-              ))}
+              {activeIndicators.map((indicator) => {
+                const displayName = getIndicatorDisplayName(indicator, indicator.params || indicator.defaultParams);
+                return (
+                  <span
+                    key={indicator.instanceId}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground",
+                      onEditIndicator && "cursor-pointer hover:bg-muted/80 transition-colors group"
+                    )}
+                    style={{ borderLeft: `3px solid ${indicator.color}` }}
+                    onClick={(e) => {
+                      // Don't trigger edit when clicking the remove button
+                      if (e.target.closest('button')) return;
+                      if (onEditIndicator) {
+                        onEditIndicator(indicator.instanceId);
+                      }
+                    }}
+                    title={onEditIndicator ? `Click to edit ${displayName}` : displayName}
+                  >
+                    {displayName}
+                    {onEditIndicator && (
+                      <Settings className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                    {onRemoveIndicator && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveIndicator(indicator.instanceId);
+                        }}
+                        className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
+                        title={`Remove ${displayName}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

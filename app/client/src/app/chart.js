@@ -414,7 +414,8 @@ function createOverlayIndicatorTraces(chartData, indicator) {
   const closes = chartData.mid_c;
   const highs = chartData.mid_h;
   const lows = chartData.mid_l;
-  const params = indicator.defaultParams || {};
+  // Use custom params if available, otherwise fall back to defaultParams
+  const params = indicator.params || indicator.defaultParams || {};
 
   switch (indicator.id) {
     case 'sma': {
@@ -531,7 +532,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
   const closes = chartData.mid_c;
   const highs = chartData.mid_h;
   const lows = chartData.mid_l;
-  const params = indicator.defaultParams || {};
+  // Use custom params if available, otherwise fall back to defaultParams
+  const params = indicator.params || indicator.defaultParams || {};
 
   switch (indicator.id) {
     case 'rsi': {
