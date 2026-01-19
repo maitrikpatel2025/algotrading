@@ -105,6 +105,8 @@ export const INDICATORS = [
       operator: 'crosses_above',
       rightOperand: 'indicator', // Will reference this indicator
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'ema',
@@ -121,6 +123,8 @@ export const INDICATORS = [
       operator: 'crosses_above',
       rightOperand: 'indicator',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'macd',
@@ -137,6 +141,8 @@ export const INDICATORS = [
       operator: 'crosses_above',
       rightOperand: 'indicator:Signal Line',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'adx',
@@ -153,6 +159,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:25',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
 
   // Momentum Indicators
@@ -171,6 +179,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:70',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'stochastic',
@@ -187,6 +197,8 @@ export const INDICATORS = [
       operator: 'crosses_above',
       rightOperand: 'indicator:%D',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'cci',
@@ -203,6 +215,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:100',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'williams_r',
@@ -219,6 +233,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:-20',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
 
   // Volatility Indicators
@@ -237,6 +253,9 @@ export const INDICATORS = [
       operator: 'crosses_above',
       rightOperand: 'indicator:Upper Band',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
+    defaultFillOpacity: 0.2,
   },
   {
     id: 'atr',
@@ -253,6 +272,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:0.001',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'keltner_channel',
@@ -269,6 +290,9 @@ export const INDICATORS = [
       operator: 'crosses_above',
       rightOperand: 'indicator:Upper Channel',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
+    defaultFillOpacity: 0.2,
   },
 
   // Volume Indicators
@@ -287,6 +311,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:0',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
   {
     id: 'volume_profile',
@@ -303,6 +329,8 @@ export const INDICATORS = [
       operator: 'is_above',
       rightOperand: 'value:0',
     },
+    defaultLineWidth: 1.5,
+    defaultLineStyle: 'solid',
   },
 ];
 

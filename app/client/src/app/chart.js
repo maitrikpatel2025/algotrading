@@ -16,7 +16,14 @@ import {
 import { INDICATOR_TYPES } from './indicators';
 import { detectPattern } from './patternDetection';
 import { PATTERN_TYPES } from './patterns';
-import { PREVIEW_LINE_DASH, PREVIEW_OPACITY, PREVIEW_LABEL_SUFFIX } from './chartConstants';
+import {
+  PREVIEW_LINE_DASH,
+  PREVIEW_OPACITY,
+  PREVIEW_LABEL_SUFFIX,
+  DEFAULT_LINE_WIDTH,
+  DEFAULT_LINE_STYLE,
+  DEFAULT_FILL_OPACITY
+} from './chartConstants';
 
 // Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
@@ -463,7 +470,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: `SMA(${params.period || 20})`,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `SMA: %{y:.5f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
@@ -480,7 +491,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: `EMA(${params.period || 20})`,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `EMA: %{y:.5f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
@@ -492,6 +507,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
       const bb = calculateBollingerBands(closes, params.period || 20, params.stdDev || 2);
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
+      const lineWidth = indicator.lineWidth ?? DEFAULT_LINE_WIDTH;
+      const lineStyle = indicator.lineStyle ?? DEFAULT_LINE_STYLE;
+      const fillOpacity = indicator.fillOpacity ?? DEFAULT_FILL_OPACITY;
+      // Convert opacity (0-1) to hex (00-FF)
+      const opacityHex = Math.round(fillOpacity * 255).toString(16).padStart(2, '0');
       // Upper band
       const upperTrace = applyPreviewStyling({
         x: chartData.time,
@@ -499,7 +519,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: 'BB Upper',
-        line: { color: indicator.color, width: 1, dash: 'dot' },
+        line: {
+          color: indicator.color,
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         hovertemplate: `BB Upper: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -512,7 +536,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: 'BB Middle',
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: lineWidth,
+          dash: lineStyle
+        },
         hovertemplate: `BB Middle: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -525,9 +553,13 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: 'BB Lower',
-        line: { color: indicator.color, width: 1, dash: 'dot' },
+        line: {
+          color: indicator.color,
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         fill: 'tonexty',
-        fillcolor: `${indicator.color}15`,
+        fillcolor: `${indicator.color}${opacityHex}`,
         hovertemplate: `BB Lower: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -539,6 +571,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
       const kc = calculateKeltnerChannel(highs, lows, closes, params.period || 20, params.atrMultiplier || 2);
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
+      const lineWidth = indicator.lineWidth ?? DEFAULT_LINE_WIDTH;
+      const lineStyle = indicator.lineStyle ?? DEFAULT_LINE_STYLE;
+      const fillOpacity = indicator.fillOpacity ?? DEFAULT_FILL_OPACITY;
+      // Convert opacity (0-1) to hex (00-FF)
+      const opacityHex = Math.round(fillOpacity * 255).toString(16).padStart(2, '0');
       // Upper channel
       const upperTrace = applyPreviewStyling({
         x: chartData.time,
@@ -546,7 +583,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: 'KC Upper',
-        line: { color: indicator.color, width: 1, dash: 'dot' },
+        line: {
+          color: indicator.color,
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         hovertemplate: `KC Upper: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -559,7 +600,11 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: 'KC Middle',
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: lineWidth,
+          dash: lineStyle
+        },
         hovertemplate: `KC Middle: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -572,9 +617,13 @@ function createOverlayIndicatorTraces(chartData, indicator) {
         type: 'scatter',
         mode: 'lines',
         name: 'KC Lower',
-        line: { color: indicator.color, width: 1, dash: 'dot' },
+        line: {
+          color: indicator.color,
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         fill: 'tonexty',
-        fillcolor: `${indicator.color}15`,
+        fillcolor: `${indicator.color}${opacityHex}`,
         hovertemplate: `KC Lower: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -612,7 +661,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: `RSI(${params.period || 14})`,
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `RSI: %{y:.2f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
@@ -629,6 +682,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
       );
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
+      const lineWidth = indicator.lineWidth ?? DEFAULT_LINE_WIDTH;
+      const lineStyle = indicator.lineStyle ?? DEFAULT_LINE_STYLE;
       // MACD line
       const macdTrace = applyPreviewStyling({
         x: chartData.time,
@@ -637,7 +692,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: 'MACD',
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: lineWidth,
+          dash: lineStyle
+        },
         hovertemplate: `MACD: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -651,13 +710,17 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: 'Signal',
         yaxis: yAxisName,
-        line: { color: '#EF4444', width: 1 },
+        line: {
+          color: '#EF4444',
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         hovertemplate: `Signal: %{y:.5f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
       }, isPreview);
       traces.push(signalTrace);
-      // Histogram
+      // Histogram - don't apply line styling to bars
       const histTrace = applyPreviewStyling({
         x: chartData.time,
         y: macd.histogram,
@@ -678,6 +741,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
       const stoch = calculateStochastic(highs, lows, closes, params.kPeriod || 14, params.dPeriod || 3);
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
+      const lineWidth = indicator.lineWidth ?? DEFAULT_LINE_WIDTH;
+      const lineStyle = indicator.lineStyle ?? DEFAULT_LINE_STYLE;
       const kTrace = applyPreviewStyling({
         x: chartData.time,
         y: stoch.k,
@@ -685,7 +750,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: '%K',
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: lineWidth,
+          dash: lineStyle
+        },
         hovertemplate: `%K: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -698,7 +767,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: '%D',
         yaxis: yAxisName,
-        line: { color: '#EF4444', width: 1 },
+        line: {
+          color: '#EF4444',
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         hovertemplate: `%D: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -715,7 +788,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: `CCI(${params.period || 20})`,
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `CCI: %{y:.2f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
@@ -732,7 +809,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: `Williams %R(${params.period || 14})`,
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `%R: %{y:.2f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
@@ -744,6 +825,8 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
       const adx = calculateADX(highs, lows, closes, params.period || 14);
       const metadata = { indicatorId: indicator.id, instanceId: indicator.instanceId };
       const customdata = Array(chartData.time.length).fill(indicator.instanceId);
+      const lineWidth = indicator.lineWidth ?? DEFAULT_LINE_WIDTH;
+      const lineStyle = indicator.lineStyle ?? DEFAULT_LINE_STYLE;
       const adxTrace = applyPreviewStyling({
         x: chartData.time,
         y: adx.adx,
@@ -751,7 +834,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: `ADX(${params.period || 14})`,
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: lineWidth,
+          dash: lineStyle
+        },
         hovertemplate: `ADX: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -764,7 +851,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: '+DI',
         yaxis: yAxisName,
-        line: { color: '#22C55E', width: 1 },
+        line: {
+          color: '#22C55E',
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         hovertemplate: `+DI: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -777,7 +868,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: '-DI',
         yaxis: yAxisName,
-        line: { color: '#EF4444', width: 1 },
+        line: {
+          color: '#EF4444',
+          width: lineWidth * 0.67,
+          dash: lineStyle
+        },
         hovertemplate: `-DI: %{y:.2f}<extra></extra>`,
         customdata: customdata,
         meta: metadata,
@@ -794,7 +889,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: `ATR(${params.period || 14})`,
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `ATR: %{y:.5f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },
@@ -811,7 +910,11 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
         mode: 'lines',
         name: 'OBV',
         yaxis: yAxisName,
-        line: { color: indicator.color, width: 1.5 },
+        line: {
+          color: indicator.color,
+          width: indicator.lineWidth ?? DEFAULT_LINE_WIDTH,
+          dash: indicator.lineStyle ?? DEFAULT_LINE_STYLE
+        },
         hovertemplate: `OBV: %{y:,.0f}<extra></extra>`,
         customdata: Array(chartData.time.length).fill(indicator.instanceId),
         meta: { indicatorId: indicator.id, instanceId: indicator.instanceId },

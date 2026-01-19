@@ -3,7 +3,17 @@ import { cn } from '../lib/utils';
 import { X, Settings2, Eye, EyeOff } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
 import { usePerformanceMonitor } from '../hooks/usePerformanceMonitor';
-import { PREVIEW_DEBOUNCE_DELAY, PERFORMANCE_THRESHOLD_GOOD, PERFORMANCE_THRESHOLD_WARNING } from '../app/chartConstants';
+import {
+  PREVIEW_DEBOUNCE_DELAY,
+  PERFORMANCE_THRESHOLD_GOOD,
+  PERFORMANCE_THRESHOLD_WARNING,
+  LINE_WIDTH_OPTIONS,
+  LINE_STYLE_OPTIONS,
+  LINE_STYLE_LABELS,
+  DEFAULT_LINE_WIDTH,
+  DEFAULT_LINE_STYLE,
+  DEFAULT_FILL_OPACITY
+} from '../app/chartConstants';
 
 // Predefined color palette for indicators (from UI style guide)
 const INDICATOR_COLORS = [
@@ -63,6 +73,9 @@ const INDICATOR_PARAM_CONFIG = {
  * @param {Object} indicator - The indicator definition object
  * @param {Object} initialParams - Initial parameter values (for edit mode)
  * @param {string} initialColor - Initial color value (for edit mode)
+ * @param {number} initialLineWidth - Initial line width value (for edit mode)
+ * @param {string} initialLineStyle - Initial line style value (for edit mode)
+ * @param {number} initialFillOpacity - Initial fill opacity value (for edit mode)
  * @param {boolean} isEditMode - Whether editing existing indicator vs adding new
  * @param {Function} onPreviewUpdate - Callback for real-time preview updates (params, color)
  * @param {boolean} comparisonMode - Whether before/after comparison is enabled
@@ -75,6 +88,9 @@ function IndicatorSettingsDialog({
   indicator,
   initialParams = null,
   initialColor = null,
+  initialLineWidth = null,
+  initialLineStyle = null,
+  initialFillOpacity = null,
   isEditMode = false,
   onPreviewUpdate = null,
   comparisonMode = false,
@@ -86,14 +102,20 @@ function IndicatorSettingsDialog({
   // Initialize params from indicator defaults or initial values
   const [params, setParams] = useState({});
   const [selectedColor, setSelectedColor] = useState(null);
+  const [lineWidth, setLineWidth] = useState(DEFAULT_LINE_WIDTH);
+  const [lineStyle, setLineStyle] = useState(DEFAULT_LINE_STYLE);
+  const [fillOpacity, setFillOpacity] = useState(DEFAULT_FILL_OPACITY);
   const [errors, setErrors] = useState({});
 
   // Performance monitoring for preview calculations
   const { startTimer, stopTimer, elapsedTime } = usePerformanceMonitor();
 
-  // Debounce params and color for preview updates
+  // Debounce params, color, and styling for preview updates
   const debouncedParams = useDebounce(params, PREVIEW_DEBOUNCE_DELAY);
   const debouncedColor = useDebounce(selectedColor, PREVIEW_DEBOUNCE_DELAY);
+  const debouncedLineWidth = useDebounce(lineWidth, PREVIEW_DEBOUNCE_DELAY);
+  const debouncedLineStyle = useDebounce(lineStyle, PREVIEW_DEBOUNCE_DELAY);
+  const debouncedFillOpacity = useDebounce(fillOpacity, PREVIEW_DEBOUNCE_DELAY);
 
   // Reset state when indicator changes or dialog opens
   useEffect(() => {
@@ -109,9 +131,34 @@ function IndicatorSettingsDialog({
 
       // Use initial color if provided, otherwise use indicator's default color
       setSelectedColor(initialColor || indicator.color);
+
+      // Use initial styling if provided, otherwise use indicator's defaults
+      setLineWidth(initialLineWidth ?? indicator.defaultLineWidth ?? DEFAULT_LINE_WIDTH);
+      setLineStyle(initialLineStyle ?? indicator.defaultLineStyle ?? DEFAULT_LINE_STYLE);
+      setFillOpacity(initialFillOpacity ?? indicator.defaultFillOpacity ?? DEFAULT_FILL_OPACITY);
+
       setErrors({});
     }
-  }, [isOpen, indicator, initialParams, initialColor]);
+  }, [isOpen, indicator, initialParams, initialColor, initialLineWidth, initialLineStyle, initialFillOpacity]);
+
+  // Handle reset to default
+  const handleResetToDefault = useCallback(() => {
+    if (indicator) {
+      // Reset parameters to defaults
+      setParams({ ...indicator.defaultParams });
+
+      // Reset color to default
+      setSelectedColor(indicator.color);
+
+      // Reset styling to defaults
+      setLineWidth(indicator.defaultLineWidth ?? DEFAULT_LINE_WIDTH);
+      setLineStyle(indicator.defaultLineStyle ?? DEFAULT_LINE_STYLE);
+      setFillOpacity(indicator.defaultFillOpacity ?? DEFAULT_FILL_OPACITY);
+
+      // Clear errors
+      setErrors({});
+    }
+  }, [indicator]);
 
   // Handle parameter change with validation
   const handleParamChange = useCallback((key, value, config) => {
@@ -166,8 +213,8 @@ function IndicatorSettingsDialog({
       return;
     }
 
-    onConfirm(params, selectedColor);
-  }, [indicator, params, selectedColor, onConfirm]);
+    onConfirm(params, selectedColor, lineWidth, lineStyle, fillOpacity);
+  }, [indicator, params, selectedColor, lineWidth, lineStyle, fillOpacity, onConfirm]);
 
   // Focus management and escape key handler
   useEffect(() => {
@@ -220,14 +267,14 @@ function IndicatorSettingsDialog({
       // Only trigger preview if all params are valid
       if (!hasErrors && Object.keys(debouncedParams).length > 0) {
         startTimer();
-        onPreviewUpdate(debouncedParams, debouncedColor);
+        onPreviewUpdate(debouncedParams, debouncedColor, debouncedLineWidth, debouncedLineStyle, debouncedFillOpacity);
         // Stop timer after a frame to allow chart to render
         requestAnimationFrame(() => {
           stopTimer();
         });
       }
     }
-  }, [isOpen, isEditMode, debouncedParams, debouncedColor, onPreviewUpdate, indicator, startTimer, stopTimer]);
+  }, [isOpen, isEditMode, debouncedParams, debouncedColor, debouncedLineWidth, debouncedLineStyle, debouncedFillOpacity, onPreviewUpdate, indicator, startTimer, stopTimer]);
 
   if (!isOpen || !indicator) return null;
 
@@ -368,6 +415,93 @@ function IndicatorSettingsDialog({
             </div>
           </div>
 
+          {/* Line Thickness */}
+          <div className="space-y-3 mb-6">
+            <h3 className="text-sm font-medium text-foreground">Line Thickness</h3>
+            <div className="flex gap-2">
+              {LINE_WIDTH_OPTIONS.map((width) => (
+                <button
+                  key={width}
+                  type="button"
+                  onClick={() => setLineWidth(width)}
+                  className={cn(
+                    "flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    "border focus:outline-none focus:ring-2 focus:ring-primary/50",
+                    lineWidth === width
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-foreground border-border hover:bg-muted/80"
+                  )}
+                  aria-label={`Select ${width}px line width`}
+                  aria-pressed={lineWidth === width}
+                >
+                  {width}px
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Line Style */}
+          <div className="space-y-3 mb-6">
+            <h3 className="text-sm font-medium text-foreground">Line Style</h3>
+            <div className="flex gap-2">
+              {Object.entries(LINE_STYLE_OPTIONS).map(([key, value]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setLineStyle(value)}
+                  className={cn(
+                    "flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    "border focus:outline-none focus:ring-2 focus:ring-primary/50",
+                    "flex flex-col items-center gap-1",
+                    lineStyle === value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-foreground border-border hover:bg-muted/80"
+                  )}
+                  aria-label={`Select ${LINE_STYLE_LABELS[value]} line style`}
+                  aria-pressed={lineStyle === value}
+                >
+                  <span className="text-xs">{LINE_STYLE_LABELS[value]}</span>
+                  <div className="w-full h-0.5 relative" style={{
+                    background: lineStyle === value ? 'currentColor' : 'currentColor',
+                    ...(value === 'dash' && {
+                      backgroundImage: 'linear-gradient(to right, currentColor 40%, transparent 40%)',
+                      backgroundSize: '8px 2px',
+                      backgroundRepeat: 'repeat-x'
+                    }),
+                    ...(value === 'dot' && {
+                      backgroundImage: 'linear-gradient(to right, currentColor 25%, transparent 25%)',
+                      backgroundSize: '4px 2px',
+                      backgroundRepeat: 'repeat-x'
+                    })
+                  }} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fill Opacity - only show for indicators with fill areas */}
+          {(indicator.id === 'bollinger_bands' || indicator.id === 'keltner_channel') && (
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-foreground">Fill Opacity</h3>
+                <span className="text-xs text-muted-foreground">{Math.round(fillOpacity * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={fillOpacity}
+                onChange={(e) => setFillOpacity(parseFloat(e.target.value))}
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-muted"
+                style={{
+                  background: `linear-gradient(to right, ${selectedColor} 0%, ${selectedColor} ${fillOpacity * 100}%, rgb(var(--muted)) ${fillOpacity * 100}%, rgb(var(--muted)) 100%)`
+                }}
+                aria-label="Fill opacity slider"
+              />
+            </div>
+          )}
+
           {/* Preview */}
           <div className="mb-6 p-3 rounded-md bg-muted/50 border border-border">
             <div className="flex items-center gap-2">
@@ -410,25 +544,39 @@ function IndicatorSettingsDialog({
 
           {/* Actions */}
           <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2">
-            {/* Left side - Comparison toggle */}
-            {isEditMode && onComparisonToggle && (
+            {/* Left side - Comparison toggle and Reset button */}
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              {isEditMode && onComparisonToggle && (
+                <button
+                  type="button"
+                  onClick={onComparisonToggle}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    "border border-border",
+                    comparisonMode
+                      ? "bg-primary/10 text-primary border-primary/50"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80",
+                    "focus:outline-none focus:ring-2 focus:ring-primary/50",
+                    "flex items-center gap-2 justify-center sm:justify-start"
+                  )}
+                >
+                  {comparisonMode ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  {comparisonMode ? 'Comparison On' : 'Compare Before/After'}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onComparisonToggle}
+                onClick={handleResetToDefault}
                 className={cn(
                   "px-3 py-2 text-sm font-medium rounded-md transition-colors",
                   "border border-border",
-                  comparisonMode
-                    ? "bg-primary/10 text-primary border-primary/50"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                  "focus:outline-none focus:ring-2 focus:ring-primary/50",
-                  "flex items-center gap-2 justify-center sm:justify-start"
+                  "bg-muted text-foreground hover:bg-muted/80",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/50"
                 )}
               >
-                {comparisonMode ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                {comparisonMode ? 'Comparison On' : 'Compare Before/After'}
+                Reset to Default
               </button>
-            )}
+            </div>
 
             {/* Right side - Cancel and Apply buttons */}
             <div className="flex flex-col-reverse sm:flex-row gap-2">

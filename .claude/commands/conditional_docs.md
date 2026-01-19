@@ -219,3 +219,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting preview calculation performance issues
     - When implementing apply/cancel logic for parameter changes
     - When working with chartConstants.js preview styling constants
+
+- app_docs/feature-534b16b8-indicator-color-style-customization.md
+  - Conditions:
+    - When implementing or modifying indicator styling controls (line thickness, line style, fill opacity)
+    - When working with indicator visual customization features
+    - When modifying IndicatorSettingsDialog styling sections
+    - When working with Plotly line styling properties (line.width, line.dash, fillcolor alpha)
+    - When troubleshooting indicator rendering or styling issues
+    - When adding new styling options or extending existing styling controls
+    - When working with chartConstants.js styling constants (LINE_WIDTH_OPTIONS, LINE_STYLE_OPTIONS, DEFAULT_FILL_OPACITY)
+    - When implementing Reset to Default functionality for indicator styling
+    - When extending preview system to show styling changes
+    - When working with indicator default styling properties in indicators.js
