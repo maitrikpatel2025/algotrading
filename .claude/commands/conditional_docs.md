@@ -140,3 +140,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing indicator selection or chart overlay functionality
     - When troubleshooting indicator search or category filtering
     - When modifying indicator data structure or categories
+
+- app_docs/feature-2b739aad-drag-indicator-onto-chart.md
+  - Conditions:
+    - When implementing drag-and-drop functionality for indicators
+    - When working with indicator calculations (SMA, EMA, RSI, MACD, Bollinger Bands, etc.)
+    - When modifying indicator rendering on charts (overlay or subchart)
+    - When working with indicatorCalculations.js calculation functions
+    - When implementing indicator limits or undo functionality
+    - When troubleshooting indicator drag-drop or chart rendering issues
+    - When adding new technical indicator types to the system
