@@ -63,6 +63,7 @@ class OptionItem(BaseModel):
     key: str
     text: str
     value: str
+    category: Optional[str] = None
 
 
 class TradingOptionsResponse(BaseModel):
