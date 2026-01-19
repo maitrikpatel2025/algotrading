@@ -16,7 +16,7 @@ import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucid
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
-import { createConditionFromIndicator, createConditionFromPattern } from '../app/conditionDefaults';
+import { createConditionFromIndicator, createConditionFromPattern, CONDITION_SECTIONS_V2, getDefaultSection, migrateSectionToV2 } from '../app/conditionDefaults';
 import { TRADE_DIRECTIONS, TRADE_DIRECTION_STORAGE_KEY } from '../app/constants';
 
 // localStorage keys for persisting preferences
@@ -389,16 +389,8 @@ function Strategy() {
       // Create display name for the indicator using custom params
       const displayName = getIndicatorDisplayName(newIndicator, params);
 
-      // Determine condition section based on trade direction
-      let conditionSection;
-      if (tradeDirection === TRADE_DIRECTIONS.LONG) {
-        conditionSection = 'entry';
-      } else if (tradeDirection === TRADE_DIRECTIONS.SHORT) {
-        conditionSection = 'exit';
-      } else {
-        // For 'both', use the template's default section or 'entry'
-        conditionSection = newIndicator.defaultConditionTemplate?.section || 'entry';
-      }
+      // Determine condition section based on trade direction (use V2 sections)
+      const conditionSection = getDefaultSection(tradeDirection, 'entry');
 
       // Create a condition for the indicator
       const newCondition = createConditionFromIndicator(newIndicator, displayName, conditionSection);
@@ -497,16 +489,8 @@ function Strategy() {
     setActiveIndicators(prev => [...prev, newIndicator]);
     setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
 
-    // Determine condition section based on trade direction
-    let conditionSection;
-    if (tradeDirection === TRADE_DIRECTIONS.LONG) {
-      conditionSection = 'entry';
-    } else if (tradeDirection === TRADE_DIRECTIONS.SHORT) {
-      conditionSection = 'exit';
-    } else {
-      // For 'both', use the template's default section or 'entry'
-      conditionSection = newIndicator.defaultConditionTemplate?.section || 'entry';
-    }
+    // Determine condition section based on trade direction (use V2 sections)
+    const conditionSection = getDefaultSection(tradeDirection, 'entry');
 
     // Auto-create a condition for the new instance
     const displayName = getDisplayName(newIndicator);
@@ -601,16 +585,8 @@ function Strategy() {
       console.log('Pattern drop - created newPattern:', { id: newPattern.id, name: newPattern.name, count: newPattern.detectedCount });
     }
 
-    // Determine condition section based on trade direction
-    let conditionSection;
-    if (tradeDirection === TRADE_DIRECTIONS.LONG) {
-      conditionSection = 'entry';
-    } else if (tradeDirection === TRADE_DIRECTIONS.SHORT) {
-      conditionSection = 'exit';
-    } else {
-      // For 'both', default to 'entry' for patterns
-      conditionSection = 'entry';
-    }
+    // Determine condition section based on trade direction (use V2 sections)
+    const conditionSection = getDefaultSection(tradeDirection, 'entry');
 
     // Create a condition for the pattern
     const newCondition = createConditionFromPattern(newPattern, conditionSection);
@@ -702,22 +678,34 @@ function Strategy() {
 
   // Handle trade direction change
   const handleTradeDirectionChange = useCallback((newDirection) => {
-    // Check if there are conditions that would be removed
-    const hasEntryConditions = conditions.some(c => c.section === 'entry');
-    const hasExitConditions = conditions.some(c => c.section === 'exit');
+    // Check if there are conditions that would be removed (using V2 sections)
+    const hasLongConditions = conditions.some(c => {
+      const section = migrateSectionToV2(c.section);
+      return section === CONDITION_SECTIONS_V2.LONG_ENTRY || section === CONDITION_SECTIONS_V2.LONG_EXIT;
+    });
+    const hasShortConditions = conditions.some(c => {
+      const section = migrateSectionToV2(c.section);
+      return section === CONDITION_SECTIONS_V2.SHORT_ENTRY || section === CONDITION_SECTIONS_V2.SHORT_EXIT;
+    });
 
     let needsConfirmation = false;
     let conditionsToRemove = [];
     let warningMessage = '';
 
-    if (newDirection === TRADE_DIRECTIONS.LONG && hasExitConditions) {
+    if (newDirection === TRADE_DIRECTIONS.LONG && hasShortConditions) {
       needsConfirmation = true;
-      conditionsToRemove = conditions.filter(c => c.section === 'exit');
-      warningMessage = `You have ${conditionsToRemove.length} Exit condition${conditionsToRemove.length !== 1 ? 's' : ''} defined. Switching to Long Only will remove ${conditionsToRemove.length === 1 ? 'it' : 'them'}. Continue?`;
-    } else if (newDirection === TRADE_DIRECTIONS.SHORT && hasEntryConditions) {
+      conditionsToRemove = conditions.filter(c => {
+        const section = migrateSectionToV2(c.section);
+        return section === CONDITION_SECTIONS_V2.SHORT_ENTRY || section === CONDITION_SECTIONS_V2.SHORT_EXIT;
+      });
+      warningMessage = `You have ${conditionsToRemove.length} Short condition${conditionsToRemove.length !== 1 ? 's' : ''} defined. Switching to Long Only will remove ${conditionsToRemove.length === 1 ? 'it' : 'them'}. Continue?`;
+    } else if (newDirection === TRADE_DIRECTIONS.SHORT && hasLongConditions) {
       needsConfirmation = true;
-      conditionsToRemove = conditions.filter(c => c.section === 'entry');
-      warningMessage = `You have ${conditionsToRemove.length} Entry condition${conditionsToRemove.length !== 1 ? 's' : ''} defined. Switching to Short Only will remove ${conditionsToRemove.length === 1 ? 'it' : 'them'}. Continue?`;
+      conditionsToRemove = conditions.filter(c => {
+        const section = migrateSectionToV2(c.section);
+        return section === CONDITION_SECTIONS_V2.LONG_ENTRY || section === CONDITION_SECTIONS_V2.LONG_EXIT;
+      });
+      warningMessage = `You have ${conditionsToRemove.length} Long condition${conditionsToRemove.length !== 1 ? 's' : ''} defined. Switching to Short Only will remove ${conditionsToRemove.length === 1 ? 'it' : 'them'}. Continue?`;
     }
 
     if (needsConfirmation) {
@@ -756,6 +744,13 @@ function Strategy() {
   // Handle hover for visual connections
   const handleIndicatorHover = useCallback((instanceId) => {
     setHighlightedIndicatorId(instanceId);
+  }, []);
+
+  // Handle Add Condition button click from LogicPanel
+  const handleAddCondition = useCallback((section) => {
+    // For now, show an info message to guide the user
+    // In a future enhancement, this could open a dialog to select an indicator/pattern
+    setInfoMessage(`To add a condition to "${section.replace('_', ' ')}", drag an indicator from the library onto the chart.`);
   }, []);
 
   // Close confirmation dialog
@@ -1138,6 +1133,7 @@ function Strategy() {
           onIndicatorHover={handleIndicatorHover}
           highlightedIndicatorId={highlightedIndicatorId}
           tradeDirection={tradeDirection}
+          onAddCondition={handleAddCondition}
         />
       </div>
 
@@ -1170,6 +1166,7 @@ function Strategy() {
             onIndicatorHover={handleIndicatorHover}
             highlightedIndicatorId={highlightedIndicatorId}
             tradeDirection={tradeDirection}
+            onAddCondition={handleAddCondition}
           />
         </div>
       </div>
