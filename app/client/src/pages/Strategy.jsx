@@ -9,10 +9,15 @@ import Technicals from '../components/Technicals';
 import IndicatorLibrary from '../components/IndicatorLibrary';
 import { cn } from '../lib/utils';
 import { Play, RefreshCw, BarChart3, AlertTriangle, Info } from 'lucide-react';
+import { INDICATOR_TYPES } from '../app/indicators';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
 const PANEL_COLLAPSED_KEY = 'forex_dash_indicator_panel_collapsed';
+
+// Indicator limits
+const MAX_OVERLAY_INDICATORS = 5;
+const MAX_SUBCHART_INDICATORS = 3;
 
 function Strategy() {
   const [selectedPair, setSelectedPair] = useState(null);
@@ -40,6 +45,11 @@ function Strategy() {
   const [chartType, setChartType] = useState('candlestick');
   const [showVolume, setShowVolume] = useState(false);
   const [selectedDateRange, setSelectedDateRange] = useState(null);
+
+  // Indicator state management
+  const [activeIndicators, setActiveIndicators] = useState([]);
+  const [indicatorHistory, setIndicatorHistory] = useState([]);
+  const [indicatorError, setIndicatorError] = useState(null);
 
   // Debounce timer ref for timeframe changes
   const debounceTimerRef = useRef(null);
@@ -234,6 +244,78 @@ function Strategy() {
     });
   }, []);
 
+  // Handle indicator drop from IndicatorLibrary
+  const handleIndicatorDrop = useCallback((indicator) => {
+    // Check limits based on indicator type
+    const overlayCount = activeIndicators.filter(ind => ind.type === INDICATOR_TYPES.OVERLAY).length;
+    const subchartCount = activeIndicators.filter(ind => ind.type === INDICATOR_TYPES.SUBCHART).length;
+
+    if (indicator.type === INDICATOR_TYPES.OVERLAY && overlayCount >= MAX_OVERLAY_INDICATORS) {
+      setIndicatorError('Maximum indicators reached. Remove one to add another.');
+      return;
+    }
+
+    if (indicator.type === INDICATOR_TYPES.SUBCHART && subchartCount >= MAX_SUBCHART_INDICATORS) {
+      setIndicatorError('Maximum indicators reached. Remove one to add another.');
+      return;
+    }
+
+    // Create a new indicator instance with unique ID
+    const newIndicator = {
+      ...indicator,
+      instanceId: `${indicator.id}-${Date.now()}`,
+    };
+
+    setActiveIndicators(prev => [...prev, newIndicator]);
+    setIndicatorHistory(prev => [...prev, newIndicator]);
+    setIndicatorError(null);
+  }, [activeIndicators]);
+
+  // Handle indicator removal
+  const handleRemoveIndicator = useCallback((instanceId) => {
+    setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== instanceId));
+    setIndicatorError(null);
+  }, []);
+
+  // Handle undo (Ctrl+Z)
+  const handleUndoIndicator = useCallback(() => {
+    if (indicatorHistory.length === 0) return;
+
+    const lastIndicator = indicatorHistory[indicatorHistory.length - 1];
+    setIndicatorHistory(prev => prev.slice(0, -1));
+    setActiveIndicators(prev => prev.filter(ind => ind.instanceId !== lastIndicator.instanceId));
+    setIndicatorError(null);
+  }, [indicatorHistory]);
+
+  // Clear indicator error after 5 seconds
+  useEffect(() => {
+    if (indicatorError) {
+      const timer = setTimeout(() => {
+        setIndicatorError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [indicatorError]);
+
+  // Keyboard listener for Ctrl+Z undo
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger when typing in inputs
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+        return;
+      }
+
+      // Ctrl+Z or Cmd+Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndoIndicator();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndoIndicator]);
+
   // Loading state
   if (loading) {
     return (
@@ -393,6 +475,29 @@ function Strategy() {
           </div>
         )}
 
+        {/* Indicator Error Display */}
+        {indicatorError && (
+          <div className="card p-4 border-amber-500 bg-amber-500/10">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-foreground">
+                  {indicatorError}
+                </p>
+              </div>
+              <button
+                onClick={() => setIndicatorError(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Dismiss warning"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Info Message Display (for insufficient data etc.) */}
         {infoMessage && (
           <div className="card p-4 border-info bg-info/10">
@@ -442,6 +547,9 @@ function Strategy() {
                   selectedDateRange={selectedDateRange}
                   onDateRangeChange={handleDateRangeChange}
                   loading={loadingData}
+                  activeIndicators={activeIndicators}
+                  onIndicatorDrop={handleIndicatorDrop}
+                  onRemoveIndicator={handleRemoveIndicator}
                 />
               </div>
             )}

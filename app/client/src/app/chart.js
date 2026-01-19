@@ -1,4 +1,19 @@
 import Plotly from 'plotly.js-dist';
+import {
+  calculateSMA,
+  calculateEMA,
+  calculateRSI,
+  calculateMACD,
+  calculateBollingerBands,
+  calculateATR,
+  calculateStochastic,
+  calculateCCI,
+  calculateWilliamsR,
+  calculateADX,
+  calculateOBV,
+  calculateKeltnerChannel,
+} from './indicatorCalculations';
+import { INDICATOR_TYPES } from './indicators';
 
 // Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
@@ -391,20 +406,355 @@ function createVolumeTrace(chartData) {
 }
 
 /**
- * Draw the chart with support for multiple chart types, volume subplot, and advanced interactions.
+ * Create overlay indicator traces (SMA, EMA, Bollinger Bands, Keltner Channel)
+ * These render directly on the main price chart
+ */
+function createOverlayIndicatorTraces(chartData, indicator) {
+  const traces = [];
+  const closes = chartData.mid_c;
+  const highs = chartData.mid_h;
+  const lows = chartData.mid_l;
+  const params = indicator.defaultParams || {};
+
+  switch (indicator.id) {
+    case 'sma': {
+      const smaValues = calculateSMA(closes, params.period || 20);
+      traces.push({
+        x: chartData.time,
+        y: smaValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: `SMA(${params.period || 20})`,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `SMA: %{y:.5f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'ema': {
+      const emaValues = calculateEMA(closes, params.period || 20);
+      traces.push({
+        x: chartData.time,
+        y: emaValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: `EMA(${params.period || 20})`,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `EMA: %{y:.5f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'bollinger_bands': {
+      const bb = calculateBollingerBands(closes, params.period || 20, params.stdDev || 2);
+      // Upper band
+      traces.push({
+        x: chartData.time,
+        y: bb.upper,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'BB Upper',
+        line: { color: indicator.color, width: 1, dash: 'dot' },
+        hovertemplate: `BB Upper: %{y:.5f}<extra></extra>`,
+      });
+      // Middle band (SMA)
+      traces.push({
+        x: chartData.time,
+        y: bb.middle,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'BB Middle',
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `BB Middle: %{y:.5f}<extra></extra>`,
+      });
+      // Lower band
+      traces.push({
+        x: chartData.time,
+        y: bb.lower,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'BB Lower',
+        line: { color: indicator.color, width: 1, dash: 'dot' },
+        fill: 'tonexty',
+        fillcolor: `${indicator.color}15`,
+        hovertemplate: `BB Lower: %{y:.5f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'keltner_channel': {
+      const kc = calculateKeltnerChannel(highs, lows, closes, params.period || 20, params.atrMultiplier || 2);
+      // Upper channel
+      traces.push({
+        x: chartData.time,
+        y: kc.upper,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'KC Upper',
+        line: { color: indicator.color, width: 1, dash: 'dot' },
+        hovertemplate: `KC Upper: %{y:.5f}<extra></extra>`,
+      });
+      // Middle (EMA)
+      traces.push({
+        x: chartData.time,
+        y: kc.middle,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'KC Middle',
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `KC Middle: %{y:.5f}<extra></extra>`,
+      });
+      // Lower channel
+      traces.push({
+        x: chartData.time,
+        y: kc.lower,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'KC Lower',
+        line: { color: indicator.color, width: 1, dash: 'dot' },
+        fill: 'tonexty',
+        fillcolor: `${indicator.color}15`,
+        hovertemplate: `KC Lower: %{y:.5f}<extra></extra>`,
+      });
+      break;
+    }
+    default:
+      console.warn(`Unknown overlay indicator: ${indicator.id}`);
+  }
+
+  return traces;
+}
+
+/**
+ * Create subchart indicator traces (RSI, MACD, Stochastic, etc.)
+ * These render in separate panes below the main chart
+ */
+function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
+  const traces = [];
+  const closes = chartData.mid_c;
+  const highs = chartData.mid_h;
+  const lows = chartData.mid_l;
+  const params = indicator.defaultParams || {};
+
+  switch (indicator.id) {
+    case 'rsi': {
+      const rsiValues = calculateRSI(closes, params.period || 14);
+      traces.push({
+        x: chartData.time,
+        y: rsiValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: `RSI(${params.period || 14})`,
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `RSI: %{y:.2f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'macd': {
+      const macd = calculateMACD(
+        closes,
+        params.fastPeriod || 12,
+        params.slowPeriod || 26,
+        params.signalPeriod || 9
+      );
+      // MACD line
+      traces.push({
+        x: chartData.time,
+        y: macd.macd,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'MACD',
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `MACD: %{y:.5f}<extra></extra>`,
+      });
+      // Signal line
+      traces.push({
+        x: chartData.time,
+        y: macd.signal,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Signal',
+        yaxis: yAxisName,
+        line: { color: '#EF4444', width: 1 },
+        hovertemplate: `Signal: %{y:.5f}<extra></extra>`,
+      });
+      // Histogram
+      traces.push({
+        x: chartData.time,
+        y: macd.histogram,
+        type: 'bar',
+        name: 'Histogram',
+        yaxis: yAxisName,
+        marker: {
+          color: macd.histogram.map(v => v >= 0 ? '#22C55E' : '#EF4444'),
+        },
+        hovertemplate: `Hist: %{y:.5f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'stochastic': {
+      const stoch = calculateStochastic(highs, lows, closes, params.kPeriod || 14, params.dPeriod || 3);
+      traces.push({
+        x: chartData.time,
+        y: stoch.k,
+        type: 'scatter',
+        mode: 'lines',
+        name: '%K',
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `%K: %{y:.2f}<extra></extra>`,
+      });
+      traces.push({
+        x: chartData.time,
+        y: stoch.d,
+        type: 'scatter',
+        mode: 'lines',
+        name: '%D',
+        yaxis: yAxisName,
+        line: { color: '#EF4444', width: 1 },
+        hovertemplate: `%D: %{y:.2f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'cci': {
+      const cciValues = calculateCCI(highs, lows, closes, params.period || 20);
+      traces.push({
+        x: chartData.time,
+        y: cciValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: `CCI(${params.period || 20})`,
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `CCI: %{y:.2f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'williams_r': {
+      const wrValues = calculateWilliamsR(highs, lows, closes, params.period || 14);
+      traces.push({
+        x: chartData.time,
+        y: wrValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: `Williams %R(${params.period || 14})`,
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `%R: %{y:.2f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'adx': {
+      const adx = calculateADX(highs, lows, closes, params.period || 14);
+      traces.push({
+        x: chartData.time,
+        y: adx.adx,
+        type: 'scatter',
+        mode: 'lines',
+        name: `ADX(${params.period || 14})`,
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `ADX: %{y:.2f}<extra></extra>`,
+      });
+      traces.push({
+        x: chartData.time,
+        y: adx.plusDI,
+        type: 'scatter',
+        mode: 'lines',
+        name: '+DI',
+        yaxis: yAxisName,
+        line: { color: '#22C55E', width: 1 },
+        hovertemplate: `+DI: %{y:.2f}<extra></extra>`,
+      });
+      traces.push({
+        x: chartData.time,
+        y: adx.minusDI,
+        type: 'scatter',
+        mode: 'lines',
+        name: '-DI',
+        yaxis: yAxisName,
+        line: { color: '#EF4444', width: 1 },
+        hovertemplate: `-DI: %{y:.2f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'atr': {
+      const atrValues = calculateATR(highs, lows, closes, params.period || 14);
+      traces.push({
+        x: chartData.time,
+        y: atrValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: `ATR(${params.period || 14})`,
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `ATR: %{y:.5f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'obv': {
+      const obvValues = calculateOBV(closes, chartData.volume, highs, lows);
+      traces.push({
+        x: chartData.time,
+        y: obvValues,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'OBV',
+        yaxis: yAxisName,
+        line: { color: indicator.color, width: 1.5 },
+        hovertemplate: `OBV: %{y:,.0f}<extra></extra>`,
+      });
+      break;
+    }
+    case 'volume_profile': {
+      // Volume profile is a horizontal histogram - skip for now, complex to implement
+      console.warn('Volume Profile indicator not yet implemented');
+      break;
+    }
+    default:
+      console.warn(`Unknown subchart indicator: ${indicator.id}`);
+  }
+
+  return traces;
+}
+
+/**
+ * Draw the chart with support for multiple chart types, volume subplot, indicators, and advanced interactions.
  * @param {Object} chartData - The chart data with time, mid_o, mid_h, mid_l, mid_c, and optionally volume
  * @param {string} p - Pair name (e.g., "EUR_USD")
  * @param {string} g - Granularity (e.g., "H1")
  * @param {string} divName - The ID of the div element to render the chart in
  * @param {string} chartType - Chart type: 'candlestick', 'ohlc', 'line', or 'area'
  * @param {boolean} showVolume - Whether to show the volume subplot
+ * @param {Array} activeIndicators - Array of active indicator objects to render
  */
-export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false) {
+export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = []) {
   const data = [];
 
   // Add main price trace
   const priceTrace = createPriceTrace(chartData, p, chartType);
   data.push(priceTrace);
+
+  // Separate overlay and subchart indicators
+  const overlayIndicators = activeIndicators.filter(ind => ind.type === INDICATOR_TYPES.OVERLAY);
+  const subchartIndicators = activeIndicators.filter(ind => ind.type === INDICATOR_TYPES.SUBCHART);
+
+  // Add overlay indicator traces (render on main price chart)
+  overlayIndicators.forEach(indicator => {
+    const traces = createOverlayIndicatorTraces(chartData, indicator);
+    data.push(...traces);
+  });
+
+  // Calculate layout domains
+  // Main chart takes most space, volume gets ~15%, each subchart gets ~12%
+  const volumeHeight = showVolume ? 0.12 : 0;
+  const subchartHeight = 0.12;
+  const subchartTotalHeight = subchartIndicators.length * subchartHeight;
+  const mainChartBottom = volumeHeight + subchartTotalHeight;
+
+  // Price chart domain
+  const priceYAxisDomain = [mainChartBottom, 1];
+  // Volume domain (if shown)
+  const volumeYAxisDomain = showVolume ? [subchartTotalHeight, subchartTotalHeight + volumeHeight - 0.02] : [0, 0];
 
   // Add volume trace if enabled
   if (showVolume) {
@@ -412,9 +762,14 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
     data.push(volumeTrace);
   }
 
-  // Calculate y-axis domain based on whether volume is shown
-  const priceYAxisDomain = showVolume ? [0.25, 1] : [0, 1];
-  const volumeYAxisDomain = [0, 0.2];
+  // Add subchart indicator traces
+  subchartIndicators.forEach((indicator, index) => {
+    // y3, y4, y5, etc. for subchart indicators
+    const yAxisNum = index + 3;
+    const yAxisName = `y${yAxisNum}`;
+    const traces = createSubchartIndicatorTraces(chartData, indicator, yAxisName);
+    data.push(...traces);
+  });
 
   const layout = {
     title: {
@@ -522,6 +877,55 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
       },
     };
   }
+
+  // Add subchart indicator y-axes
+  subchartIndicators.forEach((indicator, index) => {
+    const yAxisNum = index + 3;
+    const yAxisKey = `yaxis${yAxisNum}`;
+
+    // Calculate domain for this subchart
+    const subchartBottom = index * subchartHeight;
+    const subchartTop = subchartBottom + subchartHeight - 0.02;
+
+    layout[yAxisKey] = {
+      side: 'right',
+      showgrid: true,
+      gridcolor: CHART_COLORS.grid,
+      gridwidth: 1,
+      tickfont: {
+        family: 'JetBrains Mono, monospace',
+        size: 9,
+        color: CHART_COLORS.text,
+      },
+      linecolor: CHART_COLORS.grid,
+      linewidth: 1,
+      domain: [subchartBottom, subchartTop],
+      title: {
+        text: indicator.shortName,
+        font: {
+          size: 9,
+          color: indicator.color,
+        },
+        standoff: 5,
+      },
+      // Add reference lines for RSI, Stochastic
+      ...(indicator.id === 'rsi' && {
+        range: [0, 100],
+        dtick: 25,
+      }),
+      ...(indicator.id === 'stochastic' && {
+        range: [0, 100],
+        dtick: 25,
+      }),
+      ...(indicator.id === 'williams_r' && {
+        range: [-100, 0],
+        dtick: 25,
+      }),
+      ...(indicator.id === 'cci' && {
+        dtick: 100,
+      }),
+    };
+  });
 
   const config = {
     responsive: true,
