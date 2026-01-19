@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import Plotly from 'plotly.js-dist';
 import Select from './Select';
 import { COUNTS, CHART_TYPES, DATE_RANGES } from '../app/data';
-import { drawChart } from '../app/chart';
-import { LineChart, BarChart2 } from 'lucide-react';
+import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
+import { LineChart, BarChart2, X } from 'lucide-react';
 
 function PriceChart({
   priceData,
@@ -18,11 +19,142 @@ function PriceChart({
   onDateRangeChange,
   loading
 }) {
+  const chartRef = useRef(null);
+  const [visibleCandleCount, setVisibleCandleCount] = useState(null);
+  const [showInteractionHint, setShowInteractionHint] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  // Touch device detection and interaction hint initialization
+  useEffect(() => {
+    // Detect touch support
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    setIsTouchDevice(hasTouch);
+
+    // Check if interaction hint has been dismissed
+    const hintDismissed = localStorage.getItem('chart-interaction-hint-dismissed');
+    if (!hintDismissed) {
+      setShowInteractionHint(true);
+    }
+  }, []);
+
+  // Draw chart and set up zoom event listener
   useEffect(() => {
     if (priceData && !loading) {
       drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume);
+
+      // Get chart element reference
+      const chartElement = document.getElementById('chartDiv');
+      chartRef.current = chartElement;
+
+      if (chartElement) {
+        // Set initial candle count
+        setVisibleCandleCount(priceData.time ? priceData.time.length : 0);
+
+        // Listen for zoom updates from chart.js
+        const handleZoomUpdate = (event) => {
+          setVisibleCandleCount(event.detail.visibleCandleCount);
+        };
+
+        chartElement.addEventListener('chartZoomUpdate', handleZoomUpdate);
+
+        // Cleanup
+        return () => {
+          chartElement.removeEventListener('chartZoomUpdate', handleZoomUpdate);
+        };
+      }
     }
   }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading]);
+
+  // Keyboard navigation with focus management
+  useEffect(() => {
+    if (!priceData) return;
+
+    const handleKeyDown = (event) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+        return;
+      }
+
+      // Don't trigger if any modifier keys are pressed (except Shift for +)
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+
+      const chartElement = chartRef.current;
+      if (!chartElement || !chartElement._chartData) return;
+
+      const chartData = chartElement._chartData;
+
+      // Get current axis range
+      const getCurrentRange = () => {
+        const layout = chartElement.layout;
+        if (layout && layout.xaxis && layout.xaxis.range) {
+          return layout.xaxis.range;
+        }
+        // Fallback to data range
+        return [chartData.time[0], chartData.time[chartData.time.length - 1]];
+      };
+
+      let newRange = null;
+
+      switch (event.key) {
+        case '+':
+        case '=':
+          // Zoom in by 20%
+          event.preventDefault();
+          newRange = computeZoomedInRange(getCurrentRange(), 0.8, 0.5);
+          break;
+
+        case '-':
+        case '_':
+          // Zoom out by 20%
+          event.preventDefault();
+          newRange = computeZoomedOutRange(getCurrentRange(), 1.2, 0.5);
+          break;
+
+        case 'ArrowLeft':
+          // Scroll left by 10%
+          event.preventDefault();
+          newRange = computeScrolledRange(getCurrentRange(), 'left', 0.1, chartData);
+          break;
+
+        case 'ArrowRight':
+          // Scroll right by 10%
+          event.preventDefault();
+          newRange = computeScrolledRange(getCurrentRange(), 'right', 0.1, chartData);
+          break;
+
+        default:
+          return;
+      }
+
+      if (newRange) {
+        // Use requestAnimationFrame for smooth updates
+        requestAnimationFrame(() => {
+          Plotly.relayout(chartElement, {
+            'xaxis.range': newRange
+          }, {
+            transition: {
+              duration: 150,
+              easing: 'cubic-in-out'
+            }
+          });
+        });
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [priceData]);
+
+  // Dismiss interaction hint
+  const dismissInteractionHint = () => {
+    localStorage.setItem('chart-interaction-hint-dismissed', 'true');
+    setShowInteractionHint(false);
+  };
 
   return (
     <div className="card animate-fade-in">
@@ -116,12 +248,53 @@ function PriceChart({
             </div>
           </div>
         ) : (
-          /* Chart Display */
-          <div
-            id="chartDiv"
-            className="w-full rounded-lg bg-muted/30 min-h-[500px]"
-            style={{ height: 'calc(100vh - 450px)' }}
-          />
+          /* Chart Display with Interaction Features */
+          <div className="relative">
+            <div
+              id="chartDiv"
+              className="w-full rounded-lg bg-muted/30 min-h-[500px]"
+              style={{ height: 'calc(100vh - 450px)' }}
+            />
+
+            {/* Interaction Hints Tooltip */}
+            {showInteractionHint && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+                <div className="bg-black/90 text-white rounded-md px-4 py-3 shadow-lg max-w-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm">
+                      {isTouchDevice ? (
+                        <p>
+                          <span className="font-semibold">Pinch to zoom</span> • <span className="font-semibold">Drag to pan</span> • <span className="font-semibold">Double-tap to reset</span>
+                        </p>
+                      ) : (
+                        <p>
+                          <span className="font-semibold">Scroll to zoom</span> • <span className="font-semibold">Drag to pan</span> • <span className="font-semibold">Double-click to reset</span>
+                          <br />
+                          <span className="text-xs text-white/80 mt-1 inline-block">Keyboard: +/- to zoom, ←/→ to scroll</span>
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={dismissInteractionHint}
+                      className="text-white/70 hover:text-white transition-colors flex-shrink-0"
+                      title="Dismiss"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Zoom Level Indicator */}
+            {visibleCandleCount !== null && (
+              <div className="mt-2 text-center">
+                <span className="text-sm text-muted-foreground font-medium">
+                  Showing {visibleCandleCount} candle{visibleCandleCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

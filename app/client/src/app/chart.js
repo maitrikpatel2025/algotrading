@@ -14,6 +14,162 @@ const CHART_COLORS = {
 };
 
 /**
+ * Calculate the number of visible candles based on X-axis range
+ * @param {Array} xaxisRange - [start, end] timestamps for X-axis
+ * @param {Object} chartData - Chart data with time array
+ * @returns {number} Number of candles visible in the range
+ */
+function getVisibleCandleCount(xaxisRange, chartData) {
+  if (!xaxisRange || !chartData || !chartData.time) {
+    return 0;
+  }
+
+  const [start, end] = xaxisRange;
+  let count = 0;
+
+  for (let i = 0; i < chartData.time.length; i++) {
+    const timestamp = new Date(chartData.time[i]).getTime();
+    if (timestamp >= new Date(start).getTime() && timestamp <= new Date(end).getTime()) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Clamp zoom range to enforce min/max visible candle constraints
+ * @param {Array} newRange - [start, end] proposed range
+ * @param {Object} chartData - Chart data with time array
+ * @param {number} minCandles - Minimum candles to show (default 50)
+ * @param {number} maxCandles - Maximum candles to show (default 500)
+ * @returns {Array} Clamped [start, end] range
+ */
+function clampZoomRange(newRange, chartData, minCandles = 50, maxCandles = 500) {
+  if (!newRange || !chartData || !chartData.time || chartData.time.length === 0) {
+    return newRange;
+  }
+
+  const totalCandles = chartData.time.length;
+
+  // If dataset has fewer than minCandles, don't enforce minimum constraint
+  if (totalCandles < minCandles) {
+    return newRange;
+  }
+
+  const visibleCount = getVisibleCandleCount(newRange, chartData);
+
+  // If within constraints, return as-is
+  if (visibleCount >= minCandles && visibleCount <= maxCandles) {
+    return newRange;
+  }
+
+  const [start, end] = newRange;
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  const center = (startTime + endTime) / 2;
+
+  // Calculate average time between candles
+  const timeDeltas = [];
+  for (let i = 1; i < chartData.time.length; i++) {
+    timeDeltas.push(new Date(chartData.time[i]).getTime() - new Date(chartData.time[i - 1]).getTime());
+  }
+  const avgDelta = timeDeltas.reduce((a, b) => a + b, 0) / timeDeltas.length;
+
+  let targetCandles;
+  if (visibleCount < minCandles) {
+    targetCandles = minCandles;
+  } else {
+    targetCandles = maxCandles;
+  }
+
+  const targetRange = avgDelta * targetCandles;
+  const newStart = new Date(center - targetRange / 2);
+  const newEnd = new Date(center + targetRange / 2);
+
+  // Ensure we don't go beyond data boundaries
+  const dataStart = new Date(chartData.time[0]);
+  const dataEnd = new Date(chartData.time[chartData.time.length - 1]);
+
+  let clampedStart = newStart < dataStart ? dataStart : newStart;
+  let clampedEnd = newEnd > dataEnd ? dataEnd : newEnd;
+
+  return [clampedStart.toISOString(), clampedEnd.toISOString()];
+}
+
+/**
+ * Compute zoomed-in range (reduce visible range by zoom factor)
+ * @param {Array} currentRange - [start, end] current range
+ * @param {number} zoomFactor - Factor to zoom by (0.8 = 20% zoom in)
+ * @param {number} pivotX - Relative position (0-1) to center zoom on
+ * @returns {Array} New [start, end] range
+ */
+export function computeZoomedInRange(currentRange, zoomFactor = 0.8, pivotX = 0.5) {
+  const [start, end] = currentRange;
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  const currentSpan = endTime - startTime;
+  const newSpan = currentSpan * zoomFactor;
+
+  // Calculate zoom center based on pivot point
+  const pivotTime = startTime + currentSpan * pivotX;
+  const newStart = new Date(pivotTime - newSpan * pivotX);
+  const newEnd = new Date(pivotTime + newSpan * (1 - pivotX));
+
+  return [newStart.toISOString(), newEnd.toISOString()];
+}
+
+/**
+ * Compute zoomed-out range (increase visible range by zoom factor)
+ * @param {Array} currentRange - [start, end] current range
+ * @param {number} zoomFactor - Factor to zoom by (1.2 = 20% zoom out)
+ * @param {number} pivotX - Relative position (0-1) to center zoom on
+ * @returns {Array} New [start, end] range
+ */
+export function computeZoomedOutRange(currentRange, zoomFactor = 1.2, pivotX = 0.5) {
+  return computeZoomedInRange(currentRange, zoomFactor, pivotX);
+}
+
+/**
+ * Compute scrolled range (shift range left or right)
+ * @param {Array} currentRange - [start, end] current range
+ * @param {string} direction - 'left' or 'right'
+ * @param {number} scrollPercent - Percentage of visible range to scroll (0.1 = 10%)
+ * @param {Object} chartData - Chart data with time array for boundary checking
+ * @returns {Array} New [start, end] range
+ */
+export function computeScrolledRange(currentRange, direction = 'left', scrollPercent = 0.1, chartData = null) {
+  const [start, end] = currentRange;
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  const span = endTime - startTime;
+  const shift = span * scrollPercent * (direction === 'left' ? -1 : 1);
+
+  let newStart = new Date(startTime + shift);
+  let newEnd = new Date(endTime + shift);
+
+  // Enforce data boundaries if chartData provided
+  if (chartData && chartData.time && chartData.time.length > 0) {
+    const dataStart = new Date(chartData.time[0]);
+    const dataEnd = new Date(chartData.time[chartData.time.length - 1]);
+
+    if (newStart < dataStart) {
+      const overflow = dataStart.getTime() - newStart.getTime();
+      newStart = dataStart;
+      newEnd = new Date(newEnd.getTime() + overflow);
+    }
+
+    if (newEnd > dataEnd) {
+      const overflow = newEnd.getTime() - dataEnd.getTime();
+      newEnd = dataEnd;
+      newStart = new Date(newStart.getTime() - overflow);
+    }
+  }
+
+  return [newStart.toISOString(), newEnd.toISOString()];
+}
+
+/**
  * Create a candlestick trace
  */
 function createCandlestickTrace(chartData, pairName) {
@@ -306,5 +462,56 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
   const chartElement = document.getElementById(divName);
   if (chartElement) {
     Plotly.Plots.resize(chartElement);
+
+    // Store chartData reference on element for event handlers
+    chartElement._chartData = chartData;
+
+    // Track ongoing relayout to prevent infinite loops
+    let isRelayouting = false;
+
+    // Add event listener for zoom constraint enforcement
+    chartElement.on('plotly_relayout', (eventData) => {
+      // Avoid infinite relayout loops
+      if (isRelayouting) return;
+
+      // Check if this is a zoom/pan operation (xaxis.range update)
+      const hasXRange = eventData['xaxis.range[0]'] !== undefined && eventData['xaxis.range[1]'] !== undefined;
+      const hasXAutorange = eventData['xaxis.autorange'] !== undefined;
+
+      if (hasXRange) {
+        const newRange = [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']];
+        const visibleCount = getVisibleCandleCount(newRange, chartData);
+
+        // Apply constraints (50-500 candles)
+        if (visibleCount < 50 || visibleCount > 500) {
+          const clampedRange = clampZoomRange(newRange, chartData, 50, 500);
+
+          // Use requestAnimationFrame to debounce and prevent layout thrashing
+          requestAnimationFrame(() => {
+            isRelayouting = true;
+            Plotly.relayout(chartElement, {
+              'xaxis.range': clampedRange
+            }).then(() => {
+              isRelayouting = false;
+            }).catch(() => {
+              isRelayouting = false;
+            });
+          });
+        }
+
+        // Dispatch custom event with visible candle count for UI updates
+        const candleCountEvent = new CustomEvent('chartZoomUpdate', {
+          detail: { visibleCandleCount: visibleCount }
+        });
+        chartElement.dispatchEvent(candleCountEvent);
+      } else if (hasXAutorange) {
+        // After reset, dispatch event with total candle count
+        const totalCount = chartData.time ? chartData.time.length : 0;
+        const candleCountEvent = new CustomEvent('chartZoomUpdate', {
+          detail: { visibleCandleCount: totalCount }
+        });
+        chartElement.dispatchEvent(candleCountEvent);
+      }
+    });
   }
 }
