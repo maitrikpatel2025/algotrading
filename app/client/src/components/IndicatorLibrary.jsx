@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { cn } from '../lib/utils';
 import {
   Search,
@@ -11,6 +11,7 @@ import {
   BarChart3,
   Volume2,
   Settings2,
+  GripVertical,
 } from 'lucide-react';
 import { INDICATORS, INDICATOR_CATEGORIES } from '../app/indicators';
 
@@ -46,6 +47,8 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
     });
     return initial;
   });
+  const [draggingIndicator, setDraggingIndicator] = useState(null);
+  const dragImageRef = useRef(null);
 
   // Load category state from localStorage on mount
   useEffect(() => {
@@ -110,6 +113,33 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
       onIndicatorSelect(indicator);
     }
   }, [onIndicatorSelect]);
+
+  // Handle drag start
+  const handleDragStart = useCallback((e, indicator) => {
+    setDraggingIndicator(indicator.id);
+
+    // Set drag data
+    e.dataTransfer.setData('application/json', JSON.stringify(indicator));
+    e.dataTransfer.effectAllowed = 'copy';
+
+    // Create custom drag image
+    if (dragImageRef.current) {
+      dragImageRef.current.textContent = indicator.shortName;
+      dragImageRef.current.style.display = 'block';
+      e.dataTransfer.setDragImage(dragImageRef.current, 30, 15);
+      // Hide it after drag starts
+      setTimeout(() => {
+        if (dragImageRef.current) {
+          dragImageRef.current.style.display = 'none';
+        }
+      }, 0);
+    }
+  }, []);
+
+  // Handle drag end
+  const handleDragEnd = useCallback(() => {
+    setDraggingIndicator(null);
+  }, []);
 
   // Highlight matching text in indicator names
   const highlightMatch = (text, term) => {
@@ -223,6 +253,13 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
         </div>
       </div>
 
+      {/* Drag Image (hidden, used for custom drag preview) */}
+      <div
+        ref={dragImageRef}
+        className="fixed -left-[9999px] px-3 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow-lg whitespace-nowrap"
+        style={{ display: 'none' }}
+      />
+
       {/* Categories and Indicators */}
       <div className="flex-1 overflow-y-auto">
         {filteredIndicators.length === 0 ? (
@@ -288,6 +325,9 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
                       <button
                         key={indicator.id}
                         type="button"
+                        draggable="true"
+                        onDragStart={(e) => handleDragStart(e, indicator)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => handleIndicatorClick(indicator)}
                         className={cn(
                           "flex items-center gap-2 w-full px-4 py-2.5",
@@ -295,10 +335,12 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
                           "min-h-[44px]", // Mobile touch target
                           "hover:bg-muted/50 transition-colors",
                           "focus:outline-none focus:bg-muted/50",
-                          "group"
+                          "group cursor-grab active:cursor-grabbing",
+                          draggingIndicator === indicator.id && "opacity-50"
                         )}
-                        title={`${indicator.name}\n\n${indicator.description}`}
+                        title={`${indicator.name}\n\n${indicator.description}\n\nDrag to add to chart`}
                       >
+                        <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                         <div className="flex-1 truncate">
                           {searchTerm ? (
                             highlightMatch(indicator.shortName, searchTerm)

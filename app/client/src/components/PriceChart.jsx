@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Plotly from 'plotly.js-dist';
 import Select from './Select';
 import { COUNTS, CHART_TYPES, DATE_RANGES } from '../app/data';
 import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
 import { LineChart, BarChart2, X } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 function PriceChart({
   priceData,
@@ -17,12 +18,16 @@ function PriceChart({
   onVolumeToggle,
   selectedDateRange,
   onDateRangeChange,
-  loading
+  loading,
+  activeIndicators = [],
+  onIndicatorDrop,
+  onRemoveIndicator
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
   const [showInteractionHint, setShowInteractionHint] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Touch device detection and interaction hint initialization
   useEffect(() => {
@@ -40,7 +45,7 @@ function PriceChart({
   // Draw chart and set up zoom event listener
   useEffect(() => {
     if (priceData && !loading) {
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume);
+      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, activeIndicators);
 
       // Get chart element reference
       const chartElement = document.getElementById('chartDiv');
@@ -63,7 +68,7 @@ function PriceChart({
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
@@ -156,6 +161,34 @@ function PriceChart({
     setShowInteractionHint(false);
   };
 
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    // Only set isDragOver to false if we're leaving the drop zone entirely
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    try {
+      const indicatorData = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (indicatorData && onIndicatorDrop) {
+        onIndicatorDrop(indicatorData);
+      }
+    } catch (err) {
+      console.error('Failed to parse indicator data:', err);
+    }
+  }, [onIndicatorDrop]);
+
   return (
     <div className="card animate-fade-in">
       {/* Header */}
@@ -238,6 +271,34 @@ function PriceChart({
             ))}
           </div>
         </div>
+
+        {/* Active Indicators */}
+        {activeIndicators.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground mr-2">Active:</span>
+              {activeIndicators.map((indicator) => (
+                <span
+                  key={indicator.instanceId}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground"
+                  style={{ borderLeft: `3px solid ${indicator.color}` }}
+                >
+                  {indicator.shortName}
+                  {onRemoveIndicator && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveIndicator(indicator.instanceId)}
+                      className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
+                      title={`Remove ${indicator.shortName}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Chart Container */}
@@ -255,7 +316,23 @@ function PriceChart({
           </div>
         ) : (
           /* Chart Display with Interaction Features */
-          <div className="relative">
+          <div
+            className={cn(
+              "relative rounded-lg transition-all duration-200",
+              isDragOver && "ring-2 ring-primary ring-dashed bg-primary/5"
+            )}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {/* Drop zone overlay */}
+            {isDragOver && (
+              <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+                <div className="bg-primary/90 text-primary-foreground px-4 py-2 rounded-md shadow-lg font-medium">
+                  Drop to add indicator
+                </div>
+              </div>
+            )}
             <div
               id="chartDiv"
               className="w-full rounded-lg bg-muted/30 min-h-[500px]"
