@@ -110,3 +110,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing debounced API calls or zoom context preservation
     - When troubleshooting timeframe persistence or validation issues
     - When modifying the Select component active state styling
+
+- app_docs/bug-31ea75f5-strategy-candles-error-fix.md
+  - Conditions:
+    - When troubleshooting "Invalid time value" errors in chart functionality
+    - When working with chart.js zoom range calculations (clampZoomRange, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange)
+    - When debugging NaN or invalid Date issues in chart time calculations
+    - When implementing validation for chart data timestamps
+    - When fixing errors that occur during candle count changes on Strategy page
+    - When adding defensive programming to chart zoom/scroll functions
+    - When working with Date.toISOString() calls in chart code
