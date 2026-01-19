@@ -10,12 +10,14 @@ import IndicatorLibrary from '../components/IndicatorLibrary';
 import LogicPanel from '../components/LogicPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
+import TradeDirectionSelector from '../components/TradeDirectionSelector';
 import { cn } from '../lib/utils';
 import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
 import { createConditionFromIndicator, createConditionFromPattern } from '../app/conditionDefaults';
+import { TRADE_DIRECTIONS, TRADE_DIRECTION_STORAGE_KEY } from '../app/constants';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
@@ -64,6 +66,18 @@ function Strategy() {
   // Condition state management
   const [conditions, setConditions] = useState([]);
   const [conditionHistory, setConditionHistory] = useState([]);
+
+  // Trade direction state management
+  const [tradeDirection, setTradeDirection] = useState(() => {
+    try {
+      const stored = localStorage.getItem(TRADE_DIRECTION_STORAGE_KEY);
+      return stored && Object.values(TRADE_DIRECTIONS).includes(stored)
+        ? stored
+        : TRADE_DIRECTIONS.BOTH;
+    } catch {
+      return TRADE_DIRECTIONS.BOTH;
+    }
+  });
 
   // Hover highlight state for visual connections
   const [highlightedIndicatorId, setHighlightedIndicatorId] = useState(null);
@@ -375,8 +389,19 @@ function Strategy() {
       // Create display name for the indicator using custom params
       const displayName = getIndicatorDisplayName(newIndicator, params);
 
+      // Determine condition section based on trade direction
+      let conditionSection;
+      if (tradeDirection === TRADE_DIRECTIONS.LONG) {
+        conditionSection = 'entry';
+      } else if (tradeDirection === TRADE_DIRECTIONS.SHORT) {
+        conditionSection = 'exit';
+      } else {
+        // For 'both', use the template's default section or 'entry'
+        conditionSection = newIndicator.defaultConditionTemplate?.section || 'entry';
+      }
+
       // Create a condition for the indicator
-      const newCondition = createConditionFromIndicator(newIndicator, displayName);
+      const newCondition = createConditionFromIndicator(newIndicator, displayName, conditionSection);
 
       setActiveIndicators(prev => [...prev, newIndicator]);
       setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
@@ -390,7 +415,7 @@ function Strategy() {
 
     // Close dialog
     setSettingsDialog(prev => ({ ...prev, isOpen: false }));
-  }, [settingsDialog, activeIndicators]);
+  }, [settingsDialog, activeIndicators, tradeDirection]);
 
   // Handle settings dialog close/cancel
   const handleSettingsCancel = useCallback(() => {
@@ -472,13 +497,25 @@ function Strategy() {
     setActiveIndicators(prev => [...prev, newIndicator]);
     setIndicatorHistory(prev => [...prev, { type: 'indicator', item: newIndicator }]);
 
+    // Determine condition section based on trade direction
+    let conditionSection;
+    if (tradeDirection === TRADE_DIRECTIONS.LONG) {
+      conditionSection = 'entry';
+    } else if (tradeDirection === TRADE_DIRECTIONS.SHORT) {
+      conditionSection = 'exit';
+    } else {
+      // For 'both', use the template's default section or 'entry'
+      conditionSection = newIndicator.defaultConditionTemplate?.section || 'entry';
+    }
+
     // Auto-create a condition for the new instance
-    const newCondition = createConditionFromIndicator(newIndicator);
+    const displayName = getDisplayName(newIndicator);
+    const newCondition = createConditionFromIndicator(newIndicator, displayName, conditionSection);
     setConditions(prev => [...prev, newCondition]);
     setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
 
     setIndicatorError(null);
-  }, [activeIndicators]);
+  }, [activeIndicators, tradeDirection, getDisplayName]);
 
   // Handle indicator removal with confirmation
   const handleRemoveIndicator = useCallback((instanceId) => {
@@ -564,15 +601,26 @@ function Strategy() {
       console.log('Pattern drop - created newPattern:', { id: newPattern.id, name: newPattern.name, count: newPattern.detectedCount });
     }
 
+    // Determine condition section based on trade direction
+    let conditionSection;
+    if (tradeDirection === TRADE_DIRECTIONS.LONG) {
+      conditionSection = 'entry';
+    } else if (tradeDirection === TRADE_DIRECTIONS.SHORT) {
+      conditionSection = 'exit';
+    } else {
+      // For 'both', default to 'entry' for patterns
+      conditionSection = 'entry';
+    }
+
     // Create a condition for the pattern
-    const newCondition = createConditionFromPattern(newPattern);
+    const newCondition = createConditionFromPattern(newPattern, conditionSection);
 
     setActivePatterns(prev => [...prev, newPattern]);
     setPatternHistory(prev => [...prev, { type: 'pattern', item: newPattern }]);
     setConditions(prev => [...prev, newCondition]);
     setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
     setIndicatorError(null);
-  }, [priceData]);
+  }, [priceData, tradeDirection]);
 
   // Handle pattern removal
   const handleRemovePattern = useCallback((instanceId) => {
@@ -651,6 +699,59 @@ function Strategy() {
       c.id === conditionId ? { ...c, section: targetSection } : c
     ));
   }, []);
+
+  // Handle trade direction change
+  const handleTradeDirectionChange = useCallback((newDirection) => {
+    // Check if there are conditions that would be removed
+    const hasEntryConditions = conditions.some(c => c.section === 'entry');
+    const hasExitConditions = conditions.some(c => c.section === 'exit');
+
+    let needsConfirmation = false;
+    let conditionsToRemove = [];
+    let warningMessage = '';
+
+    if (newDirection === TRADE_DIRECTIONS.LONG && hasExitConditions) {
+      needsConfirmation = true;
+      conditionsToRemove = conditions.filter(c => c.section === 'exit');
+      warningMessage = `You have ${conditionsToRemove.length} Exit condition${conditionsToRemove.length !== 1 ? 's' : ''} defined. Switching to Long Only will remove ${conditionsToRemove.length === 1 ? 'it' : 'them'}. Continue?`;
+    } else if (newDirection === TRADE_DIRECTIONS.SHORT && hasEntryConditions) {
+      needsConfirmation = true;
+      conditionsToRemove = conditions.filter(c => c.section === 'entry');
+      warningMessage = `You have ${conditionsToRemove.length} Entry condition${conditionsToRemove.length !== 1 ? 's' : ''} defined. Switching to Short Only will remove ${conditionsToRemove.length === 1 ? 'it' : 'them'}. Continue?`;
+    }
+
+    if (needsConfirmation) {
+      // Show confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Change Trade Direction',
+        message: warningMessage,
+        variant: 'warning',
+        actions: [
+          {
+            label: 'Continue',
+            variant: 'primary',
+            onClick: () => {
+              // Remove incompatible conditions
+              setConditions(prev => prev.filter(c => !conditionsToRemove.find(cr => cr.id === c.id)));
+
+              // Update trade direction
+              setTradeDirection(newDirection);
+              localStorage.setItem(TRADE_DIRECTION_STORAGE_KEY, newDirection);
+
+              // Close dialog
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+        ],
+      });
+    } else {
+      // No confirmation needed, update directly
+      setTradeDirection(newDirection);
+      localStorage.setItem(TRADE_DIRECTION_STORAGE_KEY, newDirection);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conditions]);
 
   // Handle hover for visual connections
   const handleIndicatorHover = useCallback((instanceId) => {
@@ -850,6 +951,12 @@ function Strategy() {
               />
             </div>
 
+            {/* Trade Direction Selector */}
+            <TradeDirectionSelector
+              value={tradeDirection}
+              onChange={handleTradeDirectionChange}
+            />
+
             {/* Load Button */}
             <Button
               text={loadingData ? "Loading..." : "Load Data"}
@@ -1030,6 +1137,7 @@ function Strategy() {
           onConditionMove={handleConditionMove}
           onIndicatorHover={handleIndicatorHover}
           highlightedIndicatorId={highlightedIndicatorId}
+          tradeDirection={tradeDirection}
         />
       </div>
 
@@ -1061,6 +1169,7 @@ function Strategy() {
             onConditionMove={handleConditionMove}
             onIndicatorHover={handleIndicatorHover}
             highlightedIndicatorId={highlightedIndicatorId}
+            tradeDirection={tradeDirection}
           />
         </div>
       </div>

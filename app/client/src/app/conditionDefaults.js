@@ -47,9 +47,10 @@ export function generateConditionId() {
  * Create a condition from an indicator's default template
  * @param {Object} indicatorInstance - The indicator instance from activeIndicators
  * @param {string} displayName - The indicator display name (e.g., "EMA (50)")
+ * @param {string} section - Optional section override ('entry' or 'exit')
  * @returns {Object} A new condition object
  */
-export function createConditionFromIndicator(indicatorInstance, displayName) {
+export function createConditionFromIndicator(indicatorInstance, displayName, section = null) {
   const template = indicatorInstance.defaultConditionTemplate;
   if (!template) {
     // Fallback for indicators without a template
@@ -68,7 +69,7 @@ export function createConditionFromIndicator(indicatorInstance, displayName) {
         component: null,
         label: displayName,
       },
-      section: CONDITION_SECTIONS.ENTRY,
+      section: section || template?.section || CONDITION_SECTIONS.ENTRY,
       isNew: true, // Flag for animation
     };
   }
@@ -147,7 +148,7 @@ export function createConditionFromIndicator(indicatorInstance, displayName) {
     leftOperand,
     operator: template.operator,
     rightOperand,
-    section: CONDITION_SECTIONS.ENTRY,
+    section: section || template.section || CONDITION_SECTIONS.ENTRY,
     isNew: true, // Flag for animation
   };
 }
@@ -155,9 +156,10 @@ export function createConditionFromIndicator(indicatorInstance, displayName) {
 /**
  * Create a condition from a pattern's detection
  * @param {Object} patternInstance - The pattern instance with id, name, instanceId, detectedCount
+ * @param {string} section - Optional section override ('entry' or 'exit')
  * @returns {Object} A new condition object
  */
-export function createConditionFromPattern(patternInstance) {
+export function createConditionFromPattern(patternInstance, section = null) {
   return {
     id: generateConditionId(),
     patternInstanceId: patternInstance.instanceId,
@@ -171,7 +173,7 @@ export function createConditionFromPattern(patternInstance) {
     },
     operator: 'is_detected',
     rightOperand: null, // Pattern conditions don't have a right operand
-    section: CONDITION_SECTIONS.ENTRY,
+    section: section || CONDITION_SECTIONS.ENTRY,
     isNew: true, // Flag for animation
     patternDisplayName: patternInstance.name,
   };

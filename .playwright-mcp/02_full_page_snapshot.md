@@ -1,0 +1,239 @@
+### Page state
+- Page URL: http://localhost:3000/strategy
+- Page Title: Forex Dash | Professional Trading Dashboard
+- Page Snapshot:
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "Forex Dash" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e8]
+        - generic [ref=e11]: Forex Dash
+      - navigation [ref=e12]:
+        - link "Monitor" [ref=e13] [cursor=pointer]:
+          - /url: /monitor
+        - link "Strategy" [active] [ref=e15] [cursor=pointer]:
+          - /url: /strategy
+          - text: Strategy
+        - link "Account" [ref=e16] [cursor=pointer]:
+          - /url: /account
+      - generic [ref=e22]: Market Open
+  - main [ref=e23]:
+    - generic [ref=e168]:
+      - generic [ref=e170]:
+        - generic [ref=e171]:
+          - heading "Indicators" [level=2] [ref=e172]
+          - button "Collapse indicator library panel" [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+        - generic [ref=e177]:
+          - img [ref=e178]
+          - textbox "Search indicators..." [ref=e181]
+        - generic [ref=e182]:
+          - generic [ref=e183]:
+            - button "Trend 4" [expanded] [ref=e184] [cursor=pointer]:
+              - generic [ref=e185]:
+                - img [ref=e186]
+                - generic [ref=e189]: Trend
+                - generic [ref=e190]: "4"
+              - img [ref=e191]
+            - generic [ref=e194]:
+              - button "SMA" [ref=e195]:
+                - img [ref=e196]
+                - generic [ref=e203]: SMA
+              - button "EMA" [ref=e204]:
+                - img [ref=e205]
+                - generic [ref=e212]: EMA
+              - button "MACD" [ref=e213]:
+                - img [ref=e214]
+                - generic [ref=e221]: MACD
+              - button "ADX" [ref=e222]:
+                - img [ref=e223]
+                - generic [ref=e230]: ADX
+          - generic [ref=e231]:
+            - button "Momentum 4" [expanded] [ref=e232] [cursor=pointer]:
+              - generic [ref=e233]:
+                - img [ref=e234]
+                - generic [ref=e236]: Momentum
+                - generic [ref=e237]: "4"
+              - img [ref=e238]
+            - generic [ref=e241]:
+              - button "RSI" [ref=e242]:
+                - img [ref=e243]
+                - generic [ref=e250]: RSI
+              - button "Stochastic" [ref=e251]:
+                - img [ref=e252]
+                - generic [ref=e259]: Stochastic
+              - button "CCI" [ref=e260]:
+                - img [ref=e261]
+                - generic [ref=e268]: CCI
+              - button "Williams %R" [ref=e269]:
+                - img [ref=e270]
+                - generic [ref=e277]: Williams %R
+          - generic [ref=e278]:
+            - button "Volatility 3" [expanded] [ref=e279] [cursor=pointer]:
+              - generic [ref=e280]:
+                - img [ref=e281]
+                - generic [ref=e283]: Volatility
+                - generic [ref=e284]: "3"
+              - img [ref=e285]
+            - generic [ref=e288]:
+              - button "BB" [ref=e289]:
+                - img [ref=e290]
+                - generic [ref=e297]: BB
+              - button "ATR" [ref=e298]:
+                - img [ref=e299]
+                - generic [ref=e306]: ATR
+              - button "KC" [ref=e307]:
+                - img [ref=e308]
+                - generic [ref=e315]: KC
+          - generic [ref=e316]:
+            - button "Volume 2" [expanded] [ref=e317] [cursor=pointer]:
+              - generic [ref=e318]:
+                - img [ref=e319]
+                - generic [ref=e323]: Volume
+                - generic [ref=e324]: "2"
+              - img [ref=e325]
+            - generic [ref=e328]:
+              - button "OBV" [ref=e329]:
+                - img [ref=e330]
+                - generic [ref=e337]: OBV
+              - button "VP" [ref=e338]:
+                - img [ref=e339]
+                - generic [ref=e346]: VP
+          - generic [ref=e347]:
+            - button "Patterns 9" [expanded] [ref=e348] [cursor=pointer]:
+              - generic [ref=e349]:
+                - img [ref=e350]
+                - generic [ref=e354]: Patterns
+                - generic [ref=e355]: "9"
+              - img [ref=e356]
+            - generic [ref=e359]:
+              - button "neutral Doji" [ref=e360]:
+                - img [ref=e361]
+                - generic "neutral" [ref=e368]
+                - generic [ref=e369]: Doji
+              - button "bullish Hammer" [ref=e370]:
+                - img [ref=e371]
+                - generic "bullish" [ref=e378]
+                - generic [ref=e379]: Hammer
+              - button "bullish Inv Hammer" [ref=e380]:
+                - img [ref=e381]
+                - generic "bullish" [ref=e388]
+                - generic [ref=e389]: Inv Hammer
+              - button "bullish Bull Engulf" [ref=e390]:
+                - img [ref=e391]
+                - generic "bullish" [ref=e398]
+                - generic [ref=e399]: Bull Engulf
+              - button "bearish Bear Engulf" [ref=e400]:
+                - img [ref=e401]
+                - generic "bearish" [ref=e408]
+                - generic [ref=e409]: Bear Engulf
+              - button "bullish Morning Star" [ref=e410]:
+                - img [ref=e411]
+                - generic "bullish" [ref=e418]
+                - generic [ref=e419]: Morning Star
+              - button "bearish Evening Star" [ref=e420]:
+                - img [ref=e421]
+                - generic "bearish" [ref=e428]
+                - generic [ref=e429]: Evening Star
+              - button "bullish 3 White" [ref=e430]:
+                - img [ref=e431]
+                - generic "bullish" [ref=e438]
+                - generic [ref=e439]: 3 White
+              - button "bearish 3 Black" [ref=e440]:
+                - img [ref=e441]
+                - generic "bearish" [ref=e448]
+                - generic [ref=e449]: 3 Black
+      - generic [ref=e450]:
+        - generic [ref=e452]:
+          - heading "Strategy" [level=1] [ref=e453]
+          - paragraph [ref=e454]: Analyze currency pairs, timeframes, and technical indicators for trading decisions
+        - generic [ref=e455]:
+          - generic [ref=e456]:
+            - generic [ref=e457]:
+              - generic [ref=e458]:
+                - generic [ref=e459]: Currency Pair
+                - button "AUD_CAD" [ref=e460] [cursor=pointer]:
+                  - generic [ref=e461]:
+                    - img [ref=e462]
+                    - generic [ref=e465]: AUD_CAD
+                  - img [ref=e466]
+              - generic [ref=e468]:
+                - generic [ref=e469]: Timeframe
+                - generic [ref=e470]:
+                  - img
+                  - combobox "Timeframe" [ref=e471] [cursor=pointer]:
+                    - option "1 Min" [selected]
+                    - option "5 Min"
+                    - option "15 Min"
+                    - option "30 Min"
+                    - option "1 Hour"
+                    - option "4 Hour"
+                    - option "1 Day"
+                    - option "1 Week"
+                  - img
+            - button "Load Data" [ref=e472] [cursor=pointer]:
+              - img [ref=e473]
+              - text: Load Data
+          - generic [ref=e476]:
+            - img [ref=e477]
+            - generic [ref=e479]: Analyzing AUD_CAD on M1 timeframe
+        - generic [ref=e481]:
+          - img [ref=e483]
+          - heading "Ready to Analyze" [level=3] [ref=e485]
+          - paragraph [ref=e486]: Select a currency pair and timeframe above, then click "Load Data" to view technical analysis and price charts.
+          - generic [ref=e487]:
+            - generic [ref=e488]: Real-time data
+            - generic [ref=e490]: Technical indicators
+      - generic [ref=e493]:
+        - generic [ref=e494]:
+          - generic [ref=e495]:
+            - img [ref=e496]
+            - heading "Logic Panel" [level=2] [ref=e498]
+          - button "Collapse logic panel" [ref=e499] [cursor=pointer]:
+            - img [ref=e500]
+        - generic [ref=e502]:
+          - generic [ref=e503]:
+            - generic [ref=e504]:
+              - img [ref=e505]
+              - generic [ref=e508]: Entry Conditions
+            - generic [ref=e510]:
+              - paragraph [ref=e511]: No entry conditions
+              - paragraph [ref=e512]: Drop an indicator on the chart to create one
+          - generic [ref=e513]:
+            - generic [ref=e514]:
+              - img [ref=e515]
+              - generic [ref=e518]: Exit Conditions
+            - generic [ref=e520]:
+              - paragraph [ref=e521]: No exit conditions
+              - paragraph [ref=e522]: Drag conditions here to set exit rules
+        - paragraph [ref=e524]: Add indicators to create conditions
+  - contentinfo [ref=e134]:
+    - generic [ref=e135]:
+      - generic [ref=e136]:
+        - generic [ref=e137]:
+          - generic [ref=e138]:
+            - img [ref=e140]
+            - generic [ref=e143]: Forex Dash
+          - paragraph [ref=e144]: Professional forex trading dashboard with real-time data and technical analysis.
+        - generic [ref=e145]:
+          - heading "Quick Links" [level=4] [ref=e146]
+          - navigation [ref=e147]:
+            - link "Home" [ref=e148] [cursor=pointer]:
+              - /url: /
+            - link "Dashboard" [ref=e149] [cursor=pointer]:
+              - /url: /dashboard
+        - generic [ref=e150]:
+          - heading "Connect" [level=4] [ref=e151]
+          - generic [ref=e152]:
+            - link "GitHub" [ref=e153] [cursor=pointer]:
+              - /url: "#"
+              - img [ref=e154]
+            - link "Twitter" [ref=e157] [cursor=pointer]:
+              - /url: "#"
+              - img [ref=e158]
+      - generic [ref=e161]:
+        - paragraph [ref=e162]: © 2026 Forex Dash. Made with care.
+        - generic [ref=e163]: All systems operational
+```
