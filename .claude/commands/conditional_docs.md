@@ -172,3 +172,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing responsive breakpoints for Strategy page components
     - When following the UI style guide for dashboard layouts
     - When reorganizing Strategy page component hierarchy or grid layouts
+
+- app_docs/feature-38950e42-indicator-settings-customization.md
+  - Conditions:
+    - When working with indicator parameter customization or settings dialogs
+    - When implementing or modifying the IndicatorSettingsDialog component
+    - When adding new indicator types that need parameter configuration
+    - When working with multiple indicator instances with different settings
+    - When implementing indicator edit functionality
+    - When troubleshooting indicator parameter validation or color picker issues
+    - When extending candle count options for long-period indicators
+    - When modifying how indicator parameters are passed to chart rendering
