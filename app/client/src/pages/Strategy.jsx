@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import endPoints from '../app/api';
-import { COUNTS, calculateCandleCount } from '../app/data';
+import { COUNTS, calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
 import Button from '../components/Button';
 import PriceChart from '../components/PriceChart';
 import Select from '../components/Select';
 import Technicals from '../components/Technicals';
-import { Play, RefreshCw, BarChart3, AlertTriangle } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, AlertTriangle, Info } from 'lucide-react';
+
+// localStorage key for persisting timeframe preference
+const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
 
 function Strategy() {
   const [selectedPair, setSelectedPair] = useState(null);
@@ -17,14 +20,27 @@ function Strategy() {
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
 
   // New state for advanced chart features
   const [chartType, setChartType] = useState('candlestick');
   const [showVolume, setShowVolume] = useState(false);
   const [selectedDateRange, setSelectedDateRange] = useState(null);
 
+  // Debounce timer ref for timeframe changes
+  const debounceTimerRef = useRef(null);
+  // Previous timeframe for zoom context preservation
+  const previousGranRef = useRef(null);
+
   useEffect(() => {
     loadOptions();
+
+    // Cleanup debounce timer on unmount
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, []);
 
   const handleCountChange = (count) => {
@@ -52,15 +68,95 @@ function Strategy() {
   const loadOptions = async () => {
     const data = await endPoints.options();
     setOptions(data);
-    setSelectedGran(data.granularities[0].value);
+
+    // Get available granularity values for validation
+    const availableGranularities = data.granularities.map(g => g.value);
+
+    // Try to restore preferred timeframe from localStorage
+    const preferredTimeframe = localStorage.getItem(PREFERRED_TIMEFRAME_KEY);
+
+    if (preferredTimeframe && availableGranularities.includes(preferredTimeframe)) {
+      setSelectedGran(preferredTimeframe);
+    } else {
+      // Fallback to first available option
+      if (preferredTimeframe) {
+        console.warn(`Preferred timeframe "${preferredTimeframe}" not available, falling back to default`);
+      }
+      setSelectedGran(data.granularities[0].value);
+    }
+
     setSelectedPair(data.pairs[0].value);
     setLoading(false);
   };
 
-  const loadPrices = async (count) => {
+  // Handle timeframe change with localStorage persistence and debouncing
+  const handleTimeframeChange = useCallback((newTimeframe) => {
+    // Calculate zoom context preservation if we have data loaded
+    if (priceData && selectedGran && GRANULARITY_SECONDS[selectedGran] && GRANULARITY_SECONDS[newTimeframe]) {
+      const oldTfSeconds = GRANULARITY_SECONDS[selectedGran];
+      const newTfSeconds = GRANULARITY_SECONDS[newTimeframe];
+      const oldCandleCount = parseInt(selectedCount, 10);
+
+      // Calculate new candle count to maintain similar time coverage
+      let newCandleCount = Math.round(oldCandleCount * (oldTfSeconds / newTfSeconds));
+      // Clamp to reasonable range
+      newCandleCount = Math.max(50, Math.min(500, newCandleCount));
+
+      setSelectedCount(String(newCandleCount));
+    }
+
+    // Store previous granularity for reference
+    previousGranRef.current = selectedGran;
+
+    // Update selected granularity immediately for UI responsiveness
+    setSelectedGran(newTimeframe);
+
+    // Persist to localStorage
+    localStorage.setItem(PREFERRED_TIMEFRAME_KEY, newTimeframe);
+
+    // If we have data loaded, debounce the reload
+    if (priceData || technicalsData) {
+      // Clear any pending debounce
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Show loading state immediately
+      setLoadingData(true);
+
+      // Debounce the API call (300ms)
+      debounceTimerRef.current = setTimeout(() => {
+        loadTechnicals();
+      }, 300);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceData, technicalsData, selectedGran, selectedCount]);
+
+  const loadPrices = async (count, timeframe = selectedGran) => {
+    // Validate timeframe exists in available options
+    if (options && options.granularities) {
+      const availableGranularities = options.granularities.map(g => g.value);
+      if (!availableGranularities.includes(timeframe)) {
+        console.warn(`Invalid timeframe "${timeframe}", resetting to default`);
+        const defaultGran = options.granularities[0].value;
+        setSelectedGran(defaultGran);
+        timeframe = defaultGran;
+      }
+    }
+
     try {
-      const data = await endPoints.prices(selectedPair, selectedGran, count);
+      const data = await endPoints.prices(selectedPair, timeframe, count);
       setPriceData(data);
+
+      // Check for insufficient historical data
+      const requestedCount = parseInt(count, 10);
+      const actualCount = data.time ? data.time.length : 0;
+      if (actualCount < requestedCount && actualCount > 0) {
+        setInfoMessage(`Showing ${actualCount} candles - insufficient historical data for ${requestedCount} candles`);
+      } else {
+        setInfoMessage(null);
+      }
+
       return { success: true };
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to load price data';
@@ -105,6 +201,10 @@ function Strategy() {
 
   const clearError = () => {
     setError(null);
+  };
+
+  const clearInfoMessage = () => {
+    setInfoMessage(null);
   };
 
   // Loading state
@@ -152,7 +252,7 @@ function Strategy() {
               title="Timeframe"
               options={options.granularities}
               defaultValue={selectedGran}
-              onSelected={setSelectedGran}
+              onSelected={handleTimeframeChange}
               className="w-32"
             />
           </div>
@@ -201,6 +301,29 @@ function Strategy() {
               onClick={clearError}
               className="text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Dismiss error"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Info Message Display (for insufficient data etc.) */}
+      {infoMessage && (
+        <div className="card p-4 border-info bg-info/10">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">
+                {infoMessage}
+              </p>
+            </div>
+            <button
+              onClick={clearInfoMessage}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss info"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
