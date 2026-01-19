@@ -33,6 +33,7 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  *
  * @param {Array} conditions - Array of condition objects
  * @param {Array} activeIndicators - Array of active indicator instances
+ * @param {Array} activePatterns - Array of active pattern instances
  * @param {Function} getIndicatorDisplayName - Function to get indicator display name
  * @param {Function} onConditionUpdate - Callback when a condition is updated
  * @param {Function} onConditionDelete - Callback when delete is requested
@@ -45,6 +46,7 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
 function LogicPanel({
   conditions = [],
   activeIndicators = [],
+  activePatterns = [],
   getIndicatorDisplayName,
   onConditionUpdate,
   onConditionDelete,
@@ -266,6 +268,7 @@ function LogicPanel({
                 key={condition.id}
                 condition={condition}
                 activeIndicators={activeIndicators}
+                activePatterns={activePatterns}
                 getIndicatorDisplayName={getIndicatorDisplayName}
                 onUpdate={onConditionUpdate}
                 onDelete={onConditionDelete}

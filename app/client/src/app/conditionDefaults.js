@@ -351,3 +351,204 @@ export function formatConditionString(condition) {
   const rightLabel = condition.rightOperand.label;
   return `${leftLabel} ${operatorLabel} ${rightLabel}`;
 }
+
+/**
+ * Format condition as natural language preview
+ * Returns a human-readable string like "When Close Price crosses above EMA (50)"
+ * @param {Object} condition - The condition object
+ * @returns {string|null} Natural language preview string, or null if condition is incomplete
+ */
+export function formatNaturalLanguageCondition(condition) {
+  if (!condition || !condition.leftOperand) {
+    return null;
+  }
+
+  const leftOperand = condition.leftOperand;
+  const operator = condition.operator;
+  const rightOperand = condition.rightOperand;
+
+  // Get the left operand label
+  const leftLabel = leftOperand.label || getOperandLabel(leftOperand);
+  if (!leftLabel) {
+    return null;
+  }
+
+  // Get the operator label
+  const operatorLabel = getOperatorLabel(operator);
+  if (!operatorLabel) {
+    return null;
+  }
+
+  // Handle pattern conditions (no right operand)
+  if (leftOperand.type === 'pattern' || operator === 'is_detected') {
+    return `When ${leftLabel} ${operatorLabel}`;
+  }
+
+  // For non-pattern conditions, we need a right operand
+  if (!rightOperand) {
+    // Return partial preview with placeholder
+    return `When ${leftLabel} ${operatorLabel} ...`;
+  }
+
+  // Get the right operand label
+  const rightLabel = rightOperand.label || getOperandLabel(rightOperand);
+  if (!rightLabel) {
+    return `When ${leftLabel} ${operatorLabel} ...`;
+  }
+
+  return `When ${leftLabel} ${operatorLabel} ${rightLabel}`;
+}
+
+/**
+ * Get a display label for an operand
+ * Helper function for formatNaturalLanguageCondition
+ * @param {Object} operand - The operand object
+ * @returns {string|null} The operand label
+ */
+function getOperandLabel(operand) {
+  if (!operand) {
+    return null;
+  }
+
+  // If the operand has a label, use it
+  if (operand.label) {
+    return operand.label;
+  }
+
+  // Price type
+  if (operand.type === 'price') {
+    return getPriceSourceLabel(operand.value);
+  }
+
+  // Value type (numeric threshold)
+  if (operand.type === 'value') {
+    return String(operand.value);
+  }
+
+  // Indicator type
+  if (operand.type === 'indicator') {
+    // If no label is set, we can't generate one without context
+    return operand.component ? operand.component : null;
+  }
+
+  // Pattern type
+  if (operand.type === 'pattern') {
+    return operand.label || 'Pattern';
+  }
+
+  return null;
+}
+
+/**
+ * Validate if an operand references a valid indicator on the chart
+ * @param {Object} operand - The operand to validate
+ * @param {Array} activeIndicators - List of active indicators on the chart
+ * @returns {Object} Validation result { isValid: boolean, errorMessage: string|null }
+ */
+export function validateOperandIndicator(operand, activeIndicators) {
+  if (!operand) {
+    return { isValid: true, errorMessage: null };
+  }
+
+  // Price and value operands are always valid
+  if (operand.type === 'price' || operand.type === 'value') {
+    return { isValid: true, errorMessage: null };
+  }
+
+  // Indicator operands need to reference an existing indicator
+  if (operand.type === 'indicator') {
+    const indicatorExists = activeIndicators.some(
+      ind => ind.instanceId === operand.instanceId
+    );
+    if (!indicatorExists) {
+      return {
+        isValid: false,
+        errorMessage: 'The referenced indicator has been removed from the chart',
+      };
+    }
+  }
+
+  // Pattern operands - check if pattern still exists (handled separately)
+  if (operand.type === 'pattern') {
+    // Pattern validation is handled by the pattern system
+    return { isValid: true, errorMessage: null };
+  }
+
+  return { isValid: true, errorMessage: null };
+}
+
+/**
+ * Validate a complete condition
+ * @param {Object} condition - The condition to validate
+ * @param {Array} activeIndicators - List of active indicators on the chart
+ * @param {Array} activePatterns - List of active patterns on the chart (optional)
+ * @returns {Object} Validation result { isValid: boolean, errorMessage: string|null, invalidOperand: 'left'|'right'|null }
+ */
+export function validateCondition(condition, activeIndicators, activePatterns = []) {
+  if (!condition) {
+    return { isValid: false, errorMessage: 'Condition is undefined', invalidOperand: null };
+  }
+
+  // Pattern conditions
+  if (condition.isPatternCondition || condition.leftOperand?.type === 'pattern') {
+    const patternExists = activePatterns.some(
+      p => p.instanceId === condition.patternInstanceId || p.instanceId === condition.leftOperand?.instanceId
+    );
+    if (!patternExists) {
+      return {
+        isValid: false,
+        errorMessage: 'The referenced pattern has been removed from the chart',
+        invalidOperand: 'left',
+      };
+    }
+    return { isValid: true, errorMessage: null, invalidOperand: null };
+  }
+
+  // Validate left operand
+  const leftValidation = validateOperandIndicator(condition.leftOperand, activeIndicators);
+  if (!leftValidation.isValid) {
+    return {
+      isValid: false,
+      errorMessage: leftValidation.errorMessage,
+      invalidOperand: 'left',
+    };
+  }
+
+  // Validate right operand (if present)
+  if (condition.rightOperand) {
+    const rightValidation = validateOperandIndicator(condition.rightOperand, activeIndicators);
+    if (!rightValidation.isValid) {
+      return {
+        isValid: false,
+        errorMessage: rightValidation.errorMessage,
+        invalidOperand: 'right',
+      };
+    }
+  }
+
+  return { isValid: true, errorMessage: null, invalidOperand: null };
+}
+
+/**
+ * Create a new standalone condition (not linked to an indicator)
+ * @param {string} section - The section for the condition (V2 format)
+ * @returns {Object} A new standalone condition object
+ */
+export function createStandaloneCondition(section = CONDITION_SECTIONS_V2.LONG_ENTRY) {
+  // Ensure section is V2 format
+  const resolvedSection = migrateSectionToV2(section);
+
+  return {
+    id: generateConditionId(),
+    indicatorInstanceId: null, // Standalone condition - not linked to an indicator
+    leftOperand: {
+      type: 'price',
+      value: 'close',
+      label: 'Close Price',
+    },
+    operator: 'crosses_above',
+    rightOperand: null, // User will select this
+    section: resolvedSection,
+    isNew: true, // Flag for animation
+  };
+}

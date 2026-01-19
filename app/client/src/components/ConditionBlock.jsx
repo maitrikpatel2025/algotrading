@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
 import { X, GripVertical, AlertTriangle } from 'lucide-react';
 import ConditionDropdown from './ConditionDropdown';
-import { OPERATORS, buildOperandOptions, getOperatorLabel } from '../app/conditionDefaults';
+import {
+  OPERATORS,
+  buildOperandOptions,
+  getOperatorLabel,
+  formatNaturalLanguageCondition,
+  validateCondition,
+} from '../app/conditionDefaults';
 
 /**
  * ConditionBlock Component
@@ -13,6 +19,7 @@ import { OPERATORS, buildOperandOptions, getOperatorLabel } from '../app/conditi
  *
  * @param {Object} condition - The condition data object
  * @param {Array} activeIndicators - List of active indicators on the chart
+ * @param {Array} activePatterns - List of active patterns on the chart
  * @param {Function} getIndicatorDisplayName - Function to get indicator display name
  * @param {Function} onUpdate - Callback when condition is updated
  * @param {Function} onDelete - Callback when delete is clicked
@@ -23,6 +30,7 @@ import { OPERATORS, buildOperandOptions, getOperatorLabel } from '../app/conditi
 function ConditionBlock({
   condition,
   activeIndicators,
+  activePatterns = [],
   getIndicatorDisplayName,
   onUpdate,
   onDelete,
@@ -108,11 +116,13 @@ function ConditionBlock({
     setIsDragging(false);
   }, []);
 
-  // Check if condition has valid indicator/pattern reference
-  // Pattern conditions are always valid if they have the isPatternCondition flag
-  const hasValidIndicator = condition.isPatternCondition || activeIndicators.some(
-    ind => ind.instanceId === condition.indicatorInstanceId
-  );
+  // Validate the condition using the comprehensive validation function
+  const validation = validateCondition(condition, activeIndicators, activePatterns);
+  const hasValidIndicator = validation.isValid;
+  const validationErrorMessage = validation.errorMessage;
+
+  // Generate natural language preview
+  const naturalLanguagePreview = formatNaturalLanguageCondition(condition);
 
   // Get current operator for display
   const currentOperator = {
@@ -147,11 +157,14 @@ function ConditionBlock({
 
       {/* Content */}
       <div className="p-3 pl-6">
-        {/* Warning for invalid indicator */}
+        {/* Warning for invalid condition */}
         {!hasValidIndicator && (
-          <div className="flex items-center gap-2 text-amber-500 text-xs mb-2">
-            <AlertTriangle className="h-3 w-3" />
-            <span>Indicator removed from chart</span>
+          <div
+            className="flex items-center gap-2 text-amber-500 text-xs mb-2"
+            title={validationErrorMessage || 'Condition is invalid'}
+          >
+            <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{validationErrorMessage || 'Condition is invalid'}</span>
           </div>
         )}
 
@@ -203,6 +216,13 @@ function ConditionBlock({
             </>
           )}
         </div>
+
+        {/* Natural Language Preview */}
+        {naturalLanguagePreview && !condition.isPatternCondition && (
+          <div className="mt-2 text-xs text-muted-foreground italic">
+            {naturalLanguagePreview}
+          </div>
+        )}
       </div>
 
       {/* Delete Button */}

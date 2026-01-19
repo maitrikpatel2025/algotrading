@@ -16,7 +16,7 @@ import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucid
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
-import { createConditionFromIndicator, createConditionFromPattern, CONDITION_SECTIONS_V2, getDefaultSection, migrateSectionToV2 } from '../app/conditionDefaults';
+import { createConditionFromIndicator, createConditionFromPattern, createStandaloneCondition, CONDITION_SECTIONS_V2, getDefaultSection, migrateSectionToV2 } from '../app/conditionDefaults';
 import { TRADE_DIRECTIONS, TRADE_DIRECTION_STORAGE_KEY } from '../app/constants';
 
 // localStorage keys for persisting preferences
@@ -748,9 +748,14 @@ function Strategy() {
 
   // Handle Add Condition button click from LogicPanel
   const handleAddCondition = useCallback((section) => {
-    // For now, show an info message to guide the user
-    // In a future enhancement, this could open a dialog to select an indicator/pattern
-    setInfoMessage(`To add a condition to "${section.replace('_', ' ')}", drag an indicator from the library onto the chart.`);
+    // Create a new standalone condition for the specified section
+    const newCondition = createStandaloneCondition(section);
+
+    // Add to conditions state
+    setConditions(prev => [...prev, newCondition]);
+
+    // Add to history for undo support
+    setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
   }, []);
 
   // Close confirmation dialog
@@ -1126,6 +1131,7 @@ function Strategy() {
         <LogicPanel
           conditions={conditions}
           activeIndicators={activeIndicators}
+          activePatterns={activePatterns}
           getIndicatorDisplayName={getDisplayName}
           onConditionUpdate={handleConditionUpdate}
           onConditionDelete={handleConditionDelete}
@@ -1159,6 +1165,7 @@ function Strategy() {
           <LogicPanel
             conditions={conditions}
             activeIndicators={activeIndicators}
+            activePatterns={activePatterns}
             getIndicatorDisplayName={getDisplayName}
             onConditionUpdate={handleConditionUpdate}
             onConditionDelete={handleConditionDelete}
