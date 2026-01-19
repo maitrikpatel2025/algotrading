@@ -67,14 +67,41 @@ function clampZoomRange(newRange, chartData, minCandles = 50, maxCandles = 500) 
   const [start, end] = newRange;
   const startTime = new Date(start).getTime();
   const endTime = new Date(end).getTime();
+
+  // Validate that the input timestamps are valid
+  if (isNaN(startTime) || isNaN(endTime)) {
+    return newRange;
+  }
+
   const center = (startTime + endTime) / 2;
 
   // Calculate average time between candles
   const timeDeltas = [];
   for (let i = 1; i < chartData.time.length; i++) {
-    timeDeltas.push(new Date(chartData.time[i]).getTime() - new Date(chartData.time[i - 1]).getTime());
+    const currentTime = new Date(chartData.time[i]).getTime();
+    const prevTime = new Date(chartData.time[i - 1]).getTime();
+
+    // Skip invalid timestamps
+    if (!isNaN(currentTime) && !isNaN(prevTime)) {
+      const delta = currentTime - prevTime;
+      // Only add positive deltas (valid time progression)
+      if (delta > 0) {
+        timeDeltas.push(delta);
+      }
+    }
   }
+
+  // If we don't have valid time deltas, return original range
+  if (timeDeltas.length === 0) {
+    return newRange;
+  }
+
   const avgDelta = timeDeltas.reduce((a, b) => a + b, 0) / timeDeltas.length;
+
+  // Validate avgDelta is a valid number
+  if (isNaN(avgDelta) || avgDelta <= 0) {
+    return newRange;
+  }
 
   let targetCandles;
   if (visibleCount < minCandles) {
@@ -87,12 +114,27 @@ function clampZoomRange(newRange, chartData, minCandles = 50, maxCandles = 500) 
   const newStart = new Date(center - targetRange / 2);
   const newEnd = new Date(center + targetRange / 2);
 
+  // Validate that calculated dates are valid
+  if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+    return newRange;
+  }
+
   // Ensure we don't go beyond data boundaries
   const dataStart = new Date(chartData.time[0]);
   const dataEnd = new Date(chartData.time[chartData.time.length - 1]);
 
+  // Validate data boundary dates are valid
+  if (isNaN(dataStart.getTime()) || isNaN(dataEnd.getTime())) {
+    return newRange;
+  }
+
   let clampedStart = newStart < dataStart ? dataStart : newStart;
   let clampedEnd = newEnd > dataEnd ? dataEnd : newEnd;
+
+  // Final validation before toISOString
+  if (isNaN(clampedStart.getTime()) || isNaN(clampedEnd.getTime())) {
+    return newRange;
+  }
 
   return [clampedStart.toISOString(), clampedEnd.toISOString()];
 }
@@ -105,9 +147,19 @@ function clampZoomRange(newRange, chartData, minCandles = 50, maxCandles = 500) 
  * @returns {Array} New [start, end] range
  */
 export function computeZoomedInRange(currentRange, zoomFactor = 0.8, pivotX = 0.5) {
+  if (!currentRange || currentRange.length < 2) {
+    return currentRange;
+  }
+
   const [start, end] = currentRange;
   const startTime = new Date(start).getTime();
   const endTime = new Date(end).getTime();
+
+  // Validate input timestamps
+  if (isNaN(startTime) || isNaN(endTime)) {
+    return currentRange;
+  }
+
   const currentSpan = endTime - startTime;
   const newSpan = currentSpan * zoomFactor;
 
@@ -115,6 +167,11 @@ export function computeZoomedInRange(currentRange, zoomFactor = 0.8, pivotX = 0.
   const pivotTime = startTime + currentSpan * pivotX;
   const newStart = new Date(pivotTime - newSpan * pivotX);
   const newEnd = new Date(pivotTime + newSpan * (1 - pivotX));
+
+  // Validate calculated dates
+  if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+    return currentRange;
+  }
 
   return [newStart.toISOString(), newEnd.toISOString()];
 }
@@ -139,19 +196,39 @@ export function computeZoomedOutRange(currentRange, zoomFactor = 1.2, pivotX = 0
  * @returns {Array} New [start, end] range
  */
 export function computeScrolledRange(currentRange, direction = 'left', scrollPercent = 0.1, chartData = null) {
+  if (!currentRange || currentRange.length < 2) {
+    return currentRange;
+  }
+
   const [start, end] = currentRange;
   const startTime = new Date(start).getTime();
   const endTime = new Date(end).getTime();
+
+  // Validate input timestamps
+  if (isNaN(startTime) || isNaN(endTime)) {
+    return currentRange;
+  }
+
   const span = endTime - startTime;
   const shift = span * scrollPercent * (direction === 'left' ? -1 : 1);
 
   let newStart = new Date(startTime + shift);
   let newEnd = new Date(endTime + shift);
 
+  // Validate calculated dates
+  if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+    return currentRange;
+  }
+
   // Enforce data boundaries if chartData provided
   if (chartData && chartData.time && chartData.time.length > 0) {
     const dataStart = new Date(chartData.time[0]);
     const dataEnd = new Date(chartData.time[chartData.time.length - 1]);
+
+    // Validate data boundary dates
+    if (isNaN(dataStart.getTime()) || isNaN(dataEnd.getTime())) {
+      return [newStart.toISOString(), newEnd.toISOString()];
+    }
 
     if (newStart < dataStart) {
       const overflow = dataStart.getTime() - newStart.getTime();
@@ -163,6 +240,11 @@ export function computeScrolledRange(currentRange, direction = 'left', scrollPer
       const overflow = newEnd.getTime() - dataEnd.getTime();
       newEnd = dataEnd;
       newStart = new Date(newStart.getTime() - overflow);
+    }
+
+    // Final validation after boundary adjustments
+    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+      return currentRange;
     }
   }
 
