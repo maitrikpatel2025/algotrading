@@ -88,6 +88,9 @@ function Strategy() {
     editingInstanceId: null,
     initialParams: null,
     initialColor: null,
+    initialLineWidth: null,
+    initialLineStyle: null,
+    initialFillOpacity: null,
   });
 
   // Preview mode state for real-time parameter adjustment
@@ -317,12 +320,15 @@ function Strategy() {
       editingInstanceId: null,
       initialParams: null,
       initialColor: null,
+      initialLineWidth: null,
+      initialLineStyle: null,
+      initialFillOpacity: null,
     });
     setIndicatorError(null);
   }, [activeIndicators]);
 
   // Handle settings dialog confirm - add indicator with custom params
-  const handleSettingsConfirm = useCallback((params, color) => {
+  const handleSettingsConfirm = useCallback((params, color, lineWidth, lineStyle, fillOpacity) => {
     const indicator = settingsDialog.indicator;
 
     if (settingsDialog.isEditMode && settingsDialog.editingInstanceId) {
@@ -333,6 +339,9 @@ function Strategy() {
             ...ind,
             params: params,
             color: color,
+            lineWidth: lineWidth,
+            lineStyle: lineStyle,
+            fillOpacity: fillOpacity,
             isPreview: false, // Ensure preview flag is removed
           };
           return updatedIndicator;
@@ -358,6 +367,9 @@ function Strategy() {
         instanceId: `${indicator.id}-${Date.now()}`,
         params: params,
         color: color,
+        lineWidth: lineWidth,
+        lineStyle: lineStyle,
+        fillOpacity: fillOpacity,
       };
 
       // Create display name for the indicator using custom params
@@ -389,7 +401,7 @@ function Strategy() {
   }, []);
 
   // Handle preview update - called when parameters change in real-time
-  const handlePreviewUpdate = useCallback((previewParams, previewColor) => {
+  const handlePreviewUpdate = useCallback((previewParams, previewColor, previewLineWidth, previewLineStyle, previewFillOpacity) => {
     if (!settingsDialog.isEditMode || !settingsDialog.editingInstanceId) {
       return;
     }
@@ -402,6 +414,9 @@ function Strategy() {
       ...indicator,
       params: previewParams,
       color: previewColor,
+      lineWidth: previewLineWidth,
+      lineStyle: previewLineStyle,
+      fillOpacity: previewFillOpacity,
       isPreview: true,
     };
 
@@ -425,6 +440,9 @@ function Strategy() {
       editingInstanceId: instanceId,
       initialParams: indicator.params || indicator.defaultParams,
       initialColor: indicator.color,
+      initialLineWidth: indicator.lineWidth,
+      initialLineStyle: indicator.lineStyle,
+      initialFillOpacity: indicator.fillOpacity,
     });
   }, [activeIndicators]);
 
@@ -1065,6 +1083,9 @@ function Strategy() {
         indicator={settingsDialog.indicator}
         initialParams={settingsDialog.initialParams}
         initialColor={settingsDialog.initialColor}
+        initialLineWidth={settingsDialog.initialLineWidth}
+        initialLineStyle={settingsDialog.initialLineStyle}
+        initialFillOpacity={settingsDialog.initialFillOpacity}
         isEditMode={settingsDialog.isEditMode}
         onPreviewUpdate={handlePreviewUpdate}
         comparisonMode={comparisonMode}
