@@ -14,6 +14,8 @@ import {
   calculateKeltnerChannel,
 } from './indicatorCalculations';
 import { INDICATOR_TYPES } from './indicators';
+import { detectPattern } from './patternDetection';
+import { PATTERN_TYPES } from './patterns';
 
 // Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
@@ -720,7 +722,98 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
 }
 
 /**
- * Draw the chart with support for multiple chart types, volume subplot, indicators, and advanced interactions.
+ * Create pattern marker traces for detected candlestick patterns
+ * Patterns render as scatter markers above the relevant candles
+ * @param {Object} chartData - The chart data with OHLC arrays
+ * @param {Object} pattern - The pattern instance with id, name, patternType, color, detectedPatterns
+ * @returns {Array} Array of Plotly trace objects
+ */
+function createPatternMarkerTraces(chartData, pattern) {
+  const traces = [];
+
+  // Run pattern detection if not already done
+  const detectedPatterns = pattern.detectedPatterns || detectPattern(
+    pattern.id,
+    chartData.mid_o,
+    chartData.mid_h,
+    chartData.mid_l,
+    chartData.mid_c
+  );
+
+  if (detectedPatterns.length === 0) {
+    return traces;
+  }
+
+  // Extract data for detected patterns
+  const markerX = [];
+  const markerY = [];
+  const hoverTexts = [];
+  const reliabilityScores = [];
+
+  detectedPatterns.forEach(detection => {
+    const idx = detection.index;
+    if (idx >= 0 && idx < chartData.time.length) {
+      markerX.push(chartData.time[idx]);
+      // Position marker slightly above the high of the candle
+      const high = chartData.mid_h[idx];
+      const range = chartData.mid_h[idx] - chartData.mid_l[idx];
+      markerY.push(high + range * 0.15);
+      reliabilityScores.push(detection.reliability);
+      hoverTexts.push(
+        `<b>${pattern.name}</b><br>` +
+        `${chartData.time[idx]}<br>` +
+        `Reliability: ${Math.round(detection.reliability * 100)}%`
+      );
+    }
+  });
+
+  // Determine marker color based on pattern type
+  let markerColor;
+  switch (pattern.patternType) {
+    case PATTERN_TYPES.BULLISH:
+      markerColor = '#22C55E'; // Green
+      break;
+    case PATTERN_TYPES.BEARISH:
+      markerColor = '#EF4444'; // Red
+      break;
+    default:
+      markerColor = '#6B7280'; // Gray for neutral
+  }
+
+  // Create scatter trace for pattern markers
+  traces.push({
+    x: markerX,
+    y: markerY,
+    type: 'scatter',
+    mode: 'markers',
+    name: pattern.name,
+    marker: {
+      symbol: 'triangle-down',
+      size: 12,
+      color: markerColor,
+      line: {
+        color: '#ffffff',
+        width: 1,
+      },
+    },
+    text: hoverTexts,
+    hovertemplate: '%{text}<extra></extra>',
+    hoverlabel: {
+      bgcolor: '#18181B',
+      bordercolor: markerColor,
+      font: {
+        family: 'Anek Odia, system-ui, sans-serif',
+        size: 12,
+        color: '#FAFAFA',
+      },
+    },
+  });
+
+  return traces;
+}
+
+/**
+ * Draw the chart with support for multiple chart types, volume subplot, indicators, patterns, and advanced interactions.
  * @param {Object} chartData - The chart data with time, mid_o, mid_h, mid_l, mid_c, and optionally volume
  * @param {string} p - Pair name (e.g., "EUR_USD")
  * @param {string} g - Granularity (e.g., "H1")
@@ -728,8 +821,9 @@ function createSubchartIndicatorTraces(chartData, indicator, yAxisName) {
  * @param {string} chartType - Chart type: 'candlestick', 'ohlc', 'line', or 'area'
  * @param {boolean} showVolume - Whether to show the volume subplot
  * @param {Array} activeIndicators - Array of active indicator objects to render
+ * @param {Array} activePatterns - Array of active pattern objects to render
  */
-export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = []) {
+export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = []) {
   const data = [];
 
   // Add main price trace
@@ -745,6 +839,14 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
     const traces = createOverlayIndicatorTraces(chartData, indicator);
     data.push(...traces);
   });
+
+  // Add pattern marker traces (render on main price chart)
+  if (activePatterns && activePatterns.length > 0) {
+    activePatterns.forEach(pattern => {
+      const traces = createPatternMarkerTraces(chartData, pattern);
+      data.push(...traces);
+    });
+  }
 
   // Calculate layout domains
   // Main chart takes most space, volume gets ~15%, each subchart gets ~12%

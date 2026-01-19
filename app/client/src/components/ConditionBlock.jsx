@@ -86,9 +86,10 @@ function ConditionBlock({
   // Hover handlers for visual connection
   const handleMouseEnter = useCallback(() => {
     if (onHover) {
-      onHover(condition.indicatorInstanceId);
+      // Support both indicator and pattern conditions
+      onHover(condition.indicatorInstanceId || condition.patternInstanceId);
     }
-  }, [onHover, condition.indicatorInstanceId]);
+  }, [onHover, condition.indicatorInstanceId, condition.patternInstanceId]);
 
   const handleMouseLeave = useCallback(() => {
     if (onHover) {
@@ -107,8 +108,9 @@ function ConditionBlock({
     setIsDragging(false);
   }, []);
 
-  // Check if condition has valid indicator reference
-  const hasValidIndicator = activeIndicators.some(
+  // Check if condition has valid indicator/pattern reference
+  // Pattern conditions are always valid if they have the isPatternCondition flag
+  const hasValidIndicator = condition.isPatternCondition || activeIndicators.some(
     ind => ind.instanceId === condition.indicatorInstanceId
   );
 
@@ -155,32 +157,51 @@ function ConditionBlock({
 
         {/* Condition Dropdowns */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Left Operand */}
-          <ConditionDropdown
-            value={condition.leftOperand}
-            options={operandOptions}
-            onChange={handleLeftOperandChange}
-            placeholder="Select..."
-            className="min-w-[120px] flex-1"
-          />
+          {/* Pattern Condition Display (special case - no dropdowns, just text) */}
+          {condition.isPatternCondition ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md font-medium bg-muted"
+                style={{ borderLeft: `3px solid ${condition.leftOperand?.color || indicatorColor}` }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: condition.leftOperand?.color || indicatorColor }}
+                />
+                {condition.patternDisplayName || condition.leftOperand?.label}
+              </span>
+              <span className="text-muted-foreground">{getOperatorLabel(condition.operator)}</span>
+            </div>
+          ) : (
+            <>
+              {/* Left Operand */}
+              <ConditionDropdown
+                value={condition.leftOperand}
+                options={operandOptions}
+                onChange={handleLeftOperandChange}
+                placeholder="Select..."
+                className="min-w-[120px] flex-1"
+              />
 
-          {/* Operator */}
-          <ConditionDropdown
-            value={currentOperator}
-            options={operatorOptions}
-            onChange={handleOperatorChange}
-            placeholder="operator"
-            className="min-w-[100px]"
-          />
+              {/* Operator */}
+              <ConditionDropdown
+                value={currentOperator}
+                options={operatorOptions}
+                onChange={handleOperatorChange}
+                placeholder="operator"
+                className="min-w-[100px]"
+              />
 
-          {/* Right Operand */}
-          <ConditionDropdown
-            value={condition.rightOperand}
-            options={operandOptions}
-            onChange={handleRightOperandChange}
-            placeholder="Select..."
-            className="min-w-[120px] flex-1"
-          />
+              {/* Right Operand */}
+              <ConditionDropdown
+                value={condition.rightOperand}
+                options={operandOptions}
+                onChange={handleRightOperandChange}
+                placeholder="Select..."
+                className="min-w-[120px] flex-1"
+              />
+            </>
+          )}
         </div>
       </div>
 

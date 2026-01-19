@@ -145,6 +145,96 @@ class TestOpenFxApiTrading:
         assert result is None
 
 
+class TestMockDataFallback:
+    """Test cases for mock data fallback functionality."""
+
+    @pytest.fixture
+    def api_client(self):
+        """Create an API client instance for testing."""
+        return OpenFxApi()
+
+    def test_mock_data_returns_valid_structure(self, api_client):
+        """Test that mock data has all required keys."""
+        result = api_client._generate_mock_candles("EUR_USD", "H1", 10)
+
+        assert 'time' in result
+        assert 'mid_o' in result
+        assert 'mid_h' in result
+        assert 'mid_l' in result
+        assert 'mid_c' in result
+
+    def test_mock_data_has_correct_length(self, api_client):
+        """Test that mock data returns correct number of candles."""
+        count = 50
+        result = api_client._generate_mock_candles("EUR_USD", "H1", count)
+
+        assert len(result['time']) == count
+        assert len(result['mid_o']) == count
+        assert len(result['mid_h']) == count
+        assert len(result['mid_l']) == count
+        assert len(result['mid_c']) == count
+
+    def test_mock_data_time_series_valid(self, api_client):
+        """Test that mock data time values are properly formatted."""
+        result = api_client._generate_mock_candles("EUR_USD", "H1", 10)
+
+        # Check time format (YY-MM-DD HH:MM)
+        for time_str in result['time']:
+            assert len(time_str) == 14  # "YY-MM-DD HH:MM" format
+            assert time_str[2] == '-'
+            assert time_str[5] == '-'
+            assert time_str[8] == ' '
+            assert time_str[11] == ':'
+
+    def test_mock_data_ohlc_values_valid(self, api_client):
+        """Test that OHLC values are realistic (high >= low, etc.)."""
+        result = api_client._generate_mock_candles("EUR_USD", "H1", 100)
+
+        for i in range(len(result['time'])):
+            high = result['mid_h'][i]
+            low = result['mid_l'][i]
+            open_val = result['mid_o'][i]
+            close_val = result['mid_c'][i]
+
+            assert high >= low, f"High ({high}) should be >= Low ({low})"
+            assert high >= open_val, f"High ({high}) should be >= Open ({open_val})"
+            assert high >= close_val, f"High ({high}) should be >= Close ({close_val})"
+            assert low <= open_val, f"Low ({low}) should be <= Open ({open_val})"
+            assert low <= close_val, f"Low ({low}) should be <= Close ({close_val})"
+
+    def test_mock_data_consistent_for_same_pair(self, api_client):
+        """Test that same pair generates consistent mock data (seeded)."""
+        result1 = api_client._generate_mock_candles("EUR_USD", "H1", 10)
+        result2 = api_client._generate_mock_candles("EUR_USD", "H1", 10)
+
+        # OHLC values should be the same due to seeded random
+        assert result1['mid_o'] == result2['mid_o']
+        assert result1['mid_h'] == result2['mid_h']
+        assert result1['mid_l'] == result2['mid_l']
+        assert result1['mid_c'] == result2['mid_c']
+
+    def test_mock_data_different_for_different_pairs(self, api_client):
+        """Test that different pairs generate different mock data."""
+        result_eur = api_client._generate_mock_candles("EUR_USD", "H1", 10)
+        result_gbp = api_client._generate_mock_candles("GBP_USD", "H1", 10)
+
+        # Different pairs should have different base prices
+        assert result_eur['mid_o'][0] != result_gbp['mid_o'][0]
+
+    @patch('core.openfx_api.OpenFxApi.get_candles_df')
+    def test_fallback_on_api_failure(self, mock_df, api_client):
+        """Test that mock data is used when API fails."""
+        mock_df.return_value = None
+
+        result = api_client.web_api_candles("EUR_USD", "H1", 10)
+
+        # Should return mock data, not an error
+        assert 'error' not in result
+        assert 'time' in result
+        assert 'mid_o' in result
+        assert len(result['time']) == 10
+
+
 class TestAccountEndpoint:
     """Test cases for the /api/account endpoint."""
 

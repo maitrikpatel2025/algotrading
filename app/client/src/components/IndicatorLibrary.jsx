@@ -12,8 +12,10 @@ import {
   Volume2,
   Settings2,
   GripVertical,
+  Shapes,
 } from 'lucide-react';
 import { INDICATORS, INDICATOR_CATEGORIES } from '../app/indicators';
+import { PATTERNS, PATTERN_TYPES } from '../app/patterns';
 
 // localStorage key for category state
 const CATEGORY_STATE_KEY = 'forex_dash_indicator_categories';
@@ -25,7 +27,17 @@ const CATEGORY_ICON_MAP = {
   Volatility: BarChart3,
   Volume: Volume2,
   Custom: Settings2,
+  Patterns: Shapes,
 };
+
+// All categories including Patterns
+const ALL_CATEGORIES = [...INDICATOR_CATEGORIES, 'Patterns'];
+
+// Combine indicators and patterns for unified display
+const ALL_ITEMS = [
+  ...INDICATORS,
+  ...PATTERNS.map(p => ({ ...p, isPattern: true })),
+];
 
 /**
  * IndicatorLibrary Component
@@ -42,7 +54,7 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
   const [expandedCategories, setExpandedCategories] = useState(() => {
     // Initialize with all categories expanded
     const initial = {};
-    INDICATOR_CATEGORIES.forEach(cat => {
+    ALL_CATEGORIES.forEach(cat => {
       initial[cat] = true;
     });
     return initial;
@@ -63,30 +75,30 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
     }
   }, []);
 
-  // Filter indicators based on search term
-  const filteredIndicators = useMemo(() => {
+  // Filter indicators and patterns based on search term
+  const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) {
-      return INDICATORS;
+      return ALL_ITEMS;
     }
     const term = searchTerm.toLowerCase();
-    return INDICATORS.filter(
-      indicator =>
-        indicator.name.toLowerCase().includes(term) ||
-        indicator.shortName.toLowerCase().includes(term) ||
-        indicator.description.toLowerCase().includes(term)
+    return ALL_ITEMS.filter(
+      item =>
+        item.name.toLowerCase().includes(term) ||
+        item.shortName.toLowerCase().includes(term) ||
+        item.description.toLowerCase().includes(term)
     );
   }, [searchTerm]);
 
-  // Group filtered indicators by category
-  const groupedIndicators = useMemo(() => {
+  // Group filtered items by category
+  const groupedItems = useMemo(() => {
     const grouped = {};
-    INDICATOR_CATEGORIES.forEach(category => {
-      grouped[category] = filteredIndicators.filter(
-        indicator => indicator.category === category
+    ALL_CATEGORIES.forEach(category => {
+      grouped[category] = filteredItems.filter(
+        item => item.category === category
       );
     });
     return grouped;
-  }, [filteredIndicators]);
+  }, [filteredItems]);
 
   // Toggle category expand/collapse
   const toggleCategory = useCallback((category) => {
@@ -107,24 +119,32 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
     setSearchTerm('');
   }, []);
 
-  // Handle indicator click (for future use)
-  const handleIndicatorClick = useCallback((indicator) => {
+  // Handle item click (for future use)
+  const handleItemClick = useCallback((item) => {
     if (onIndicatorSelect) {
-      onIndicatorSelect(indicator);
+      onIndicatorSelect(item);
     }
   }, [onIndicatorSelect]);
 
   // Handle drag start
-  const handleDragStart = useCallback((e, indicator) => {
-    setDraggingIndicator(indicator.id);
+  const handleDragStart = useCallback((e, item) => {
+    setDraggingIndicator(item.id);
 
-    // Set drag data
-    e.dataTransfer.setData('application/json', JSON.stringify(indicator));
+    // Set drag data - include isPattern flag for patterns
+    e.dataTransfer.setData('application/json', JSON.stringify(item));
     e.dataTransfer.effectAllowed = 'copy';
 
     // Create custom drag image
     if (dragImageRef.current) {
-      dragImageRef.current.textContent = indicator.shortName;
+      dragImageRef.current.textContent = item.shortName;
+      // Color the drag image based on pattern type
+      if (item.isPattern) {
+        dragImageRef.current.style.backgroundColor =
+          item.patternType === PATTERN_TYPES.BULLISH ? '#22C55E' :
+          item.patternType === PATTERN_TYPES.BEARISH ? '#EF4444' : '#6B7280';
+      } else {
+        dragImageRef.current.style.backgroundColor = '';
+      }
       dragImageRef.current.style.display = 'block';
       e.dataTransfer.setDragImage(dragImageRef.current, 30, 15);
       // Hide it after drag starts
@@ -177,7 +197,7 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
       >
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
         <div className="mt-4 flex flex-col items-center gap-3">
-          {INDICATOR_CATEGORIES.slice(0, 4).map(category => {
+          {ALL_CATEGORIES.slice(0, 5).map(category => {
             const IconComponent = CATEGORY_ICON_MAP[category];
             return (
               <div
@@ -260,11 +280,11 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
         style={{ display: 'none' }}
       />
 
-      {/* Categories and Indicators */}
+      {/* Categories and Items (Indicators + Patterns) */}
       <div className="flex-1 overflow-y-auto">
-        {filteredIndicators.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
-            No indicators match '{searchTerm}'
+            No indicators or patterns match '{searchTerm}'
             <button
               type="button"
               onClick={handleClearSearch}
@@ -274,13 +294,13 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
             </button>
           </div>
         ) : (
-          INDICATOR_CATEGORIES.map(category => {
-            const categoryIndicators = groupedIndicators[category];
+          ALL_CATEGORIES.map(category => {
+            const categoryItems = groupedItems[category];
             const IconComponent = CATEGORY_ICON_MAP[category];
             const isExpanded = expandedCategories[category];
 
             // Hide empty categories when searching
-            if (categoryIndicators.length === 0) return null;
+            if (categoryItems.length === 0) return null;
 
             return (
               <div key={category} className="border-b border-border last:border-b-0">
@@ -301,7 +321,7 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
                     <IconComponent className="h-4 w-4 text-muted-foreground" />
                     <span>{category}</span>
                     <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                      {categoryIndicators.length}
+                      {categoryItems.length}
                     </span>
                   </div>
                   <ChevronDown
@@ -321,14 +341,14 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
                   )}
                 >
                   <div className="pb-2">
-                    {categoryIndicators.map(indicator => (
+                    {categoryItems.map(item => (
                       <button
-                        key={indicator.id}
+                        key={item.id}
                         type="button"
                         draggable="true"
-                        onDragStart={(e) => handleDragStart(e, indicator)}
+                        onDragStart={(e) => handleDragStart(e, item)}
                         onDragEnd={handleDragEnd}
-                        onClick={() => handleIndicatorClick(indicator)}
+                        onClick={() => handleItemClick(item)}
                         className={cn(
                           "flex items-center gap-2 w-full px-4 py-2.5",
                           "text-sm text-foreground text-left",
@@ -336,16 +356,24 @@ function IndicatorLibrary({ isCollapsed, onToggleCollapse, onIndicatorSelect }) 
                           "hover:bg-muted/50 transition-colors",
                           "focus:outline-none focus:bg-muted/50",
                           "group cursor-grab active:cursor-grabbing",
-                          draggingIndicator === indicator.id && "opacity-50"
+                          draggingIndicator === item.id && "opacity-50"
                         )}
-                        title={`${indicator.name}\n\n${indicator.description}\n\nDrag to add to chart`}
+                        title={`${item.name}\n\n${item.description}\n\nDrag to add to chart`}
                       >
                         <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        {/* Pattern type indicator (colored dot) */}
+                        {item.isPattern && (
+                          <span
+                            className="h-2 w-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: item.color }}
+                            title={item.patternType}
+                          />
+                        )}
                         <div className="flex-1 truncate">
                           {searchTerm ? (
-                            highlightMatch(indicator.shortName, searchTerm)
+                            highlightMatch(item.shortName, searchTerm)
                           ) : (
-                            indicator.shortName
+                            item.shortName
                           )}
                         </div>
                       </button>

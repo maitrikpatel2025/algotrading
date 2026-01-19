@@ -183,3 +183,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting indicator parameter validation or color picker issues
     - When extending candle count options for long-period indicators
     - When modifying how indicator parameters are passed to chart rendering
+
+- app_docs/feature-ec8c6210-drag-pattern-recognition-chart.md
+  - Conditions:
+    - When working with candlestick pattern recognition or detection
+    - When implementing or modifying the patterns.js or patternDetection.js files
+    - When adding new candlestick patterns to the library
+    - When working with pattern markers on the price chart
+    - When implementing pattern-based trading conditions
+    - When troubleshooting pattern detection algorithms or reliability scores
+    - When extending the Patterns category in the IndicatorLibrary
+    - When working with pattern drop handling or pattern state management
