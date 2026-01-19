@@ -3,6 +3,7 @@ import endPoints from '../app/api';
 import { COUNTS, calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
 import Button from '../components/Button';
 import PriceChart from '../components/PriceChart';
+import PairSelector from '../components/PairSelector';
 import Select from '../components/Select';
 import Technicals from '../components/Technicals';
 import { Play, RefreshCw, BarChart3, AlertTriangle, Info } from 'lucide-react';
@@ -239,13 +240,12 @@ function Strategy() {
         <div className="flex flex-col md:flex-row items-start md:items-end gap-4 flex-wrap">
           {/* Pair & Granularity Selectors */}
           <div className="flex flex-wrap items-end gap-4">
-            <Select
-              name="Currency"
-              title="Currency Pair"
+            <PairSelector
               options={options.pairs}
               defaultValue={selectedPair}
               onSelected={setSelectedPair}
-              className="w-40"
+              hasLoadedData={!!(technicalsData || priceData)}
+              className="w-48"
             />
             <Select
               name="Granularity"

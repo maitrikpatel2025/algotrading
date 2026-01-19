@@ -295,3 +295,17 @@ class BotControlResponse(BaseModel):
     status: Literal["running", "stopped", "starting", "stopping", "error"]
     pid: Optional[int] = None
     error: Optional[str] = None
+
+
+# =============================================================================
+# Spread Data Models
+# =============================================================================
+
+class SpreadResponse(BaseModel):
+    """Spread data response for a currency pair."""
+    pair: str = Field(..., description="Currency pair (e.g., 'EUR_USD')")
+    spread: Optional[float] = Field(None, description="Spread in pips")
+    bid: Optional[float] = Field(None, description="Current bid price")
+    ask: Optional[float] = Field(None, description="Current ask price")
+    timestamp: Optional[datetime] = Field(None, description="Price timestamp")
+    error: Optional[str] = Field(None, description="Error message if fetch failed")

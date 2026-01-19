@@ -33,6 +33,7 @@ from core.data_models import (
     HeadlinesResponse,
     HealthCheckResponse,
     OpenTradesResponse,
+    SpreadResponse,
     TradeHistoryItem,
     TradeHistoryResponse,
     TradeInfo,
@@ -560,6 +561,68 @@ async def options():
     except Exception as e:
         logger.error(f"[ERROR] Options fetch failed: {str(e)}")
         return TradingOptionsResponse(error=str(e))
+
+
+@app.get("/api/spread/{pair}", response_model=SpreadResponse, tags=["Price Data"])
+async def spread(pair: str):
+    """
+    Get current spread data for a currency pair.
+
+    Args:
+        pair: Currency pair (e.g., 'EUR_USD')
+
+    Returns:
+        JSON object with spread in pips, bid/ask prices, and timestamp
+    """
+    try:
+        # Validate pair exists in available options
+        available_pairs = list(settings.INVESTING_COM_PAIRS.keys())
+        if pair not in available_pairs:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Currency pair '{pair}' not found in available instruments"
+            )
+
+        # Get price data (API expects pair without underscore)
+        symbol = pair.replace('_', '')
+        prices = api.get_prices([symbol])
+
+        if prices is None or len(prices) == 0:
+            logger.warning(f"[WARNING] Could not fetch price for {pair}")
+            return SpreadResponse(
+                pair=pair,
+                error="Unable to fetch current price data"
+            )
+
+        price = prices[0]
+
+        # Calculate spread in pips
+        # JPY pairs have pip at 0.01, others at 0.0001
+        is_jpy_pair = 'JPY' in pair
+        pip_multiplier = 100 if is_jpy_pair else 10000
+
+        raw_spread = abs(price.ask - price.bid)
+        spread_pips = round(raw_spread * pip_multiplier, 2)
+
+        response = SpreadResponse(
+            pair=pair,
+            spread=spread_pips,
+            bid=price.bid,
+            ask=price.ask,
+            timestamp=price.time
+        )
+        logger.info(f"[SUCCESS] Spread fetched for {pair}: {spread_pips} pips")
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Spread fetch failed for {pair}: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return SpreadResponse(
+            pair=pair,
+            error=str(e)
+        )
 
 
 @app.get("/api/technicals/{pair}/{timeframe}", tags=["Technical Analysis"])
