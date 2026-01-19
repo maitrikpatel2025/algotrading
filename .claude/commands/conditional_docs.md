@@ -100,3 +100,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting chart interaction issues (keyboard focus, zoom limits)
     - When optimizing chart performance with requestAnimationFrame or Plotly transitions
     - When implementing plotly_relayout event handlers or custom chart events
+
+- app_docs/feature-085c8952-timeframe-selector-persistence.md
+  - Conditions:
+    - When working with timeframe selection or granularity options
+    - When implementing or modifying localStorage persistence for user preferences
+    - When adding new timeframe options (M1, M5, M15, M30, H1, H4, D, W1)
+    - When working with the Strategy page timeframe dropdown
+    - When implementing debounced API calls or zoom context preservation
+    - When troubleshooting timeframe persistence or validation issues
+    - When modifying the Select component active state styling
