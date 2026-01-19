@@ -194,3 +194,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting pattern detection algorithms or reliability scores
     - When extending the Patterns category in the IndicatorLibrary
     - When working with pattern drop handling or pattern state management
+
+- app_docs/feature-32ef6eda-indicator-click-configuration.md
+  - Conditions:
+    - When implementing or modifying indicator click event handling
+    - When working with Plotly click events (plotly_click) on chart traces
+    - When implementing context menus for chart elements
+    - When adding right-click functionality to indicators
+    - When working with indicator trace metadata (customdata, meta fields)
+    - When implementing indicator duplication functionality
+    - When troubleshooting indicator click detection or hit-testing issues
+    - When working with viewport-aware positioning for overlays or menus
+    - When implementing click-to-configure patterns for chart elements
