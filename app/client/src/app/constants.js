@@ -58,3 +58,18 @@ export const LOGIC_PANEL_WIDTH_KEY = 'forex_dash_logic_panel_width';
 export const LOGIC_PANEL_MIN_WIDTH = 200;
 export const LOGIC_PANEL_MAX_WIDTH = 480;
 export const LOGIC_PANEL_DEFAULT_WIDTH = 288; // w-72 = 18rem = 288px
+
+// Candle Close Confirmation Constants
+export const CANDLE_CLOSE_CONFIRMATION = {
+  YES: 'yes',
+  NO: 'no',
+};
+
+export const CANDLE_CLOSE_CONFIRMATION_LABELS = {
+  [CANDLE_CLOSE_CONFIRMATION.YES]: 'Yes - Wait for close',
+  [CANDLE_CLOSE_CONFIRMATION.NO]: 'No - Real-time',
+};
+
+export const CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY = 'forex_dash_candle_close_confirmation';
+export const CANDLE_CLOSE_CONFIRMATION_DEFAULT = CANDLE_CLOSE_CONFIRMATION.YES;
+export const CANDLE_CLOSE_CONFIRMATION_TOOLTIP = 'Waiting for candle close reduces false signals but may delay entries';

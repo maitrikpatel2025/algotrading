@@ -11,13 +11,14 @@ import LogicPanel from '../components/LogicPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
 import TradeDirectionSelector from '../components/TradeDirectionSelector';
+import CandleCloseToggle from '../components/CandleCloseToggle';
 import { cn } from '../lib/utils';
-import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
 import { createConditionFromIndicator, createConditionFromPattern, createStandaloneCondition, CONDITION_SECTIONS_V2, getDefaultSection, migrateSectionToV2 } from '../app/conditionDefaults';
-import { TRADE_DIRECTIONS, TRADE_DIRECTION_STORAGE_KEY } from '../app/constants';
+import { TRADE_DIRECTIONS, TRADE_DIRECTION_STORAGE_KEY, CANDLE_CLOSE_CONFIRMATION, CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY, CANDLE_CLOSE_CONFIRMATION_DEFAULT } from '../app/constants';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
@@ -76,6 +77,18 @@ function Strategy() {
         : TRADE_DIRECTIONS.BOTH;
     } catch {
       return TRADE_DIRECTIONS.BOTH;
+    }
+  });
+
+  // Candle close confirmation state management
+  const [confirmOnCandleClose, setConfirmOnCandleClose] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY);
+      return stored && Object.values(CANDLE_CLOSE_CONFIRMATION).includes(stored)
+        ? stored
+        : CANDLE_CLOSE_CONFIRMATION_DEFAULT;
+    } catch {
+      return CANDLE_CLOSE_CONFIRMATION_DEFAULT;
     }
   });
 
@@ -741,6 +754,12 @@ function Strategy() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conditions]);
 
+  // Handle candle close confirmation change
+  const handleCandleCloseChange = useCallback((newValue) => {
+    setConfirmOnCandleClose(newValue);
+    localStorage.setItem(CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY, newValue);
+  }, []);
+
   // Handle hover for visual connections
   const handleIndicatorHover = useCallback((instanceId) => {
     setHighlightedIndicatorId(instanceId);
@@ -957,6 +976,12 @@ function Strategy() {
               onChange={handleTradeDirectionChange}
             />
 
+            {/* Candle Close Confirmation Toggle */}
+            <CandleCloseToggle
+              value={confirmOnCandleClose}
+              onChange={handleCandleCloseChange}
+            />
+
             {/* Load Button */}
             <Button
               text={loadingData ? "Loading..." : "Load Data"}
@@ -970,12 +995,27 @@ function Strategy() {
           {/* Selected Info Badge */}
           {selectedPair && selectedGran && (
             <div className="mt-6 pt-6 border-t border-border">
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <BarChart3 className="h-4 w-4" />
-                <span>
-                  Analyzing <span className="font-semibold text-foreground">{selectedPair}</span> on{' '}
-                  <span className="font-semibold text-foreground">{selectedGran}</span> timeframe
-                </span>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span>
+                    Analyzing <span className="font-semibold text-foreground">{selectedPair}</span> on{' '}
+                    <span className="font-semibold text-foreground">{selectedGran}</span> timeframe
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {confirmOnCandleClose === CANDLE_CLOSE_CONFIRMATION.YES ? (
+                    <>
+                      <Clock className="h-4 w-4 text-blue-500" />
+                      <span>Signals confirmed on candle close</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 text-amber-500" />
+                      <span>Real-time signal evaluation</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}

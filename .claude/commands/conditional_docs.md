@@ -281,3 +281,12 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing percentage value inputs for conditions
     - When troubleshooting out-of-bounds validation warnings
     - When extending buildOperandOptions with new operand types
+
+- app_docs/feature-d3028e00-candle-close-confirmation.md
+  - Conditions:
+    - When working with candle close confirmation or signal timing settings
+    - When implementing or modifying the CandleCloseToggle component
+    - When working with entry condition evaluation timing
+    - When adding new strategy configuration toggles to the Controls Card
+    - When troubleshooting localStorage persistence for strategy settings
+    - When implementing real-time vs candle-based signal evaluation
