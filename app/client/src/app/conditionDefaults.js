@@ -3,7 +3,10 @@
  *
  * Defines comparison operators, price sources, and condition templates
  * for the Logic Panel's trading condition system.
+ * Also includes group-related functions for AND/OR logic.
  */
+
+import { GROUP_OPERATORS, MAX_NESTING_DEPTH } from './constants';
 
 /**
  * Comparison operators for conditions
@@ -816,4 +819,661 @@ export function getOperandBounds(operand, activeIndicators, indicatorDefinitions
   // Get the indicator ID and look up bounds
   const indicatorId = operand.indicatorId || indicatorInstance.id;
   return getIndicatorBounds(indicatorId, indicatorDefinitions);
+}
+
+// =============================================================================
+// GROUP FUNCTIONS - AND/OR Logic Support
+// =============================================================================
+
+/**
+ * Generate a unique group ID
+ * @returns {string} Unique group ID
+ */
+export function generateGroupId() {
+  return `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Create a condition group with AND/OR operator
+ * @param {string} operator - 'and' or 'or'
+ * @param {string} section - The section for this group (V2 format)
+ * @param {Array<string>} conditionIds - Array of condition IDs to include in the group
+ * @param {string|null} parentGroupId - ID of parent group for nested groups
+ * @returns {Object} A new condition group object
+ */
+export function createConditionGroup(operator = GROUP_OPERATORS.AND, section, conditionIds = [], parentGroupId = null) {
+  const resolvedSection = migrateSectionToV2(section);
+
+  return {
+    id: generateGroupId(),
+    type: 'group',
+    operator: operator,
+    conditionIds: [...conditionIds], // Array of condition IDs in this group
+    section: resolvedSection,
+    parentGroupId: parentGroupId,
+    createdAt: Date.now(),
+  };
+}
+
+/**
+ * Check if an item is a condition group
+ * @param {Object} item - The item to check
+ * @returns {boolean} True if the item is a group
+ */
+export function isConditionGroup(item) {
+  return item && item.type === 'group' && item.id && item.id.startsWith('group-');
+}
+
+/**
+ * Get the depth of a group in the nesting hierarchy
+ * @param {string} groupId - The group ID to check
+ * @param {Array} groups - All groups in the system
+ * @returns {number} The nesting depth (0 = root level)
+ */
+export function getGroupDepth(groupId, groups) {
+  if (!groupId || !groups || groups.length === 0) {
+    return 0;
+  }
+
+  const group = groups.find(g => g.id === groupId);
+  if (!group) {
+    return 0;
+  }
+
+  if (!group.parentGroupId) {
+    return 0;
+  }
+
+  return 1 + getGroupDepth(group.parentGroupId, groups);
+}
+
+/**
+ * Check if a new subgroup can be added to a group (respects MAX_NESTING_DEPTH)
+ * @param {string} groupId - The parent group ID
+ * @param {Array} groups - All groups in the system
+ * @returns {boolean} True if adding a subgroup is allowed
+ */
+export function canAddToGroup(groupId, groups) {
+  const currentDepth = getGroupDepth(groupId, groups);
+  return currentDepth < MAX_NESTING_DEPTH - 1;
+}
+
+/**
+ * Validate the integrity of the group structure
+ * @param {Array} groups - All groups to validate
+ * @param {Array} conditions - All conditions to validate against
+ * @returns {Object} Validation result { isValid: boolean, errors: string[] }
+ */
+export function validateGroupStructure(groups, conditions) {
+  const errors = [];
+  const conditionIdSet = new Set(conditions.map(c => c.id));
+  const groupIdSet = new Set(groups.map(g => g.id));
+
+  groups.forEach(group => {
+    // Check for invalid condition references
+    group.conditionIds.forEach(condId => {
+      if (!conditionIdSet.has(condId) && !groupIdSet.has(condId)) {
+        errors.push(`Group ${group.id} references non-existent condition/group: ${condId}`);
+      }
+    });
+
+    // Check for invalid parent reference
+    if (group.parentGroupId && !groupIdSet.has(group.parentGroupId)) {
+      errors.push(`Group ${group.id} references non-existent parent: ${group.parentGroupId}`);
+    }
+
+    // Check for circular references
+    if (group.parentGroupId) {
+      const visited = new Set([group.id]);
+      let parentId = group.parentGroupId;
+      let hasCircular = false;
+
+      // Use a max iteration count to prevent infinite loops
+      for (let i = 0; i < groups.length && parentId; i++) {
+        if (visited.has(parentId)) {
+          hasCircular = true;
+          break;
+        }
+        visited.add(parentId);
+        const parentGroup = groups.find(g => g.id === parentId);
+        parentId = parentGroup?.parentGroupId;
+      }
+
+      if (hasCircular) {
+        errors.push(`Circular reference detected in group ${group.id}`);
+      }
+    }
+
+    // Check for exceeding max depth
+    const depth = getGroupDepth(group.id, groups);
+    if (depth >= MAX_NESTING_DEPTH) {
+      errors.push(`Group ${group.id} exceeds maximum nesting depth of ${MAX_NESTING_DEPTH}`);
+    }
+  });
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Extract all condition IDs from a group, including nested groups
+ * @param {Object} group - The group to flatten
+ * @param {Array} groups - All groups (for resolving nested groups)
+ * @returns {Array<string>} Array of condition IDs
+ */
+export function flattenGroupToConditions(group, groups) {
+  if (!group || !group.conditionIds) {
+    return [];
+  }
+
+  const result = [];
+  group.conditionIds.forEach(itemId => {
+    const nestedGroup = groups.find(g => g.id === itemId);
+    if (nestedGroup) {
+      result.push(...flattenGroupToConditions(nestedGroup, groups));
+    } else {
+      result.push(itemId);
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Build a logic tree structure for display
+ * @param {Array} conditions - All conditions
+ * @param {Array} groups - All groups
+ * @param {string} section - The section to build tree for
+ * @returns {Object} Tree structure for rendering
+ */
+export function buildLogicTree(conditions, groups, section) {
+  const sectionConditions = conditions.filter(c => migrateSectionToV2(c.section) === section);
+  const sectionGroups = groups.filter(g => g.section === section && !g.parentGroupId);
+
+  // Get IDs of conditions that are in groups
+  const groupedConditionIds = new Set();
+  groups.forEach(group => {
+    group.conditionIds.forEach(id => groupedConditionIds.add(id));
+  });
+
+  // Ungrouped conditions (root level)
+  const ungroupedConditions = sectionConditions.filter(c => !groupedConditionIds.has(c.id));
+
+  // Build tree structure
+  const buildGroupNode = (group) => {
+    const children = group.conditionIds.map(itemId => {
+      const nestedGroup = groups.find(g => g.id === itemId);
+      if (nestedGroup) {
+        return buildGroupNode(nestedGroup);
+      }
+      const condition = conditions.find(c => c.id === itemId);
+      return condition ? { type: 'condition', data: condition } : null;
+    }).filter(Boolean);
+
+    return {
+      type: 'group',
+      data: group,
+      operator: group.operator,
+      children,
+    };
+  };
+
+  const rootNodes = [
+    ...sectionGroups.map(buildGroupNode),
+    ...ungroupedConditions.map(c => ({ type: 'condition', data: c })),
+  ];
+
+  return {
+    section,
+    children: rootNodes,
+  };
+}
+
+/**
+ * Get conditions that belong to a specific group
+ * @param {string} groupId - The group ID
+ * @param {Array} groups - All groups
+ * @param {Array} conditions - All conditions
+ * @returns {Array} Conditions in the group
+ */
+export function getConditionsInGroup(groupId, groups, conditions) {
+  const group = groups.find(g => g.id === groupId);
+  if (!group) {
+    return [];
+  }
+
+  return group.conditionIds
+    .map(id => conditions.find(c => c.id === id))
+    .filter(Boolean);
+}
+
+/**
+ * Check if a condition is inside any group
+ * @param {string} conditionId - The condition ID to check
+ * @param {Array} groups - All groups
+ * @returns {Object|null} The parent group if found, null otherwise
+ */
+export function getConditionParentGroup(conditionId, groups) {
+  return groups.find(g => g.conditionIds.includes(conditionId)) || null;
+}
+
+/**
+ * Remove a condition from its parent group
+ * @param {string} conditionId - The condition ID to remove
+ * @param {Array} groups - All groups (will be mutated)
+ * @returns {Array} Updated groups array
+ */
+export function removeConditionFromGroup(conditionId, groups) {
+  return groups.map(group => {
+    if (group.conditionIds.includes(conditionId)) {
+      return {
+        ...group,
+        conditionIds: group.conditionIds.filter(id => id !== conditionId),
+      };
+    }
+    return group;
+  });
+}
+
+/**
+ * Add a condition to a group
+ * @param {string} conditionId - The condition ID to add
+ * @param {string} groupId - The target group ID
+ * @param {Array} groups - All groups
+ * @param {number} index - Optional index to insert at
+ * @returns {Array} Updated groups array
+ */
+export function addConditionToGroup(conditionId, groupId, groups, index = -1) {
+  return groups.map(group => {
+    if (group.id === groupId) {
+      const newConditionIds = [...group.conditionIds];
+      if (index >= 0 && index < newConditionIds.length) {
+        newConditionIds.splice(index, 0, conditionId);
+      } else {
+        newConditionIds.push(conditionId);
+      }
+      return {
+        ...group,
+        conditionIds: newConditionIds,
+      };
+    }
+    return group;
+  });
+}
+
+/**
+ * Move a condition within a group to a new index
+ * @param {string} conditionId - The condition ID to move
+ * @param {string} groupId - The group ID
+ * @param {number} newIndex - The new index
+ * @param {Array} groups - All groups
+ * @returns {Array} Updated groups array
+ */
+export function reorderConditionInGroup(conditionId, groupId, newIndex, groups) {
+  return groups.map(group => {
+    if (group.id === groupId) {
+      const newConditionIds = [...group.conditionIds];
+      const currentIndex = newConditionIds.indexOf(conditionId);
+      if (currentIndex !== -1) {
+        newConditionIds.splice(currentIndex, 1);
+        newConditionIds.splice(newIndex, 0, conditionId);
+      }
+      return {
+        ...group,
+        conditionIds: newConditionIds,
+      };
+    }
+    return group;
+  });
+}
+
+// =============================================================================
+// EVALUATION FUNCTIONS - Test Logic Support
+// =============================================================================
+
+/**
+ * Get the current value for an operand
+ * @param {Object} operand - The operand (price, indicator, value, pattern)
+ * @param {Object} candleData - Current candle data { open, high, low, close, time }
+ * @param {Object} indicatorValues - Map of indicator instanceId -> current value
+ * @param {Object} patternDetections - Map of pattern instanceId -> boolean (detected)
+ * @returns {number|boolean|null} The current value, or null if unavailable
+ */
+export function getOperandValue(operand, candleData, indicatorValues, patternDetections) {
+  if (!operand) return null;
+
+  switch (operand.type) {
+    case 'price':
+      if (!candleData) return null;
+      switch (operand.value) {
+        case 'open': return candleData.open;
+        case 'high': return candleData.high;
+        case 'low': return candleData.low;
+        case 'close': return candleData.close;
+        default: return candleData.close;
+      }
+
+    case 'indicator':
+      if (!indicatorValues) return null;
+      const instanceId = operand.instanceId;
+      const component = operand.component;
+      const indicatorData = indicatorValues[instanceId];
+      if (!indicatorData) return null;
+      if (component && typeof indicatorData === 'object') {
+        return indicatorData[component] ?? null;
+      }
+      return typeof indicatorData === 'object' ? indicatorData.value : indicatorData;
+
+    case 'value':
+      return operand.value;
+
+    case 'percentage':
+      return operand.value;
+
+    case 'pattern':
+      if (!patternDetections) return null;
+      return patternDetections[operand.instanceId] ?? false;
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Compare two values using the specified operator
+ * @param {number} left - Left value
+ * @param {string} operator - The operator ID
+ * @param {number} right - Right value
+ * @param {number} rightMax - Optional max value for 'is_between' operator
+ * @param {Object} previousValues - Previous candle values for 'crosses' operators
+ * @returns {boolean} The comparison result
+ */
+export function compareValues(left, operator, right, rightMax = null, previousValues = null) {
+  if (left === null || left === undefined) return false;
+
+  switch (operator) {
+    case 'is_above':
+      return right !== null && left > right;
+
+    case 'is_below':
+      return right !== null && left < right;
+
+    case 'is_greater_or_equal':
+      return right !== null && left >= right;
+
+    case 'is_less_or_equal':
+      return right !== null && left <= right;
+
+    case 'equals':
+      return right !== null && left === right;
+
+    case 'is_between':
+      return right !== null && rightMax !== null && left >= right && left <= rightMax;
+
+    case 'crosses_above':
+      if (!previousValues || right === null) return false;
+      return previousValues.left <= right && left > right;
+
+    case 'crosses_below':
+      if (!previousValues || right === null) return false;
+      return previousValues.left >= right && left < right;
+
+    case 'is_detected':
+      // For patterns, left should be a boolean
+      return left === true;
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Evaluate a single condition against current data
+ * @param {Object} condition - The condition to evaluate
+ * @param {Object} candleData - Current candle data
+ * @param {Object} indicatorValues - Map of indicator values
+ * @param {Object} patternDetections - Map of pattern detections
+ * @param {Object} previousCandleData - Previous candle data for crosses operators
+ * @param {Object} previousIndicatorValues - Previous indicator values for crosses operators
+ * @returns {Object} Evaluation result { result: boolean, leftValue, rightValue, details }
+ */
+export function evaluateCondition(
+  condition,
+  candleData,
+  indicatorValues,
+  patternDetections,
+  previousCandleData = null,
+  previousIndicatorValues = null
+) {
+  if (!condition) {
+    return { result: false, error: 'No condition provided' };
+  }
+
+  // Handle pattern conditions
+  if (condition.isPatternCondition || condition.leftOperand?.type === 'pattern') {
+    const instanceId = condition.patternInstanceId || condition.leftOperand?.instanceId;
+    const detected = patternDetections?.[instanceId] ?? false;
+    return {
+      result: detected,
+      leftValue: detected,
+      rightValue: null,
+      details: {
+        conditionId: condition.id,
+        operator: 'is_detected',
+        passed: detected,
+      },
+    };
+  }
+
+  // Get left operand value
+  const leftValue = getOperandValue(condition.leftOperand, candleData, indicatorValues, patternDetections);
+
+  // Get right operand value
+  const rightValue = getOperandValue(condition.rightOperand, candleData, indicatorValues, patternDetections);
+
+  // For range conditions, get max value too
+  const rightMaxValue = condition.rightOperandMax
+    ? getOperandValue(condition.rightOperandMax, candleData, indicatorValues, patternDetections)
+    : null;
+
+  // For crosses operators, get previous values
+  let previousValues = null;
+  if (condition.operator === 'crosses_above' || condition.operator === 'crosses_below') {
+    const prevLeft = getOperandValue(condition.leftOperand, previousCandleData, previousIndicatorValues, patternDetections);
+    const prevRight = getOperandValue(condition.rightOperand, previousCandleData, previousIndicatorValues, patternDetections);
+    if (prevLeft !== null && prevRight !== null) {
+      previousValues = { left: prevLeft, right: prevRight };
+    }
+  }
+
+  // Compare values
+  const result = compareValues(leftValue, condition.operator, rightValue, rightMaxValue, previousValues);
+
+  return {
+    result,
+    leftValue,
+    rightValue,
+    rightMaxValue,
+    details: {
+      conditionId: condition.id,
+      operator: condition.operator,
+      passed: result,
+      leftLabel: condition.leftOperand?.label,
+      rightLabel: condition.rightOperand?.label,
+    },
+  };
+}
+
+/**
+ * Evaluate a group of conditions with AND/OR logic
+ * @param {Object} group - The group to evaluate
+ * @param {Array} conditions - All conditions
+ * @param {Array} groups - All groups (for nested groups)
+ * @param {Object} candleData - Current candle data
+ * @param {Object} indicatorValues - Map of indicator values
+ * @param {Object} patternDetections - Map of pattern detections
+ * @param {Object} previousCandleData - Previous candle data
+ * @param {Object} previousIndicatorValues - Previous indicator values
+ * @returns {Object} Evaluation result { result: boolean, childResults: [] }
+ */
+export function evaluateGroup(
+  group,
+  conditions,
+  groups,
+  candleData,
+  indicatorValues,
+  patternDetections,
+  previousCandleData = null,
+  previousIndicatorValues = null
+) {
+  if (!group || !group.conditionIds || group.conditionIds.length === 0) {
+    return { result: false, childResults: [], error: 'Empty group' };
+  }
+
+  const childResults = [];
+  const operator = group.operator || GROUP_OPERATORS.AND;
+
+  for (const itemId of group.conditionIds) {
+    // Check if itemId is a nested group
+    const nestedGroup = groups.find(g => g.id === itemId);
+    if (nestedGroup) {
+      const nestedResult = evaluateGroup(
+        nestedGroup,
+        conditions,
+        groups,
+        candleData,
+        indicatorValues,
+        patternDetections,
+        previousCandleData,
+        previousIndicatorValues
+      );
+      childResults.push({
+        type: 'group',
+        id: itemId,
+        ...nestedResult,
+      });
+    } else {
+      // It's a condition
+      const condition = conditions.find(c => c.id === itemId);
+      if (condition) {
+        const conditionResult = evaluateCondition(
+          condition,
+          candleData,
+          indicatorValues,
+          patternDetections,
+          previousCandleData,
+          previousIndicatorValues
+        );
+        childResults.push({
+          type: 'condition',
+          id: itemId,
+          ...conditionResult,
+        });
+      }
+    }
+  }
+
+  // Compute group result based on operator
+  let groupResult;
+  if (operator === GROUP_OPERATORS.AND) {
+    groupResult = childResults.every(r => r.result);
+  } else {
+    // OR
+    groupResult = childResults.some(r => r.result);
+  }
+
+  return {
+    result: groupResult,
+    operator,
+    childResults,
+  };
+}
+
+/**
+ * Evaluate all conditions in a section (entry point for Test Logic)
+ * @param {string} section - The section to evaluate
+ * @param {Array} conditions - All conditions
+ * @param {Array} groups - All groups
+ * @param {Object} candleData - Current candle data
+ * @param {Object} indicatorValues - Map of indicator values
+ * @param {Object} patternDetections - Map of pattern detections
+ * @param {Object} previousCandleData - Previous candle data
+ * @param {Object} previousIndicatorValues - Previous indicator values
+ * @returns {Object} Full evaluation result
+ */
+export function evaluateLogic(
+  section,
+  conditions,
+  groups,
+  candleData,
+  indicatorValues,
+  patternDetections,
+  previousCandleData = null,
+  previousIndicatorValues = null
+) {
+  const sectionConditions = conditions.filter(c => migrateSectionToV2(c.section) === section);
+  const sectionGroups = groups.filter(g => g.section === section && !g.parentGroupId);
+
+  // Get IDs of conditions that are in groups
+  const groupedConditionIds = new Set();
+  groups.forEach(group => {
+    group.conditionIds.forEach(id => groupedConditionIds.add(id));
+  });
+
+  // Ungrouped conditions
+  const ungroupedConditions = sectionConditions.filter(c => !groupedConditionIds.has(c.id));
+
+  const results = [];
+
+  // Evaluate groups first
+  for (const group of sectionGroups) {
+    const groupResult = evaluateGroup(
+      group,
+      conditions,
+      groups,
+      candleData,
+      indicatorValues,
+      patternDetections,
+      previousCandleData,
+      previousIndicatorValues
+    );
+    results.push({
+      type: 'group',
+      id: group.id,
+      ...groupResult,
+    });
+  }
+
+  // Evaluate ungrouped conditions
+  for (const condition of ungroupedConditions) {
+    const conditionResult = evaluateCondition(
+      condition,
+      candleData,
+      indicatorValues,
+      patternDetections,
+      previousCandleData,
+      previousIndicatorValues
+    );
+    results.push({
+      type: 'condition',
+      id: condition.id,
+      ...conditionResult,
+    });
+  }
+
+  // Overall result: all items must pass (implicit AND at section level for ungrouped conditions)
+  const overallResult = results.every(r => r.result);
+
+  return {
+    section,
+    result: overallResult,
+    itemResults: results,
+    summary: {
+      total: results.length,
+      passed: results.filter(r => r.result).length,
+      failed: results.filter(r => !r.result).length,
+    },
+  };
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import endPoints from '../app/api';
 import { COUNTS, calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
 import Button from '../components/Button';
@@ -17,8 +17,27 @@ import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap }
 import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
-import { createConditionFromIndicator, createConditionFromPattern, createStandaloneCondition, CONDITION_SECTIONS_V2, getDefaultSection, migrateSectionToV2 } from '../app/conditionDefaults';
-import { TRADE_DIRECTIONS, TRADE_DIRECTION_STORAGE_KEY, CANDLE_CLOSE_CONFIRMATION, CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY, CANDLE_CLOSE_CONFIRMATION_DEFAULT } from '../app/constants';
+import {
+  createConditionFromIndicator,
+  createConditionFromPattern,
+  createStandaloneCondition,
+  CONDITION_SECTIONS_V2,
+  getDefaultSection,
+  migrateSectionToV2,
+  createConditionGroup,
+  removeConditionFromGroup,
+  addConditionToGroup,
+  reorderConditionInGroup,
+} from '../app/conditionDefaults';
+import {
+  TRADE_DIRECTIONS,
+  TRADE_DIRECTION_STORAGE_KEY,
+  CANDLE_CLOSE_CONFIRMATION,
+  CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY,
+  CANDLE_CLOSE_CONFIRMATION_DEFAULT,
+  CONDITION_GROUPS_STORAGE_KEY,
+  GROUP_OPERATORS,
+} from '../app/constants';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
@@ -67,6 +86,22 @@ function Strategy() {
   // Condition state management
   const [conditions, setConditions] = useState([]);
   const [conditionHistory, setConditionHistory] = useState([]);
+
+  // Group state management for AND/OR logic
+  const [groups, setGroups] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CONDITION_GROUPS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
+  // eslint-disable-next-line no-unused-vars
+  const [groupHistory, setGroupHistory] = useState([]);
 
   // Trade direction state management
   const [tradeDirection, setTradeDirection] = useState(() => {
@@ -766,16 +801,199 @@ function Strategy() {
   }, []);
 
   // Handle Add Condition button click from LogicPanel
-  const handleAddCondition = useCallback((section) => {
+  const handleAddCondition = useCallback((section, groupId = null) => {
     // Create a new standalone condition for the specified section
     const newCondition = createStandaloneCondition(section);
 
     // Add to conditions state
     setConditions(prev => [...prev, newCondition]);
 
+    // If groupId is provided, add the condition to the group
+    if (groupId) {
+      setGroups(prev => addConditionToGroup(newCondition.id, groupId, prev));
+    }
+
     // Add to history for undo support
     setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
   }, []);
+
+  // Handle creating a new group from selected conditions
+  const handleGroupCreate = useCallback((conditionIds, operator = GROUP_OPERATORS.AND, section, parentGroupId = null) => {
+    if (conditionIds.length < 2) return;
+
+    const newGroup = createConditionGroup(operator, section, conditionIds, parentGroupId);
+
+    // If this is a nested group, add it to the parent's conditionIds
+    if (parentGroupId) {
+      setGroups(prev => {
+        // Remove the condition IDs from the parent (they're now in the subgroup)
+        const updatedGroups = prev.map(g => {
+          if (g.id === parentGroupId) {
+            const remainingIds = g.conditionIds.filter(id => !conditionIds.includes(id));
+            return {
+              ...g,
+              conditionIds: [...remainingIds, newGroup.id],
+            };
+          }
+          return g;
+        });
+        return [...updatedGroups, newGroup];
+      });
+    } else {
+      setGroups(prev => [...prev, newGroup]);
+    }
+
+    setGroupHistory(prev => [...prev, { type: 'group', item: newGroup }]);
+  }, []);
+
+  // Handle updating a group
+  const handleGroupUpdate = useCallback((groupId, updates) => {
+    setGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, ...updates } : g
+    ));
+  }, []);
+
+  // Handle deleting a group (keeps conditions as ungrouped)
+  const handleGroupDelete = useCallback((groupId) => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    // If this is a nested group, remove it from parent's conditionIds and move its conditions up
+    setGroups(prev => {
+      let updatedGroups = prev.filter(g => g.id !== groupId);
+
+      // If parent exists, add the group's conditions to parent
+      if (group.parentGroupId) {
+        updatedGroups = updatedGroups.map(g => {
+          if (g.id === group.parentGroupId) {
+            // Replace the group ID with its condition IDs
+            const newConditionIds = g.conditionIds.flatMap(id =>
+              id === groupId ? group.conditionIds : [id]
+            );
+            return { ...g, conditionIds: newConditionIds };
+          }
+          return g;
+        });
+      }
+
+      return updatedGroups;
+    });
+  }, [groups]);
+
+  // Handle toggling group operator (AND <-> OR)
+  const handleGroupOperatorChange = useCallback((groupId, newOperator) => {
+    setGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, operator: newOperator } : g
+    ));
+  }, []);
+
+  // Handle ungrouping - flatten conditions back to parent level
+  const handleUngroup = useCallback((groupId) => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    setGroups(prev => {
+      // Remove the group
+      let updatedGroups = prev.filter(g => g.id !== groupId);
+
+      // If this group has a parent, move conditions to parent
+      if (group.parentGroupId) {
+        updatedGroups = updatedGroups.map(g => {
+          if (g.id === group.parentGroupId) {
+            // Replace the group ID with its condition IDs
+            const newConditionIds = g.conditionIds.flatMap(id =>
+              id === groupId ? group.conditionIds : [id]
+            );
+            return { ...g, conditionIds: newConditionIds };
+          }
+          return g;
+        });
+      }
+
+      return updatedGroups;
+    });
+  }, [groups]);
+
+  // Handle reordering condition within or between groups
+  const handleConditionReorderInGroup = useCallback((conditionId, targetGroupId, targetIndex, sourceGroupId) => {
+    setGroups(prev => {
+      let updatedGroups = [...prev];
+
+      // Remove from source group if specified
+      if (sourceGroupId && sourceGroupId !== targetGroupId) {
+        updatedGroups = removeConditionFromGroup(conditionId, updatedGroups);
+      }
+
+      // Add to target group
+      if (sourceGroupId === targetGroupId) {
+        // Reorder within same group
+        updatedGroups = reorderConditionInGroup(conditionId, targetGroupId, targetIndex, updatedGroups);
+      } else {
+        // Moving to different group
+        updatedGroups = addConditionToGroup(conditionId, targetGroupId, updatedGroups, targetIndex);
+      }
+
+      return updatedGroups;
+    });
+  }, []);
+
+  // Handle Test Logic button - prepare data for evaluation
+  const handleTestLogic = useCallback((section) => {
+    // This callback can be used to prepare/refresh data before showing the dialog
+    // The actual evaluation happens in the TestLogicDialog component
+  }, []);
+
+  // Prepare test logic data from current state
+  const testLogicData = useMemo(() => {
+    if (!priceData) return null;
+
+    // Get current candle data (last candle)
+    const lastIndex = priceData.time.length - 1;
+    if (lastIndex < 0) return null;
+
+    const candleData = {
+      open: priceData.mid_o[lastIndex],
+      high: priceData.mid_h[lastIndex],
+      low: priceData.mid_l[lastIndex],
+      close: priceData.mid_c[lastIndex],
+      time: priceData.time[lastIndex],
+    };
+
+    // Get previous candle data
+    const prevIndex = lastIndex - 1;
+    const previousCandleData = prevIndex >= 0 ? {
+      open: priceData.mid_o[prevIndex],
+      high: priceData.mid_h[prevIndex],
+      low: priceData.mid_l[prevIndex],
+      close: priceData.mid_c[prevIndex],
+      time: priceData.time[prevIndex],
+    } : null;
+
+    // Build indicator values map - this would need to be populated from actual indicator calculations
+    // For now, we'll return a placeholder structure
+    const indicatorValues = {};
+    activeIndicators.forEach(indicator => {
+      // Placeholder - actual values would come from indicator calculation
+      indicatorValues[indicator.instanceId] = null;
+    });
+
+    // Build pattern detections map
+    const patternDetections = {};
+    activePatterns.forEach(pattern => {
+      // Check if pattern is detected on the current candle
+      patternDetections[pattern.instanceId] = pattern.detectedPatterns?.some(
+        dp => dp.endIndex === lastIndex
+      ) ?? false;
+    });
+
+    return {
+      candleData,
+      previousCandleData,
+      indicatorValues,
+      patternDetections,
+      previousIndicatorValues: {},
+    };
+  }, [priceData, activeIndicators, activePatterns]);
 
   // Close confirmation dialog
   const closeConfirmDialog = useCallback(() => {
@@ -820,6 +1038,15 @@ function Strategy() {
 
     setIndicatorError(null);
   }, [indicatorHistory, conditionHistory, patternHistory]);
+
+  // Persist groups to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CONDITION_GROUPS_STORAGE_KEY, JSON.stringify(groups));
+    } catch (e) {
+      console.warn('Failed to save groups to localStorage:', e);
+    }
+  }, [groups]);
 
   // Clear indicator error after 5 seconds
   useEffect(() => {
@@ -1170,6 +1397,7 @@ function Strategy() {
       <div className="hidden md:flex flex-shrink-0">
         <LogicPanel
           conditions={conditions}
+          groups={groups}
           activeIndicators={activeIndicators}
           activePatterns={activePatterns}
           getIndicatorDisplayName={getDisplayName}
@@ -1180,6 +1408,14 @@ function Strategy() {
           highlightedIndicatorId={highlightedIndicatorId}
           tradeDirection={tradeDirection}
           onAddCondition={handleAddCondition}
+          onGroupCreate={handleGroupCreate}
+          onGroupUpdate={handleGroupUpdate}
+          onGroupDelete={handleGroupDelete}
+          onGroupOperatorChange={handleGroupOperatorChange}
+          onUngroup={handleUngroup}
+          onConditionReorderInGroup={handleConditionReorderInGroup}
+          onTestLogic={handleTestLogic}
+          testLogicData={testLogicData}
         />
       </div>
 
@@ -1204,6 +1440,7 @@ function Strategy() {
         >
           <LogicPanel
             conditions={conditions}
+            groups={groups}
             activeIndicators={activeIndicators}
             activePatterns={activePatterns}
             getIndicatorDisplayName={getDisplayName}
@@ -1214,6 +1451,14 @@ function Strategy() {
             highlightedIndicatorId={highlightedIndicatorId}
             tradeDirection={tradeDirection}
             onAddCondition={handleAddCondition}
+            onGroupCreate={handleGroupCreate}
+            onGroupUpdate={handleGroupUpdate}
+            onGroupDelete={handleGroupDelete}
+            onGroupOperatorChange={handleGroupOperatorChange}
+            onUngroup={handleUngroup}
+            onConditionReorderInGroup={handleConditionReorderInGroup}
+            onTestLogic={handleTestLogic}
+            testLogicData={testLogicData}
           />
         </div>
       </div>
