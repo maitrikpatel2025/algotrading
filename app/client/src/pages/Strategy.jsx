@@ -11,6 +11,7 @@ import LogicPanel from '../components/LogicPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
 import MultiTimeframeConditionDialog from '../components/MultiTimeframeConditionDialog';
+import TimeFilterDialog from '../components/TimeFilterDialog';
 import TradeDirectionSelector from '../components/TradeDirectionSelector';
 import CandleCloseToggle from '../components/CandleCloseToggle';
 import { cn } from '../lib/utils';
@@ -40,6 +41,8 @@ import {
   CONDITION_GROUPS_STORAGE_KEY,
   GROUP_OPERATORS,
   REFERENCE_INDICATORS_STORAGE_KEY,
+  TIME_FILTER_STORAGE_KEY,
+  DEFAULT_TIME_FILTER,
 } from '../app/constants';
 
 // localStorage keys for persisting preferences
@@ -121,6 +124,21 @@ function Strategy() {
   });
   const [referenceIndicatorValues, setReferenceIndicatorValues] = useState({});
   const [referenceDataLoading, setReferenceDataLoading] = useState(false);
+
+  // Time filter state management
+  const [timeFilter, setTimeFilter] = useState(() => {
+    try {
+      const stored = localStorage.getItem(TIME_FILTER_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed && typeof parsed === 'object' ? parsed : { ...DEFAULT_TIME_FILTER };
+      }
+    } catch {
+      // Ignore
+    }
+    return { ...DEFAULT_TIME_FILTER };
+  });
+  const [timeFilterDialogOpen, setTimeFilterDialogOpen] = useState(false);
 
   // Trade direction state management
   const [tradeDirection, setTradeDirection] = useState(() => {
@@ -939,6 +957,27 @@ function Strategy() {
     return getIndicatorDisplayName(indicatorDef, refIndicator.params);
   }, []);
 
+  // Handle time filter clear
+  const handleTimeFilterClear = useCallback(() => {
+    setTimeFilter({ ...DEFAULT_TIME_FILTER });
+  }, []);
+
+  // Handle time filter edit (open dialog)
+  const handleTimeFilterEdit = useCallback(() => {
+    setTimeFilterDialogOpen(true);
+  }, []);
+
+  // Handle time filter dialog close
+  const handleTimeFilterDialogClose = useCallback(() => {
+    setTimeFilterDialogOpen(false);
+  }, []);
+
+  // Handle time filter save from dialog
+  const handleTimeFilterSave = useCallback((newFilter) => {
+    setTimeFilter(newFilter);
+    setTimeFilterDialogOpen(false);
+  }, []);
+
   // Handle creating a new group from selected conditions
   const handleGroupCreate = useCallback((conditionIds, operator = GROUP_OPERATORS.AND, section, parentGroupId = null) => {
     if (conditionIds.length < 2) return;
@@ -1178,6 +1217,15 @@ function Strategy() {
       console.warn('Failed to save reference indicators to localStorage:', e);
     }
   }, [referenceIndicators]);
+
+  // Persist time filter to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(TIME_FILTER_STORAGE_KEY, JSON.stringify(timeFilter));
+    } catch (e) {
+      console.warn('Failed to save time filter to localStorage:', e);
+    }
+  }, [timeFilter]);
 
   // Calculate reference indicator values when data changes or reference indicators change
   useEffect(() => {
@@ -1634,6 +1682,9 @@ function Strategy() {
           getReferenceDisplayName={getReferenceDisplayName}
           onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
           referenceDataLoading={referenceDataLoading}
+          timeFilter={timeFilter}
+          onTimeFilterEdit={handleTimeFilterEdit}
+          onTimeFilterClear={handleTimeFilterClear}
         />
       </div>
 
@@ -1683,6 +1734,9 @@ function Strategy() {
             onConditionReorderInGroup={handleConditionReorderInGroup}
             onTestLogic={handleTestLogic}
             testLogicData={testLogicData}
+            timeFilter={timeFilter}
+            onTimeFilterEdit={handleTimeFilterEdit}
+            onTimeFilterClear={handleTimeFilterClear}
           />
         </div>
       </div>
@@ -1722,6 +1776,14 @@ function Strategy() {
         currentTimeframe={selectedGran}
         section={multiTimeframeDialog.section}
         referenceIndicators={referenceIndicators}
+      />
+
+      {/* Time Filter Dialog */}
+      <TimeFilterDialog
+        isOpen={timeFilterDialogOpen}
+        onClose={handleTimeFilterDialogClose}
+        onSave={handleTimeFilterSave}
+        initialFilter={timeFilter}
       />
     </div>
   );

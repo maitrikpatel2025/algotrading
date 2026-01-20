@@ -125,3 +125,124 @@ export const REFERENCE_INDICATORS_STORAGE_KEY = 'forex_dash_reference_indicators
 
 // Performance warning message for multi-timeframe conditions
 export const MULTI_TIMEFRAME_WARNING_TEXT = 'Multi-timeframe conditions may increase backtest time';
+
+// =============================================================================
+// TIME FILTER CONSTANTS - Session-based trading time restrictions
+// =============================================================================
+
+// Time filter mode (include = trade only during these times, exclude = blackout these times)
+export const TIME_FILTER_MODES = {
+  INCLUDE: 'include',
+  EXCLUDE: 'exclude',
+};
+
+export const TIME_FILTER_MODE_LABELS = {
+  [TIME_FILTER_MODES.INCLUDE]: 'Include (Trade Only During)',
+  [TIME_FILTER_MODES.EXCLUDE]: 'Exclude (Blackout Period)',
+};
+
+// Trading session definitions with UTC times
+// Note: Sessions that cross midnight have end time > 24 (e.g., 06:00 next day = 30:00)
+export const TRADING_SESSIONS = {
+  SYDNEY: {
+    id: 'sydney',
+    name: 'Sydney',
+    startHour: 21, // 21:00 UTC
+    endHour: 30, // 06:00 UTC next day (21:00 to 06:00)
+    color: '#10B981', // emerald
+  },
+  TOKYO: {
+    id: 'tokyo',
+    name: 'Tokyo',
+    startHour: 23, // 23:00 UTC (previous day)
+    endHour: 32, // 08:00 UTC (23:00 to 08:00)
+    color: '#F59E0B', // amber
+  },
+  LONDON: {
+    id: 'london',
+    name: 'London',
+    startHour: 7, // 07:00 UTC
+    endHour: 16, // 16:00 UTC
+    color: '#3B82F6', // blue
+  },
+  NEW_YORK: {
+    id: 'new_york',
+    name: 'New York',
+    startHour: 12, // 12:00 UTC
+    endHour: 21, // 21:00 UTC
+    color: '#8B5CF6', // violet
+  },
+};
+
+// Session overlaps (high liquidity periods)
+export const SESSION_OVERLAPS = {
+  TOKYO_LONDON: {
+    id: 'tokyo_london',
+    name: 'Tokyo/London',
+    startHour: 7,
+    endHour: 8,
+    description: 'Tokyo/London overlap - moderate liquidity',
+  },
+  LONDON_NEW_YORK: {
+    id: 'london_new_york',
+    name: 'London/New York',
+    startHour: 12,
+    endHour: 16,
+    description: 'London/New York overlap - highest forex liquidity',
+  },
+};
+
+// Timezone options
+export const TIMEZONES = {
+  UTC: {
+    id: 'UTC',
+    label: 'UTC',
+    offset: 0,
+    description: 'Coordinated Universal Time',
+  },
+  GMT: {
+    id: 'GMT',
+    label: 'GMT',
+    offset: 0,
+    description: 'Greenwich Mean Time (same as UTC)',
+  },
+  EST: {
+    id: 'EST',
+    label: 'EST',
+    offset: -5,
+    description: 'Eastern Standard Time (UTC-5)',
+  },
+  LOCAL: {
+    id: 'LOCAL',
+    label: 'Local',
+    offset: null, // Calculated from browser
+    description: 'Your local timezone',
+  },
+};
+
+// Days of the week
+export const DAYS_OF_WEEK = [
+  { id: 'monday', label: 'Monday', short: 'Mon', dayIndex: 1 },
+  { id: 'tuesday', label: 'Tuesday', short: 'Tue', dayIndex: 2 },
+  { id: 'wednesday', label: 'Wednesday', short: 'Wed', dayIndex: 3 },
+  { id: 'thursday', label: 'Thursday', short: 'Thu', dayIndex: 4 },
+  { id: 'friday', label: 'Friday', short: 'Fri', dayIndex: 5 },
+  { id: 'saturday', label: 'Saturday', short: 'Sat', dayIndex: 6 },
+  { id: 'sunday', label: 'Sunday', short: 'Sun', dayIndex: 0 },
+];
+
+// Default days (weekdays only)
+export const DEFAULT_TRADING_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+// localStorage key for time filter persistence
+export const TIME_FILTER_STORAGE_KEY = 'forex_dash_time_filter';
+
+// Default time filter state (disabled)
+export const DEFAULT_TIME_FILTER = {
+  enabled: false,
+  mode: TIME_FILTER_MODES.INCLUDE,
+  sessions: [],
+  customWindows: [],
+  days: [...DEFAULT_TRADING_DAYS],
+  timezone: 'UTC',
+};

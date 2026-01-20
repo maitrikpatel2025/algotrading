@@ -314,3 +314,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When extending the Logic Panel with multi-timeframe functionality
     - When working with AVAILABLE_TIMEFRAMES or MAX_REFERENCE_TIMEFRAMES constants
     - When implementing background price data fetching for non-chart timeframes
+
+- app_docs/feature-77187659-condition-time-filters.md
+  - Conditions:
+    - When working with time-based trading filters or session-based restrictions
+    - When implementing or modifying the TimeFilterDialog component
+    - When working with TimeFilterBadge or TimeFilterTimeline components
+    - When working with trading session definitions (Sydney, Tokyo, London, New York)
+    - When implementing timezone conversion or time window evaluation
+    - When troubleshooting time filter persistence or evaluation issues
+    - When extending the Logic Panel with time-based filtering
+    - When working with timeFilterUtils.js utility functions
+    - When implementing include/exclude mode for trading hours

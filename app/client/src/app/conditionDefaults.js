@@ -13,6 +13,7 @@ import {
   TIMEFRAME_LABELS,
   MAX_REFERENCE_TIMEFRAMES,
 } from './constants';
+import { evaluateTimeFilter } from './timeFilterUtils';
 
 /**
  * Comparison operators for conditions
@@ -1753,5 +1754,73 @@ export function evaluateLogic(
       passed: results.filter(r => r.result).length,
       failed: results.filter(r => !r.result).length,
     },
+  };
+}
+
+/**
+ * Evaluate logic with time filter
+ *
+ * Combines condition/group evaluation with time filter check.
+ * Time filter is applied first - if it fails, conditions are not evaluated.
+ *
+ * @param {string} section - The section to evaluate
+ * @param {Array} conditions - All conditions
+ * @param {Array} groups - All groups
+ * @param {Object} candleData - Current candle data
+ * @param {Object} indicatorValues - Map of indicator instanceId -> current value
+ * @param {Object} patternDetections - Map of pattern instanceId -> boolean
+ * @param {Object} previousCandleData - Previous candle data
+ * @param {Object} previousIndicatorValues - Previous indicator values
+ * @param {Object} timeFilter - Time filter configuration (optional)
+ * @param {Date} currentTime - Current time for time filter evaluation (defaults to now)
+ * @returns {Object} Full evaluation result including time filter status
+ */
+export function evaluateLogicWithTimeFilter(
+  section,
+  conditions,
+  groups,
+  candleData,
+  indicatorValues,
+  patternDetections,
+  previousCandleData = null,
+  previousIndicatorValues = null,
+  timeFilter = null,
+  currentTime = new Date()
+) {
+  // Evaluate time filter first
+  const timeFilterResult = evaluateTimeFilter(timeFilter, currentTime);
+
+  // If time filter is active and fails, return early
+  if (timeFilterResult.isActive && !timeFilterResult.passes) {
+    return {
+      section,
+      result: false,
+      itemResults: [],
+      summary: {
+        total: 0,
+        passed: 0,
+        failed: 0,
+      },
+      timeFilter: timeFilterResult,
+      blockedByTimeFilter: true,
+    };
+  }
+
+  // Time filter passed (or not active), evaluate conditions
+  const logicResult = evaluateLogic(
+    section,
+    conditions,
+    groups,
+    candleData,
+    indicatorValues,
+    patternDetections,
+    previousCandleData,
+    previousIndicatorValues
+  );
+
+  return {
+    ...logicResult,
+    timeFilter: timeFilterResult,
+    blockedByTimeFilter: false,
   };
 }
