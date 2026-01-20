@@ -14,8 +14,10 @@ import MultiTimeframeConditionDialog from '../components/MultiTimeframeCondition
 import TimeFilterDialog from '../components/TimeFilterDialog';
 import TradeDirectionSelector from '../components/TradeDirectionSelector';
 import CandleCloseToggle from '../components/CandleCloseToggle';
+import SaveStrategyDialog from '../components/SaveStrategyDialog';
+import Toast, { useToast } from '../components/Toast';
 import { cn } from '../lib/utils';
-import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap, Save } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
@@ -44,6 +46,10 @@ import {
   TIME_FILTER_STORAGE_KEY,
   DEFAULT_TIME_FILTER,
   DRAWINGS_STORAGE_KEY,
+  STRATEGY_DRAFT_STORAGE_KEY,
+  STRATEGY_DRAFT_TIMESTAMP_KEY,
+  AUTO_SAVE_INTERVAL_MS,
+  STRATEGY_DRAFT_EXPIRY_MS,
 } from '../app/constants';
 import { DRAWING_TOOLS } from '../app/drawingTypes';
 import {
@@ -231,6 +237,34 @@ function Strategy() {
     isOpen: false,
     drawing: null,
   });
+
+  // Save Strategy state management
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentStrategyName, setCurrentStrategyName] = useState('');
+  const [currentStrategyDescription, setCurrentStrategyDescription] = useState('');
+  const [currentStrategyTags, setCurrentStrategyTags] = useState([]);
+  const [existingStrategyId, setExistingStrategyId] = useState(null);
+
+  // Overwrite confirmation dialog state
+  const [overwriteDialog, setOverwriteDialog] = useState({
+    isOpen: false,
+    strategyName: '',
+    strategyId: null,
+  });
+
+  // Draft recovery dialog state
+  const [draftRecoveryDialog, setDraftRecoveryDialog] = useState({
+    isOpen: false,
+    draftTimestamp: null,
+  });
+
+  // Toast hook for notifications
+  // eslint-disable-next-line no-unused-vars
+  const { toast, showToast, hideToast, success: showSuccess, error: showError } = useToast();
+
+  // Auto-save draft interval ref
+  const autoSaveIntervalRef = useRef(null);
 
   // Debounce timer ref for timeframe changes
   const debounceTimerRef = useRef(null);
@@ -1279,6 +1313,282 @@ function Strategy() {
     // The actual evaluation happens in the TestLogicDialog component
   }, []);
 
+  // =============================================================================
+  // SAVE STRATEGY HANDLERS
+  // =============================================================================
+
+  // Collect all strategy state for saving
+  const collectStrategyState = useCallback(() => {
+    return {
+      name: currentStrategyName,
+      description: currentStrategyDescription,
+      tags: currentStrategyTags,
+      trade_direction: tradeDirection,
+      confirm_on_candle_close: confirmOnCandleClose,
+      pair: selectedPair,
+      timeframe: selectedGran,
+      candle_count: selectedCount,
+      indicators: activeIndicators.map(ind => ({
+        id: ind.id,
+        instance_id: ind.instanceId,
+        params: ind.params || ind.defaultParams,
+        color: ind.color,
+        line_width: ind.lineWidth,
+        line_style: ind.lineStyle,
+        fill_opacity: ind.fillOpacity,
+      })),
+      patterns: activePatterns.map(pat => ({
+        id: pat.id,
+        instance_id: pat.instanceId,
+        name: pat.name,
+        description: pat.description,
+        type: pat.type,
+        color: pat.color,
+      })),
+      conditions: conditions.map(c => ({
+        id: c.id,
+        section: c.section,
+        left_operand: c.leftOperand,
+        operator: c.operator,
+        right_operand: c.rightOperand,
+        indicator_instance_id: c.indicatorInstanceId,
+        indicator_display_name: c.indicatorDisplayName,
+        pattern_instance_id: c.patternInstanceId,
+        is_pattern_condition: c.isPatternCondition,
+      })),
+      groups: groups.map(g => ({
+        id: g.id,
+        operator: g.operator,
+        section: g.section,
+        condition_ids: g.conditionIds,
+        parent_group_id: g.parentGroupId,
+      })),
+      reference_indicators: referenceIndicators.map(ri => ({
+        id: ri.id,
+        timeframe: ri.timeframe,
+        indicator_id: ri.indicatorId,
+        params: ri.params,
+      })),
+      time_filter: timeFilter.enabled ? {
+        enabled: timeFilter.enabled,
+        start_hour: timeFilter.startHour,
+        start_minute: timeFilter.startMinute,
+        end_hour: timeFilter.endHour,
+        end_minute: timeFilter.endMinute,
+        days_of_week: timeFilter.days,
+        timezone: timeFilter.timezone,
+      } : null,
+      drawings: serializeDrawings(drawings),
+    };
+  }, [
+    currentStrategyName, currentStrategyDescription, currentStrategyTags,
+    tradeDirection, confirmOnCandleClose, selectedPair, selectedGran, selectedCount,
+    activeIndicators, activePatterns, conditions, groups, referenceIndicators,
+    timeFilter, drawings
+  ]);
+
+  // Handle opening save dialog
+  const handleOpenSaveDialog = useCallback(() => {
+    setSaveDialogOpen(true);
+  }, []);
+
+  // Handle closing save dialog
+  const handleCloseSaveDialog = useCallback(() => {
+    setSaveDialogOpen(false);
+  }, []);
+
+  // Handle save strategy
+  const handleSaveStrategy = useCallback(async (name, description, tags) => {
+    setIsSaving(true);
+
+    try {
+      // Check if name already exists
+      const checkResponse = await endPoints.checkStrategyName(name);
+
+      if (checkResponse.exists && checkResponse.strategy_id !== existingStrategyId) {
+        // Name exists and it's not the current strategy - show overwrite dialog
+        setOverwriteDialog({
+          isOpen: true,
+          strategyName: name,
+          strategyId: checkResponse.strategy_id,
+        });
+        setCurrentStrategyName(name);
+        setCurrentStrategyDescription(description);
+        setCurrentStrategyTags(tags);
+        setIsSaving(false);
+        return;
+      }
+
+      // Proceed with save
+      await performSave(name, description, tags, existingStrategyId || checkResponse.strategy_id);
+
+    } catch (error) {
+      console.error('Failed to save strategy:', error);
+      showError('Failed to save strategy. Please try again.');
+      setIsSaving(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingStrategyId, showError]);
+
+  // Perform the actual save operation
+  const performSave = useCallback(async (name, description, tags, strategyId = null) => {
+    try {
+      const strategyState = collectStrategyState();
+      const strategy = {
+        ...strategyState,
+        id: strategyId,
+        name,
+        description,
+        tags,
+      };
+
+      const response = await endPoints.saveStrategy(strategy);
+
+      if (response.success) {
+        setExistingStrategyId(response.strategy_id);
+        setCurrentStrategyName(name);
+        setCurrentStrategyDescription(description);
+        setCurrentStrategyTags(tags);
+        setSaveDialogOpen(false);
+        setOverwriteDialog({ isOpen: false, strategyName: '', strategyId: null });
+
+        // Clear draft after successful save
+        clearDraft();
+
+        showSuccess(`Strategy '${name}' saved successfully`);
+      } else {
+        showError(response.error || 'Failed to save strategy');
+      }
+    } catch (error) {
+      console.error('Failed to save strategy:', error);
+      showError('Failed to save strategy. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectStrategyState, showSuccess, showError]);
+
+  // Handle overwrite confirmation
+  const handleOverwriteConfirm = useCallback(() => {
+    setOverwriteDialog(prev => ({ ...prev, isOpen: false }));
+    setIsSaving(true);
+    performSave(
+      overwriteDialog.strategyName,
+      currentStrategyDescription,
+      currentStrategyTags,
+      overwriteDialog.strategyId
+    );
+  }, [overwriteDialog, currentStrategyDescription, currentStrategyTags, performSave]);
+
+  // Handle overwrite cancel
+  const handleOverwriteCancel = useCallback(() => {
+    setOverwriteDialog({ isOpen: false, strategyName: '', strategyId: null });
+  }, []);
+
+  // =============================================================================
+  // AUTO-SAVE DRAFT HANDLERS
+  // =============================================================================
+
+  // Save draft to localStorage
+  const saveDraft = useCallback(() => {
+    try {
+      const strategyState = collectStrategyState();
+      localStorage.setItem(STRATEGY_DRAFT_STORAGE_KEY, JSON.stringify(strategyState));
+      localStorage.setItem(STRATEGY_DRAFT_TIMESTAMP_KEY, Date.now().toString());
+    } catch (error) {
+      console.warn('Failed to save draft to localStorage:', error);
+    }
+  }, [collectStrategyState]);
+
+  // Clear draft from localStorage
+  const clearDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(STRATEGY_DRAFT_STORAGE_KEY);
+      localStorage.removeItem(STRATEGY_DRAFT_TIMESTAMP_KEY);
+    } catch (error) {
+      console.warn('Failed to clear draft from localStorage:', error);
+    }
+  }, []);
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    try {
+      const draftTimestamp = localStorage.getItem(STRATEGY_DRAFT_TIMESTAMP_KEY);
+      const draft = localStorage.getItem(STRATEGY_DRAFT_STORAGE_KEY);
+
+      if (draft && draftTimestamp) {
+        const timestamp = parseInt(draftTimestamp, 10);
+        const age = Date.now() - timestamp;
+
+        // Only show recovery if draft is less than 24 hours old
+        if (age < STRATEGY_DRAFT_EXPIRY_MS) {
+          setDraftRecoveryDialog({
+            isOpen: true,
+            draftTimestamp: new Date(timestamp),
+          });
+        } else {
+          // Draft is too old, clear it
+          clearDraft();
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to check for draft:', error);
+    }
+  }, [clearDraft]);
+
+  // Set up auto-save interval
+  useEffect(() => {
+    // Start auto-save interval
+    autoSaveIntervalRef.current = setInterval(() => {
+      // Only save if there's meaningful data
+      if (activeIndicators.length > 0 || conditions.length > 0 || drawings.length > 0) {
+        saveDraft();
+      }
+    }, AUTO_SAVE_INTERVAL_MS);
+
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current);
+      }
+    };
+  }, [activeIndicators.length, conditions.length, drawings.length, saveDraft]);
+
+  // Handle draft recovery
+  const handleRecoverDraft = useCallback(() => {
+    try {
+      const draft = localStorage.getItem(STRATEGY_DRAFT_STORAGE_KEY);
+      if (draft) {
+        const parsedDraft = JSON.parse(draft);
+
+        // Restore strategy state from draft
+        if (parsedDraft.name) setCurrentStrategyName(parsedDraft.name);
+        if (parsedDraft.description) setCurrentStrategyDescription(parsedDraft.description);
+        if (parsedDraft.tags) setCurrentStrategyTags(parsedDraft.tags);
+        if (parsedDraft.trade_direction) setTradeDirection(parsedDraft.trade_direction);
+        if (parsedDraft.confirm_on_candle_close) setConfirmOnCandleClose(parsedDraft.confirm_on_candle_close);
+        if (parsedDraft.pair) setSelectedPair(parsedDraft.pair);
+        if (parsedDraft.timeframe) setSelectedGran(parsedDraft.timeframe);
+        if (parsedDraft.candle_count) setSelectedCount(parsedDraft.candle_count);
+
+        // Note: Complex state like indicators, conditions, drawings would need
+        // additional deserialization logic - keeping simple for initial implementation
+      }
+
+      setDraftRecoveryDialog({ isOpen: false, draftTimestamp: null });
+      clearDraft();
+    } catch (error) {
+      console.error('Failed to recover draft:', error);
+      showError('Failed to recover draft');
+      setDraftRecoveryDialog({ isOpen: false, draftTimestamp: null });
+    }
+  }, [clearDraft, showError]);
+
+  // Handle discard draft
+  const handleDiscardDraft = useCallback(() => {
+    clearDraft();
+    setDraftRecoveryDialog({ isOpen: false, draftTimestamp: null });
+  }, [clearDraft]);
+
   // Prepare test logic data from current state
   const testLogicData = useMemo(() => {
     if (!priceData) return null;
@@ -1607,6 +1917,14 @@ function Strategy() {
             <p className="text-muted-foreground">
               Analyze currency pairs, timeframes, and technical indicators for trading decisions
             </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              text="Save Strategy"
+              handleClick={handleOpenSaveDialog}
+              icon={Save}
+              className="btn-primary"
+            />
           </div>
         </div>
 
@@ -1980,6 +2298,58 @@ function Strategy() {
         onClose={handleDrawingDialogClose}
         onConfirm={handleDrawingDialogConfirm}
         drawing={drawingDialog.drawing}
+      />
+
+      {/* Save Strategy Dialog */}
+      <SaveStrategyDialog
+        isOpen={saveDialogOpen}
+        onClose={handleCloseSaveDialog}
+        onSave={handleSaveStrategy}
+        existingName={currentStrategyName}
+        existingDescription={currentStrategyDescription}
+        existingTags={currentStrategyTags}
+        isSaving={isSaving}
+      />
+
+      {/* Overwrite Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={overwriteDialog.isOpen}
+        onClose={handleOverwriteCancel}
+        title="Strategy Already Exists"
+        message={`A strategy with the name "${overwriteDialog.strategyName}" already exists. Do you want to overwrite it?`}
+        actions={[
+          {
+            label: 'Overwrite',
+            variant: 'danger',
+            onClick: handleOverwriteConfirm,
+          },
+        ]}
+        variant="warning"
+      />
+
+      {/* Draft Recovery Dialog */}
+      <ConfirmDialog
+        isOpen={draftRecoveryDialog.isOpen}
+        onClose={handleDiscardDraft}
+        title="Unsaved Draft Found"
+        message={`An unsaved draft was found${draftRecoveryDialog.draftTimestamp ? ` from ${draftRecoveryDialog.draftTimestamp.toLocaleString()}` : ''}. Would you like to recover it?`}
+        actions={[
+          {
+            label: 'Recover',
+            variant: 'primary',
+            onClick: handleRecoverDraft,
+          },
+        ]}
+        variant="info"
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        type={toast?.type || 'info'}
+        message={toast?.message || ''}
+        isVisible={!!toast}
+        onClose={hideToast}
+        duration={toast?.duration}
       />
     </div>
   );

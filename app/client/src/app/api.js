@@ -39,7 +39,8 @@ const response = (resp) => resp.data;
 
 const requests = {
     get: (url) => axios.get(url).then(response),
-    post: (url, data) => axios.post(url, data).then(response)
+    post: (url, data) => axios.post(url, data).then(response),
+    delete: (url) => axios.delete(url).then(response)
 }
 
 const endPoints = {
@@ -54,7 +55,13 @@ const endPoints = {
     botStatus: () => requests.get("/bot/status"),
     botStart: (config = {}) => requests.post("/bot/start", config),
     botStop: () => requests.post("/bot/stop"),
-    botRestart: (config = {}) => requests.post("/bot/restart", config)
+    botRestart: (config = {}) => requests.post("/bot/restart", config),
+    // Strategy endpoints
+    saveStrategy: (strategy) => requests.post("/strategies", { strategy }),
+    listStrategies: () => requests.get("/strategies"),
+    getStrategy: (id) => requests.get(`/strategies/${id}`),
+    deleteStrategy: (id) => requests.delete(`/strategies/${id}`),
+    checkStrategyName: (name) => requests.get(`/strategies/check-name/${encodeURIComponent(name)}`)
 }
 
 export default endPoints;

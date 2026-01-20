@@ -253,3 +253,21 @@ export const DEFAULT_TIME_FILTER = {
 
 // localStorage key for drawings persistence
 export const DRAWINGS_STORAGE_KEY = 'forex_dash_drawings';
+
+// =============================================================================
+// STRATEGY PERSISTENCE CONSTANTS - Save/load strategy functionality
+// =============================================================================
+
+// localStorage keys for strategy drafts (auto-save)
+export const STRATEGY_DRAFT_STORAGE_KEY = 'forex_dash_strategy_draft';
+export const STRATEGY_DRAFT_TIMESTAMP_KEY = 'forex_dash_strategy_draft_timestamp';
+
+// Auto-save interval in milliseconds (60 seconds)
+export const AUTO_SAVE_INTERVAL_MS = 60000;
+
+// Strategy name and description limits
+export const STRATEGY_NAME_MAX_LENGTH = 50;
+export const STRATEGY_DESCRIPTION_MAX_LENGTH = 500;
+
+// Draft expiry time in milliseconds (24 hours)
+export const STRATEGY_DRAFT_EXPIRY_MS = 24 * 60 * 60 * 1000;
