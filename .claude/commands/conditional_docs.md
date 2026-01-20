@@ -326,3 +326,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When extending the Logic Panel with time-based filtering
     - When working with timeFilterUtils.js utility functions
     - When implementing include/exclude mode for trading hours
+
+- app_docs/feature-81932c3d-chart-drawing-tools.md
+  - Conditions:
+    - When working with chart drawing tools (horizontal lines, trendlines, Fibonacci)
+    - When implementing or modifying DrawingToolbar, DrawingPropertiesDialog, or DrawingContextMenu components
+    - When working with drawingTypes.js or drawingUtils.js files
+    - When adding new drawing types or annotation features to charts
+    - When implementing drawing-based trading conditions
+    - When troubleshooting drawing rendering, persistence, or interaction issues
+    - When extending chart.js with additional shapes or annotations
+    - When working with Plotly shapes API for chart overlays
