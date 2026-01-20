@@ -2332,49 +2332,93 @@ function Strategy() {
 
       {/* Control Bar */}
       <div className="border-b border-border bg-card/50">
-        <div className="py-3 px-6 flex flex-col lg:flex-row lg:items-center gap-4 flex-wrap">
-          {/* Left: Pair Selector & Timeframe Buttons */}
-          <div className="flex flex-wrap items-center gap-4">
-            <PairSelector
-              options={options.pairs}
-              defaultValue={selectedPair}
-              onSelected={setSelectedPair}
-              hasLoadedData={!!(technicalsData || priceData)}
-              className="w-44"
-            />
+        <div className="py-3 px-6 flex flex-col gap-3">
+          {/* Main Controls Row */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4 flex-wrap">
+            {/* Left: Pair Selector & Timeframe Buttons */}
+            <div className="flex flex-wrap items-center gap-4">
+              <PairSelector
+                options={options.pairs}
+                defaultValue={selectedPair}
+                onSelected={setSelectedPair}
+                hasLoadedData={!!(technicalsData || priceData)}
+                className="w-44"
+              />
 
-            {/* Timeframe Button Group */}
-            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-              {TIMEFRAME_BUTTONS.map((tf) => (
-                <button
-                  key={tf.value}
-                  type="button"
-                  onClick={() => handleTimeframeChange(tf.value)}
-                  className={cn(
-                    "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                    selectedGran === tf.value
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10"
-                  )}
-                >
-                  {tf.label}
-                </button>
-              ))}
+              {/* Timeframe Button Group */}
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                {TIMEFRAME_BUTTONS.map((tf) => (
+                  <button
+                    key={tf.value}
+                    type="button"
+                    onClick={() => handleTimeframeChange(tf.value)}
+                    className={cn(
+                      "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                      selectedGran === tf.value
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10"
+                    )}
+                  >
+                    {tf.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Load Button */}
+              <Button
+                text={loadingData ? "Loading..." : "Load Data"}
+                handleClick={() => loadTechnicals()}
+                disabled={loadingData}
+                icon={loadingData ? RefreshCw : Play}
+                className={cn("btn-primary", loadingData && "[&_svg]:animate-spin")}
+              />
             </div>
 
-            {/* Load Button */}
-            <Button
-              text={loadingData ? "Loading..." : "Load Data"}
-              handleClick={() => loadTechnicals()}
-              disabled={loadingData}
-              icon={loadingData ? RefreshCw : Play}
-              className={cn("btn-primary", loadingData && "[&_svg]:animate-spin")}
+            {/* Right: Trade Direction, Candle Close, Layout Toggles */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <TradeDirectionSelector
+              value={tradeDirection}
+              onChange={handleTradeDirectionChange}
             />
+            <CandleCloseToggle
+              value={confirmOnCandleClose}
+              onChange={handleCandleCloseChange}
+            />
+            {/* Layout Toggle Buttons */}
+            <div className="hidden lg:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handlePanelToggle}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  isPanelCollapsed
+                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-primary bg-primary/10"
+                )}
+                title={isPanelCollapsed ? "Show Indicator Library" : "Hide Indicator Library"}
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleLogicPanelToggle}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  isLogicPanelCollapsed
+                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-primary bg-primary/10"
+                )}
+                title={isLogicPanelCollapsed ? "Show Logic Panel" : "Hide Logic Panel"}
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
           </div>
 
-          {/* Center: Active Indicators Chips */}
+          {/* Active Indicators Chips Row */}
           {activeIndicators.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap flex-1">
+            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/50">
               <span className="text-xs text-muted-foreground font-medium">Active:</span>
               {activeIndicators.map((indicator) => {
                 const displayName = getDisplayName(indicator);
@@ -2427,47 +2471,6 @@ function Strategy() {
               })}
             </div>
           )}
-
-          {/* Right: Trade Direction, Candle Close, Layout Toggles */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <TradeDirectionSelector
-              value={tradeDirection}
-              onChange={handleTradeDirectionChange}
-            />
-            <CandleCloseToggle
-              value={confirmOnCandleClose}
-              onChange={handleCandleCloseChange}
-            />
-            {/* Layout Toggle Buttons */}
-            <div className="hidden lg:flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePanelToggle}
-                className={cn(
-                  "p-2 rounded-md transition-colors",
-                  isPanelCollapsed
-                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    : "text-primary bg-primary/10"
-                )}
-                title={isPanelCollapsed ? "Show Indicator Library" : "Hide Indicator Library"}
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleLogicPanelToggle}
-                className={cn(
-                  "p-2 rounded-md transition-colors",
-                  isLogicPanelCollapsed
-                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    : "text-primary bg-primary/10"
-                )}
-                title={isLogicPanelCollapsed ? "Show Logic Panel" : "Hide Logic Panel"}
-              >
-                <PanelRightClose className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
