@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { cn } from '../lib/utils';
 import {
   ChevronRight,
@@ -38,8 +38,11 @@ function LogicTreeView({
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
 
-  // Build tree structure
-  const tree = buildLogicTree(conditions, groups, section);
+  // Memoize tree structure to prevent unnecessary recomputation
+  const tree = useMemo(
+    () => buildLogicTree(conditions, groups, section),
+    [conditions, groups, section]
+  );
 
   // Toggle node expansion
   const toggleNode = useCallback((nodeId) => {
@@ -199,13 +202,13 @@ function LogicTreeView({
     );
   };
 
-  // Initialize all groups as expanded
-  React.useEffect(() => {
-    const allGroupIds = new Set();
+  // Create a stable string representation of group IDs for the dependency
+  const groupIdsKey = useMemo(() => {
+    const allGroupIds = [];
     const collectGroupIds = (nodes) => {
       nodes.forEach(node => {
         if (node.type === 'group') {
-          allGroupIds.add(node.data.id);
+          allGroupIds.push(node.data.id);
           if (node.children) {
             collectGroupIds(node.children);
           }
@@ -213,8 +216,25 @@ function LogicTreeView({
       });
     };
     collectGroupIds(tree.children);
-    setExpandedNodes(allGroupIds);
-  }, [tree.children]);
+    return allGroupIds.sort().join(',');
+  }, [tree]);
+
+  // Initialize all groups as expanded
+  React.useEffect(() => {
+    if (!groupIdsKey) return;
+
+    const groupIdArray = groupIdsKey.split(',').filter(Boolean);
+    const allGroupIds = new Set(groupIdArray);
+
+    // Only update if there are new groups to expand
+    setExpandedNodes(prev => {
+      const hasNewGroups = groupIdArray.some(id => !prev.has(id));
+      if (!hasNewGroups && prev.size === allGroupIds.size) {
+        return prev; // No change needed
+      }
+      return allGroupIds;
+    });
+  }, [groupIdsKey]);
 
   if (tree.children.length === 0) {
     return (

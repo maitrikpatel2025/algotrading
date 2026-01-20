@@ -414,7 +414,7 @@ function LogicPanel({
         </div>
 
         {/* Section Content */}
-        <div className="p-3 space-y-3 min-h-[80px]">
+        <div className="p-3 space-y-3 min-h-[80px] overflow-visible">
           {/* Tree View */}
           {viewMode === LOGIC_VIEW_MODES.TREE ? (
             <LogicTreeView
@@ -503,57 +503,63 @@ function LogicPanel({
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            {/* Add Condition Button */}
-            <button
-              type="button"
-              onClick={() => handleAddConditionClick(sectionKey)}
-              className={cn(
-                "flex items-center gap-2 py-2 px-3",
-                "text-sm text-muted-foreground",
-                "border border-dashed border-border rounded-md",
-                "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
-                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-              )}
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Condition</span>
-            </button>
-
-            {/* Group Selected Button */}
-            {selectedCount >= 2 && viewMode === LOGIC_VIEW_MODES.INLINE && (
+          <div className="space-y-2 pt-2">
+            {/* Primary action buttons row */}
+            <div className="flex flex-wrap gap-2">
+              {/* Add Condition Button */}
               <button
                 type="button"
-                onClick={() => handleGroupSelected(sectionKey)}
+                onClick={() => handleAddConditionClick(sectionKey)}
                 className={cn(
                   "flex items-center gap-2 py-2 px-3",
-                  "text-sm text-primary-foreground bg-primary",
-                  "rounded-md",
-                  "hover:bg-primary/90",
-                  "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-                )}
-              >
-                <FolderPlus className="h-4 w-4" />
-                <span>Group Selected ({selectedCount})</span>
-              </button>
-            )}
-
-            {/* Test Logic Button */}
-            {sectionConditions.length > 0 && (
-              <button
-                type="button"
-                onClick={() => handleTestLogicClick(sectionKey)}
-                className={cn(
-                  "flex items-center gap-2 py-2 px-3 ml-auto",
                   "text-sm text-muted-foreground",
-                  "border border-border rounded-md",
-                  "hover:bg-muted/50 hover:text-foreground",
+                  "border border-dashed border-border rounded-md",
+                  "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
                   "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
                 )}
               >
-                <FlaskConical className="h-4 w-4" />
-                <span>Test Logic</span>
+                <Plus className="h-4 w-4" />
+                <span>Add Condition</span>
               </button>
+
+              {/* Group Selected Button */}
+              {selectedCount >= 2 && viewMode === LOGIC_VIEW_MODES.INLINE && (
+                <button
+                  type="button"
+                  onClick={() => handleGroupSelected(sectionKey)}
+                  className={cn(
+                    "flex items-center gap-2 py-2 px-3",
+                    "text-sm text-primary-foreground bg-primary",
+                    "rounded-md",
+                    "hover:bg-primary/90",
+                    "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  <span>Group Selected ({selectedCount})</span>
+                </button>
+              )}
+            </div>
+
+            {/* Test Logic Button - separate row for visibility */}
+            {sectionConditions.length > 0 && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  data-testid="test-logic-button"
+                  onClick={() => handleTestLogicClick(sectionKey)}
+                  className={cn(
+                    "flex items-center gap-2 py-2 px-3",
+                    "text-sm text-muted-foreground",
+                    "border border-border rounded-md",
+                    "hover:bg-muted/50 hover:text-foreground",
+                    "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                >
+                  <FlaskConical className="h-4 w-4" />
+                  <span>Test Logic</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -649,6 +655,7 @@ function LogicPanel({
             <button
               type="button"
               onClick={handleViewModeToggle}
+              data-testid="view-mode-toggle"
               className={cn(
                 "p-1.5 rounded-md text-muted-foreground",
                 "hover:bg-muted hover:text-foreground",
