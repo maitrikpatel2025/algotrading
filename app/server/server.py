@@ -890,6 +890,46 @@ async def check_strategy_name(name: str):
         return CheckNameResponse(exists=False)
 
 
+@app.get("/api/strategies/extended", response_model=ListStrategiesExtendedResponse, tags=["Strategies"])
+async def list_strategies_extended():
+    """
+    List all saved strategies with extended metadata (indicator counts, etc).
+
+    Returns:
+        JSON object with list of strategy summaries including counts
+    """
+    try:
+        logger.info("[STRATEGY] List strategies (extended) request received")
+
+        success, strategies, error = service_list_strategies_extended()
+
+        if success:
+            logger.info(f"[SUCCESS] Listed {len(strategies)} strategies (extended)")
+            return ListStrategiesExtendedResponse(
+                success=True,
+                strategies=strategies,
+                count=len(strategies)
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy list (extended) failed: {error}")
+            return ListStrategiesExtendedResponse(
+                success=False,
+                strategies=[],
+                count=0,
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy list (extended) failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return ListStrategiesExtendedResponse(
+            success=False,
+            strategies=[],
+            count=0,
+            error=str(e)
+        )
+
+
 @app.get("/api/strategies/{strategy_id}", response_model=LoadStrategyResponse, tags=["Strategies"])
 async def get_strategy(strategy_id: str):
     """
@@ -967,46 +1007,6 @@ async def delete_strategy(strategy_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
-        )
-
-
-@app.get("/api/strategies/extended", response_model=ListStrategiesExtendedResponse, tags=["Strategies"])
-async def list_strategies_extended():
-    """
-    List all saved strategies with extended metadata (indicator counts, etc).
-
-    Returns:
-        JSON object with list of strategy summaries including counts
-    """
-    try:
-        logger.info("[STRATEGY] List strategies (extended) request received")
-
-        success, strategies, error = service_list_strategies_extended()
-
-        if success:
-            logger.info(f"[SUCCESS] Listed {len(strategies)} strategies (extended)")
-            return ListStrategiesExtendedResponse(
-                success=True,
-                strategies=strategies,
-                count=len(strategies)
-            )
-        else:
-            logger.warning(f"[WARNING] Strategy list (extended) failed: {error}")
-            return ListStrategiesExtendedResponse(
-                success=False,
-                strategies=[],
-                count=0,
-                error=error
-            )
-
-    except Exception as e:
-        logger.error(f"[ERROR] Strategy list (extended) failed: {str(e)}")
-        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return ListStrategiesExtendedResponse(
-            success=False,
-            strategies=[],
-            count=0,
-            error=str(e)
         )
 
 
