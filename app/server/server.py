@@ -31,15 +31,22 @@ from core.data_models import (
     BotStatusResponse,
     CheckNameResponse,
     DeleteStrategyResponse,
+    DuplicateStrategyResponse,
     HeadlineItem,
     HeadlinesResponse,
     HealthCheckResponse,
+    ImportStrategyRequest,
+    ImportStrategyResponse,
+    ImportStrategySaveRequest,
+    ImportValidationResult,
+    ListStrategiesExtendedResponse,
     ListStrategiesResponse,
     LoadStrategyResponse,
     OpenTradesResponse,
     SaveStrategyRequest,
     SaveStrategyResponse,
     SpreadResponse,
+    StrategyExport,
     TradeHistoryItem,
     TradeHistoryResponse,
     TradeInfo,
@@ -53,13 +60,28 @@ from core.strategy_service import (
     delete_strategy as service_delete_strategy,
 )
 from core.strategy_service import (
+    duplicate_strategy as service_duplicate_strategy,
+)
+from core.strategy_service import (
     get_strategy as service_get_strategy,
+)
+from core.strategy_service import (
+    get_strategy_for_export as service_get_strategy_for_export,
+)
+from core.strategy_service import (
+    import_strategy as service_import_strategy,
 )
 from core.strategy_service import (
     list_strategies as service_list_strategies,
 )
 from core.strategy_service import (
+    list_strategies_extended as service_list_strategies_extended,
+)
+from core.strategy_service import (
     save_strategy as service_save_strategy,
+)
+from core.strategy_service import (
+    validate_import as service_validate_import,
 )
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
@@ -946,6 +968,222 @@ async def delete_strategy(strategy_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        )
+
+
+@app.get("/api/strategies/extended", response_model=ListStrategiesExtendedResponse, tags=["Strategies"])
+async def list_strategies_extended():
+    """
+    List all saved strategies with extended metadata (indicator counts, etc).
+
+    Returns:
+        JSON object with list of strategy summaries including counts
+    """
+    try:
+        logger.info("[STRATEGY] List strategies (extended) request received")
+
+        success, strategies, error = service_list_strategies_extended()
+
+        if success:
+            logger.info(f"[SUCCESS] Listed {len(strategies)} strategies (extended)")
+            return ListStrategiesExtendedResponse(
+                success=True,
+                strategies=strategies,
+                count=len(strategies)
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy list (extended) failed: {error}")
+            return ListStrategiesExtendedResponse(
+                success=False,
+                strategies=[],
+                count=0,
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy list (extended) failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return ListStrategiesExtendedResponse(
+            success=False,
+            strategies=[],
+            count=0,
+            error=str(e)
+        )
+
+
+@app.post("/api/strategies/{strategy_id}/duplicate", response_model=DuplicateStrategyResponse, tags=["Strategies"])
+async def duplicate_strategy(strategy_id: str):
+    """
+    Duplicate a strategy by ID.
+
+    Args:
+        strategy_id: The strategy ID to duplicate
+
+    Returns:
+        JSON object with new strategy ID and name
+    """
+    try:
+        logger.info(f"[STRATEGY] Duplicate strategy request for ID: {strategy_id}")
+
+        success, new_id, new_name, error = service_duplicate_strategy(strategy_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Strategy duplicated: {new_name} (ID: {new_id})")
+            return DuplicateStrategyResponse(
+                success=True,
+                strategy_id=new_id,
+                strategy_name=new_name,
+                message=f"Strategy duplicated as '{new_name}'"
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy duplicate failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Strategy not found: {strategy_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy duplicate failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.get("/api/strategies/{strategy_id}/export", tags=["Strategies"])
+async def export_strategy(strategy_id: str):
+    """
+    Export a strategy as JSON.
+
+    Args:
+        strategy_id: The strategy ID to export
+
+    Returns:
+        JSON file with strategy data in export schema format
+    """
+    from fastapi.responses import JSONResponse
+
+    try:
+        logger.info(f"[STRATEGY] Export strategy request for ID: {strategy_id}")
+
+        success, export_data, error = service_get_strategy_for_export(strategy_id)
+
+        if success and export_data:
+            # Generate filename
+            strategy_name = export_data.strategy.name.replace(" ", "_").replace("/", "-")
+            date_str = datetime.now().strftime("%Y%m%d")
+            filename = f"strategy_{strategy_name}_{date_str}.json"
+
+            logger.info(f"[SUCCESS] Strategy exported: {filename}")
+
+            # Return JSON response with Content-Disposition header for download
+            return JSONResponse(
+                content=export_data.model_dump(mode="json"),
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Type": "application/json"
+                }
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy export failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Strategy not found: {strategy_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy export failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.post("/api/strategies/import/validate", response_model=ImportValidationResult, tags=["Strategies"])
+async def validate_import_strategy(request: ImportStrategyRequest):
+    """
+    Validate import data without saving.
+
+    Args:
+        request: JSON data to validate
+
+    Returns:
+        Validation result with errors, warnings, and preview
+    """
+    try:
+        logger.info("[STRATEGY] Import validation request received")
+
+        result = service_validate_import(request.strategy_data)
+
+        if result.valid:
+            logger.info("[SUCCESS] Import validation passed")
+        else:
+            logger.warning(f"[WARNING] Import validation failed: {result.errors}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[ERROR] Import validation failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return ImportValidationResult(
+            valid=False,
+            errors=[str(e)],
+            warnings=[],
+            strategy_preview=None,
+            name_conflict=False,
+            conflicting_strategy_id=None
+        )
+
+
+@app.post("/api/strategies/import/save", response_model=ImportStrategyResponse, tags=["Strategies"])
+async def save_imported_strategy(request: ImportStrategySaveRequest):
+    """
+    Save a validated imported strategy.
+
+    Args:
+        request: Validated strategy data with optional name override and conflict resolution
+
+    Returns:
+        JSON object with success status and new strategy ID
+    """
+    try:
+        logger.info("[STRATEGY] Import save request received")
+
+        success, strategy_id, strategy_name, error = service_import_strategy(
+            request.strategy_data,
+            name_override=request.name_override,
+            conflict_resolution=request.conflict_resolution
+        )
+
+        if success:
+            logger.info(f"[SUCCESS] Strategy imported: {strategy_name} (ID: {strategy_id})")
+            return ImportStrategyResponse(
+                success=True,
+                strategy_id=strategy_id,
+                strategy_name=strategy_name,
+                message=f"Strategy '{strategy_name}' imported successfully"
+            )
+        else:
+            logger.warning(f"[WARNING] Import save failed: {error}")
+            return ImportStrategyResponse(
+                success=False,
+                message="Failed to import strategy",
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Import save failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return ImportStrategyResponse(
+            success=False,
+            message="Failed to import strategy",
+            error=str(e)
         )
 
 

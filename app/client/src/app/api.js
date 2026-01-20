@@ -59,9 +59,19 @@ const endPoints = {
     // Strategy endpoints
     saveStrategy: (strategy) => requests.post("/strategies", { strategy }),
     listStrategies: () => requests.get("/strategies"),
+    listStrategiesExtended: () => requests.get("/strategies/extended"),
     getStrategy: (id) => requests.get(`/strategies/${id}`),
     deleteStrategy: (id) => requests.delete(`/strategies/${id}`),
-    checkStrategyName: (name) => requests.get(`/strategies/check-name/${encodeURIComponent(name)}`)
+    checkStrategyName: (name) => requests.get(`/strategies/check-name/${encodeURIComponent(name)}`),
+    // Strategy management endpoints
+    duplicateStrategy: (id) => requests.post(`/strategies/${id}/duplicate`),
+    exportStrategy: (id) => requests.get(`/strategies/${id}/export`),
+    validateImport: (data) => requests.post('/strategies/import/validate', { strategy_data: data }),
+    saveImport: (data, options = {}) => requests.post('/strategies/import/save', {
+        strategy_data: data,
+        name_override: options.name_override,
+        conflict_resolution: options.conflict_resolution
+    })
 }
 
 export default endPoints;

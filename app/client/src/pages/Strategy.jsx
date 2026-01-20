@@ -15,9 +15,11 @@ import TimeFilterDialog from '../components/TimeFilterDialog';
 import TradeDirectionSelector from '../components/TradeDirectionSelector';
 import CandleCloseToggle from '../components/CandleCloseToggle';
 import SaveStrategyDialog from '../components/SaveStrategyDialog';
+import LoadStrategyDialog from '../components/LoadStrategyDialog';
+import ImportStrategyDialog from '../components/ImportStrategyDialog';
 import Toast, { useToast } from '../components/Toast';
 import { cn } from '../lib/utils';
-import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap, Save } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap, Save, FolderOpen, Upload, Download, Copy } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
@@ -50,6 +52,7 @@ import {
   STRATEGY_DRAFT_TIMESTAMP_KEY,
   AUTO_SAVE_INTERVAL_MS,
   STRATEGY_DRAFT_EXPIRY_MS,
+  UNDO_TOAST_DURATION_MS,
 } from '../app/constants';
 import { DRAWING_TOOLS } from '../app/drawingTypes';
 import {
@@ -257,6 +260,25 @@ function Strategy() {
   const [draftRecoveryDialog, setDraftRecoveryDialog] = useState({
     isOpen: false,
     draftTimestamp: null,
+  });
+
+  // Load Strategy Dialog state
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [strategiesList, setStrategiesList] = useState([]);
+  const [isLoadingStrategies, setIsLoadingStrategies] = useState(false);
+  const [pendingDeleteStrategy, setPendingDeleteStrategy] = useState(null);
+  const [undoDeleteTimeout, setUndoDeleteTimeout] = useState(null);
+
+  // Import Strategy Dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [isValidatingImport, setIsValidatingImport] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Delete confirmation dialog state
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({
+    isOpen: false,
+    strategyName: '',
+    strategyId: null,
   });
 
   // Toast hook for notifications
@@ -1486,6 +1508,350 @@ function Strategy() {
   }, []);
 
   // =============================================================================
+  // STRATEGY MANAGEMENT HANDLERS (Load, Duplicate, Delete, Export, Import)
+  // =============================================================================
+
+  // Fetch strategies list for load dialog
+  const fetchStrategiesList = useCallback(async () => {
+    setIsLoadingStrategies(true);
+    try {
+      const response = await endPoints.listStrategiesExtended();
+      if (response.success) {
+        setStrategiesList(response.strategies || []);
+      } else {
+        showError(response.error || 'Failed to load strategies');
+      }
+    } catch (error) {
+      console.error('Failed to fetch strategies:', error);
+      showError('Failed to load strategies');
+    } finally {
+      setIsLoadingStrategies(false);
+    }
+  }, [showError]);
+
+  // Open load dialog
+  const handleOpenLoadDialog = useCallback(() => {
+    setLoadDialogOpen(true);
+    fetchStrategiesList();
+  }, [fetchStrategiesList]);
+
+  // Close load dialog
+  const handleCloseLoadDialog = useCallback(() => {
+    setLoadDialogOpen(false);
+  }, []);
+
+  // Load a strategy from the list
+  const handleLoadStrategy = useCallback(async (strategyListItem) => {
+    try {
+      const response = await endPoints.getStrategy(strategyListItem.id);
+      if (response.success && response.strategy) {
+        const strategy = response.strategy;
+
+        // Update all state from loaded strategy
+        setCurrentStrategyName(strategy.name || '');
+        setCurrentStrategyDescription(strategy.description || '');
+        setCurrentStrategyTags(strategy.tags || []);
+        setExistingStrategyId(strategy.id);
+        setTradeDirection(strategy.trade_direction || TRADE_DIRECTIONS.BOTH);
+        setConfirmOnCandleClose(strategy.confirm_on_candle_close || CANDLE_CLOSE_CONFIRMATION_DEFAULT);
+
+        if (strategy.pair) setSelectedPair(strategy.pair);
+        if (strategy.timeframe) setSelectedGran(strategy.timeframe);
+        if (strategy.candle_count) setSelectedCount(strategy.candle_count);
+
+        // Restore indicators
+        if (strategy.indicators && Array.isArray(strategy.indicators)) {
+          const restoredIndicators = strategy.indicators.map(ind => {
+            const indicatorDef = INDICATORS[ind.id];
+            return {
+              ...indicatorDef,
+              instanceId: ind.instance_id || `${ind.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              params: ind.params || indicatorDef?.defaultParams,
+              color: ind.color || indicatorDef?.defaultColor,
+              lineWidth: ind.line_width || 2,
+              lineStyle: ind.line_style || 'solid',
+              fillOpacity: ind.fill_opacity || 0.2,
+            };
+          }).filter(Boolean);
+          setActiveIndicators(restoredIndicators);
+        }
+
+        // Restore patterns
+        if (strategy.patterns && Array.isArray(strategy.patterns)) {
+          setActivePatterns(strategy.patterns.map(pat => ({
+            ...pat,
+            instanceId: pat.instance_id || `${pat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          })));
+        }
+
+        // Restore conditions
+        if (strategy.conditions && Array.isArray(strategy.conditions)) {
+          setConditions(strategy.conditions.map(c => ({
+            id: c.id,
+            section: c.section,
+            leftOperand: c.left_operand,
+            operator: c.operator,
+            rightOperand: c.right_operand,
+            indicatorInstanceId: c.indicator_instance_id,
+            indicatorDisplayName: c.indicator_display_name,
+            patternInstanceId: c.pattern_instance_id,
+            isPatternCondition: c.is_pattern_condition,
+          })));
+        }
+
+        // Restore groups
+        if (strategy.groups && Array.isArray(strategy.groups)) {
+          setGroups(strategy.groups.map(g => ({
+            id: g.id,
+            operator: g.operator,
+            conditionIds: g.condition_ids || [],
+            parentId: g.parent_id,
+            section: g.section,
+          })));
+        }
+
+        // Restore reference indicators
+        if (strategy.reference_indicators && Array.isArray(strategy.reference_indicators)) {
+          setReferenceIndicators(strategy.reference_indicators);
+        }
+
+        // Restore time filter
+        if (strategy.time_filter) {
+          setTimeFilter(strategy.time_filter);
+        }
+
+        // Restore drawings
+        if (strategy.drawings) {
+          setDrawings(deserializeDrawings(JSON.stringify(strategy.drawings)));
+        }
+
+        setLoadDialogOpen(false);
+        showSuccess(`Strategy '${strategy.name}' loaded successfully`);
+
+        // Optionally trigger data load for the strategy's pair/timeframe
+        if (strategy.pair && strategy.timeframe) {
+          loadTechnicals();
+        }
+      } else {
+        showError(response.error || 'Failed to load strategy');
+      }
+    } catch (error) {
+      console.error('Failed to load strategy:', error);
+      showError('Failed to load strategy');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccess, showError]);
+
+  // Duplicate a strategy
+  const handleDuplicateStrategy = useCallback(async (strategy) => {
+    try {
+      const response = await endPoints.duplicateStrategy(strategy.id);
+      if (response.success) {
+        showSuccess(`Strategy duplicated as '${response.strategy_name}'`);
+        // Refresh the list if dialog is open
+        if (loadDialogOpen) {
+          fetchStrategiesList();
+        }
+      } else {
+        showError(response.error || 'Failed to duplicate strategy');
+      }
+    } catch (error) {
+      console.error('Failed to duplicate strategy:', error);
+      showError('Failed to duplicate strategy');
+    }
+  }, [loadDialogOpen, fetchStrategiesList, showSuccess, showError]);
+
+  // Duplicate the current loaded strategy
+  const handleDuplicateCurrentStrategy = useCallback(async () => {
+    if (!existingStrategyId) {
+      showError('No strategy is currently loaded');
+      return;
+    }
+    try {
+      const response = await endPoints.duplicateStrategy(existingStrategyId);
+      if (response.success) {
+        setExistingStrategyId(response.strategy_id);
+        setCurrentStrategyName(response.strategy_name);
+        showSuccess(`Strategy duplicated as '${response.strategy_name}'`);
+      } else {
+        showError(response.error || 'Failed to duplicate strategy');
+      }
+    } catch (error) {
+      console.error('Failed to duplicate strategy:', error);
+      showError('Failed to duplicate strategy');
+    }
+  }, [existingStrategyId, showSuccess, showError]);
+
+  // Delete strategy - show confirmation
+  const handleDeleteStrategyConfirm = useCallback((strategy) => {
+    setDeleteConfirmDialog({
+      isOpen: true,
+      strategyName: strategy.name,
+      strategyId: strategy.id,
+    });
+  }, []);
+
+  // Perform delete with undo support
+  const handleDeleteStrategy = useCallback(async () => {
+    const { strategyId, strategyName } = deleteConfirmDialog;
+
+    // Store for potential undo
+    const strategyToDelete = strategiesList.find(s => s.id === strategyId);
+    setPendingDeleteStrategy(strategyToDelete);
+
+    // Optimistically remove from list
+    setStrategiesList(prev => prev.filter(s => s.id !== strategyId));
+    setDeleteConfirmDialog({ isOpen: false, strategyName: '', strategyId: null });
+
+    // Show undo toast
+    showToast('warning', `Strategy '${strategyName}' deleted. Click to undo.`, UNDO_TOAST_DURATION_MS);
+
+    // Set timeout for actual deletion
+    const timeout = setTimeout(async () => {
+      try {
+        await endPoints.deleteStrategy(strategyId);
+        setPendingDeleteStrategy(null);
+
+        // Clear from current if it was loaded
+        if (existingStrategyId === strategyId) {
+          setExistingStrategyId(null);
+          setCurrentStrategyName('');
+          setCurrentStrategyDescription('');
+          setCurrentStrategyTags([]);
+        }
+      } catch (error) {
+        console.error('Failed to delete strategy:', error);
+        // Restore to list on error
+        if (strategyToDelete) {
+          setStrategiesList(prev => [...prev, strategyToDelete]);
+        }
+        showError('Failed to delete strategy');
+      }
+    }, UNDO_TOAST_DURATION_MS);
+
+    setUndoDeleteTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deleteConfirmDialog, strategiesList, existingStrategyId, showToast, showError]);
+
+  // Undo delete
+  const handleUndoDelete = useCallback(() => {
+    if (undoDeleteTimeout) {
+      clearTimeout(undoDeleteTimeout);
+      setUndoDeleteTimeout(null);
+    }
+
+    if (pendingDeleteStrategy) {
+      setStrategiesList(prev => [...prev, pendingDeleteStrategy].sort(
+        (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
+      ));
+      setPendingDeleteStrategy(null);
+      hideToast();
+      showSuccess('Delete cancelled');
+    }
+  }, [undoDeleteTimeout, pendingDeleteStrategy, hideToast, showSuccess]);
+
+  // Cancel delete confirmation
+  const handleCancelDeleteConfirm = useCallback(() => {
+    setDeleteConfirmDialog({ isOpen: false, strategyName: '', strategyId: null });
+  }, []);
+
+  // Export a strategy
+  const handleExportStrategy = useCallback(async (strategy) => {
+    try {
+      const response = await endPoints.exportStrategy(strategy.id);
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      const safeName = strategy.name.replace(/[^a-z0-9]/gi, '_');
+      const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      link.download = `strategy_${safeName}_${date}.json`;
+      link.href = url;
+      link.click();
+
+      URL.revokeObjectURL(url);
+      showSuccess(`Strategy '${strategy.name}' exported`);
+    } catch (error) {
+      console.error('Failed to export strategy:', error);
+      showError('Failed to export strategy');
+    }
+  }, [showSuccess, showError]);
+
+  // Export the current loaded strategy
+  const handleExportCurrentStrategy = useCallback(async () => {
+    if (!existingStrategyId) {
+      showError('No strategy is currently loaded');
+      return;
+    }
+    await handleExportStrategy({ id: existingStrategyId, name: currentStrategyName });
+  }, [existingStrategyId, currentStrategyName, handleExportStrategy, showError]);
+
+  // Open import dialog
+  const handleOpenImportDialog = useCallback(() => {
+    setImportDialogOpen(true);
+  }, []);
+
+  // Close import dialog
+  const handleCloseImportDialog = useCallback(() => {
+    setImportDialogOpen(false);
+    setIsValidatingImport(false);
+    setIsImporting(false);
+  }, []);
+
+  // Validate import data
+  const handleValidateImport = useCallback(async (data) => {
+    setIsValidatingImport(true);
+    try {
+      const response = await endPoints.validateImport(data);
+      return response;
+    } catch (error) {
+      console.error('Failed to validate import:', error);
+      return {
+        valid: false,
+        errors: [error.message || 'Validation failed'],
+        warnings: [],
+        strategy_preview: null,
+        name_conflict: false,
+      };
+    } finally {
+      setIsValidatingImport(false);
+    }
+  }, []);
+
+  // Perform import
+  const handleImportStrategy = useCallback(async (data, options) => {
+    setIsImporting(true);
+    try {
+      const response = await endPoints.saveImport(data, options);
+      if (response.success) {
+        showSuccess(`Strategy '${response.strategy_name}' imported successfully`);
+        setImportDialogOpen(false);
+        // Refresh strategies list if load dialog opens next
+        fetchStrategiesList();
+      } else {
+        showError(response.error || 'Failed to import strategy');
+      }
+    } catch (error) {
+      console.error('Failed to import strategy:', error);
+      showError('Failed to import strategy');
+    } finally {
+      setIsImporting(false);
+    }
+  }, [fetchStrategiesList, showSuccess, showError]);
+
+  // Check if current strategy has unsaved changes
+  const hasUnsavedChanges = useMemo(() => {
+    // Simple check: if we have indicators, conditions, or drawings but no saved strategy
+    if (!existingStrategyId && (activeIndicators.length > 0 || conditions.length > 0 || drawings.length > 0)) {
+      return true;
+    }
+    // More comprehensive check would compare current state with saved state
+    return false;
+  }, [existingStrategyId, activeIndicators.length, conditions.length, drawings.length]);
+
+  // =============================================================================
   // AUTO-SAVE DRAFT HANDLERS
   // =============================================================================
 
@@ -1918,9 +2284,40 @@ function Strategy() {
               Analyze currency pairs, timeframes, and technical indicators for trading decisions
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Load Strategy */}
             <Button
-              text="Save Strategy"
+              text="Load"
+              handleClick={handleOpenLoadDialog}
+              icon={FolderOpen}
+              className="btn-secondary"
+            />
+            {/* Import Strategy */}
+            <Button
+              text="Import"
+              handleClick={handleOpenImportDialog}
+              icon={Upload}
+              className="btn-secondary"
+            />
+            {/* Export Current Strategy */}
+            <Button
+              text="Export"
+              handleClick={handleExportCurrentStrategy}
+              icon={Download}
+              className="btn-secondary"
+              disabled={!existingStrategyId}
+            />
+            {/* Duplicate Current Strategy */}
+            <Button
+              text="Duplicate"
+              handleClick={handleDuplicateCurrentStrategy}
+              icon={Copy}
+              className="btn-secondary"
+              disabled={!existingStrategyId}
+            />
+            {/* Save Strategy */}
+            <Button
+              text="Save"
               handleClick={handleOpenSaveDialog}
               icon={Save}
               className="btn-primary"
@@ -2343,12 +2740,51 @@ function Strategy() {
         variant="info"
       />
 
+      {/* Load Strategy Dialog */}
+      <LoadStrategyDialog
+        isOpen={loadDialogOpen}
+        onClose={handleCloseLoadDialog}
+        onLoad={handleLoadStrategy}
+        onDuplicate={handleDuplicateStrategy}
+        onDelete={handleDeleteStrategyConfirm}
+        onExport={handleExportStrategy}
+        strategies={strategiesList}
+        isLoading={isLoadingStrategies}
+        hasUnsavedChanges={hasUnsavedChanges}
+      />
+
+      {/* Import Strategy Dialog */}
+      <ImportStrategyDialog
+        isOpen={importDialogOpen}
+        onClose={handleCloseImportDialog}
+        onImport={handleImportStrategy}
+        onValidate={handleValidateImport}
+        isValidating={isValidatingImport}
+        isImporting={isImporting}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirmDialog.isOpen}
+        onClose={handleCancelDeleteConfirm}
+        title="Delete Strategy"
+        message={`Are you sure you want to delete "${deleteConfirmDialog.strategyName}"? This action can be undone within 30 seconds.`}
+        actions={[
+          {
+            label: 'Delete',
+            variant: 'danger',
+            onClick: handleDeleteStrategy,
+          },
+        ]}
+        variant="danger"
+      />
+
       {/* Toast Notification */}
       <Toast
         type={toast?.type || 'info'}
         message={toast?.message || ''}
         isVisible={!!toast}
-        onClose={hideToast}
+        onClose={pendingDeleteStrategy ? handleUndoDelete : hideToast}
         duration={toast?.duration}
       />
     </div>

@@ -271,3 +271,28 @@ export const STRATEGY_DESCRIPTION_MAX_LENGTH = 500;
 
 // Draft expiry time in milliseconds (24 hours)
 export const STRATEGY_DRAFT_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+// =============================================================================
+// STRATEGY MANAGEMENT CONSTANTS - Load/Duplicate/Delete/Export/Import
+// =============================================================================
+
+// Export schema version
+export const EXPORT_SCHEMA_VERSION = "1.0";
+
+// Fields to exclude from export (security sensitive)
+export const STRATEGY_EXPORT_EXCLUDED_FIELDS = [
+  'api_keys',
+  'account_info',
+  'credentials',
+  'secrets',
+  'internal_id',
+];
+
+// Undo toast duration for delete operations (30 seconds)
+export const UNDO_TOAST_DURATION_MS = 30000;
+
+// Strategy file extension
+export const STRATEGY_FILE_EXTENSION = '.json';
+
+// MIME type for strategy files
+export const STRATEGY_FILE_MIME_TYPE = 'application/json';
