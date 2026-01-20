@@ -6,7 +6,13 @@
  * Also includes group-related functions for AND/OR logic.
  */
 
-import { GROUP_OPERATORS, MAX_NESTING_DEPTH } from './constants';
+import {
+  GROUP_OPERATORS,
+  MAX_NESTING_DEPTH,
+  AVAILABLE_TIMEFRAMES,
+  TIMEFRAME_LABELS,
+  MAX_REFERENCE_TIMEFRAMES,
+} from './constants';
 
 /**
  * Comparison operators for conditions
@@ -278,9 +284,11 @@ export function getPriceSourceLabel(priceSourceId) {
  * @param {Object} options - Optional configuration
  * @param {boolean} options.isLeftOperand - Whether this is for the left operand (includes Indicator Values group)
  * @param {boolean} options.includePercentage - Whether to include percentage value option
+ * @param {Array} options.referenceIndicators - Optional array of reference indicators for multi-timeframe support
+ * @param {Function} options.getReferenceDisplayName - Optional function to get reference indicator display name
  * @returns {Array} Grouped options for dropdown
  */
-export function buildOperandOptions(activeIndicators, getDisplayName, { isLeftOperand = false, includePercentage = false } = {}) {
+export function buildOperandOptions(activeIndicators, getDisplayName, { isLeftOperand = false, includePercentage = false, referenceIndicators = [], getReferenceDisplayName = null } = {}) {
   const options = [];
 
   // Price sources group
@@ -376,6 +384,38 @@ export function buildOperandOptions(activeIndicators, getDisplayName, { isLeftOp
     }
   }
 
+  // Reference Indicators group (for multi-timeframe conditions)
+  if (referenceIndicators && referenceIndicators.length > 0) {
+    const refIndicatorOptions = [];
+
+    referenceIndicators.forEach(refIndicator => {
+      const displayName = getReferenceDisplayName
+        ? getReferenceDisplayName(refIndicator)
+        : `${refIndicator.indicatorId} (${Object.values(refIndicator.params || {}).join(', ')})`;
+      const timeframeBadge = `[${refIndicator.timeframe}]`;
+
+      // For reference indicators, we need to check if they have components
+      // This would be determined by the indicator definition
+      refIndicatorOptions.push({
+        type: 'referenceIndicator',
+        referenceIndicatorId: refIndicator.id,
+        timeframe: refIndicator.timeframe,
+        component: null,
+        label: `${timeframeBadge} ${displayName}`,
+        color: refIndicator.color,
+        indicatorId: refIndicator.indicatorId,
+        isReferenceIndicator: true,
+      });
+    });
+
+    if (refIndicatorOptions.length > 0) {
+      options.push({
+        group: 'Reference Indicators',
+        options: refIndicatorOptions,
+      });
+    }
+  }
+
   // Numeric value options (for thresholds)
   const valueOptions = [
     {
@@ -422,6 +462,7 @@ export function formatConditionString(condition) {
 /**
  * Format condition as natural language preview
  * Returns a human-readable string like "When Close Price crosses above EMA (50)"
+ * For multi-timeframe conditions, includes timeframe prefix like "When [H4] EMA (50) is above..."
  * @param {Object} condition - The condition object
  * @returns {string|null} Natural language preview string, or null if condition is incomplete
  */
@@ -434,10 +475,15 @@ export function formatNaturalLanguageCondition(condition) {
   const operator = condition.operator;
   const rightOperand = condition.rightOperand;
 
-  // Get the left operand label
-  const leftLabel = leftOperand.label || getOperandLabel(leftOperand);
+  // Get the left operand label with optional timeframe prefix
+  let leftLabel = leftOperand.label || getOperandLabel(leftOperand);
   if (!leftLabel) {
     return null;
+  }
+
+  // Prepend timeframe badge if operand has a timeframe
+  if (leftOperand.timeframe) {
+    leftLabel = `[${leftOperand.timeframe}] ${leftLabel}`;
   }
 
   // Get the operator label
@@ -480,6 +526,11 @@ export function formatNaturalLanguageCondition(condition) {
   let rightLabel = rightOperand.label || getOperandLabel(rightOperand);
   if (!rightLabel) {
     return `When ${leftLabel} ${operatorLabel} ...`;
+  }
+
+  // Prepend timeframe badge if right operand has a timeframe
+  if (rightOperand.timeframe) {
+    rightLabel = `[${rightOperand.timeframe}] ${rightLabel}`;
   }
 
   // Format percentage values
@@ -573,9 +624,10 @@ export function validateOperandIndicator(operand, activeIndicators) {
  * @param {Object} condition - The condition to validate
  * @param {Array} activeIndicators - List of active indicators on the chart
  * @param {Array} activePatterns - List of active patterns on the chart (optional)
+ * @param {Array} referenceIndicators - List of reference indicators (optional)
  * @returns {Object} Validation result { isValid: boolean, errorMessage: string|null, invalidOperand: 'left'|'right'|null }
  */
-export function validateCondition(condition, activeIndicators, activePatterns = []) {
+export function validateCondition(condition, activeIndicators, activePatterns = [], referenceIndicators = []) {
   if (!condition) {
     return { isValid: false, errorMessage: 'Condition is undefined', invalidOperand: null };
   }
@@ -596,7 +648,7 @@ export function validateCondition(condition, activeIndicators, activePatterns = 
   }
 
   // Validate left operand
-  const leftValidation = validateOperandIndicator(condition.leftOperand, activeIndicators);
+  const leftValidation = validateOperandWithReference(condition.leftOperand, activeIndicators, referenceIndicators);
   if (!leftValidation.isValid) {
     return {
       isValid: false,
@@ -607,7 +659,7 @@ export function validateCondition(condition, activeIndicators, activePatterns = 
 
   // Validate right operand (if present)
   if (condition.rightOperand) {
-    const rightValidation = validateOperandIndicator(condition.rightOperand, activeIndicators);
+    const rightValidation = validateOperandWithReference(condition.rightOperand, activeIndicators, referenceIndicators);
     if (!rightValidation.isValid) {
       return {
         isValid: false,
@@ -618,6 +670,41 @@ export function validateCondition(condition, activeIndicators, activePatterns = 
   }
 
   return { isValid: true, errorMessage: null, invalidOperand: null };
+}
+
+/**
+ * Validate an operand that may reference either a chart indicator or a reference indicator
+ * @param {Object} operand - The operand to validate
+ * @param {Array} activeIndicators - List of active indicators on the chart
+ * @param {Array} referenceIndicators - List of reference indicators
+ * @returns {Object} Validation result { isValid: boolean, errorMessage: string|null }
+ */
+function validateOperandWithReference(operand, activeIndicators, referenceIndicators) {
+  if (!operand) {
+    return { isValid: true, errorMessage: null };
+  }
+
+  // Price and value operands are always valid
+  if (operand.type === 'price' || operand.type === 'value' || operand.type === 'percentage') {
+    return { isValid: true, errorMessage: null };
+  }
+
+  // Reference indicator operands
+  if (operand.type === 'referenceIndicator' || operand.isReferenceIndicator || operand.referenceIndicatorId) {
+    const refIndicatorExists = referenceIndicators.some(
+      ri => ri.id === operand.referenceIndicatorId
+    );
+    if (!refIndicatorExists) {
+      return {
+        isValid: false,
+        errorMessage: 'The referenced indicator from another timeframe has been removed',
+      };
+    }
+    return { isValid: true, errorMessage: null };
+  }
+
+  // Standard indicator operands (delegate to existing validator)
+  return validateOperandIndicator(operand, activeIndicators);
 }
 
 /**
@@ -1127,6 +1214,197 @@ export function reorderConditionInGroup(conditionId, groupId, newIndex, groups) 
     }
     return group;
   });
+}
+
+// =============================================================================
+// MULTI-TIMEFRAME FUNCTIONS - Reference Indicator Support
+// =============================================================================
+
+/**
+ * Generate a unique reference indicator ID
+ * @returns {string} Unique reference indicator ID
+ */
+export function generateReferenceIndicatorId() {
+  return `ref-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Create a reference indicator for multi-timeframe conditions
+ * @param {string} timeframe - The timeframe code (H4, D, etc.)
+ * @param {string} indicatorId - The indicator ID from INDICATORS catalog
+ * @param {Object} params - The indicator parameters (period, etc.)
+ * @param {string} color - Optional custom color
+ * @returns {Object} A new reference indicator object
+ */
+export function createReferenceIndicator(timeframe, indicatorId, params = {}, color = null) {
+  return {
+    id: generateReferenceIndicatorId(),
+    timeframe: timeframe,
+    indicatorId: indicatorId,
+    params: params,
+    color: color,
+    createdAt: Date.now(),
+  };
+}
+
+/**
+ * Create a multi-timeframe condition
+ * @param {string} section - The section for the condition (V2 format)
+ * @param {string} timeframe - The reference timeframe
+ * @param {Object} leftOperand - The left operand with timeframe
+ * @param {string} operator - The operator ID
+ * @param {Object} rightOperand - The right operand (may also have timeframe)
+ * @returns {Object} A new multi-timeframe condition object
+ */
+export function createMultiTimeframeCondition(section, timeframe, leftOperand, operator, rightOperand) {
+  const resolvedSection = migrateSectionToV2(section);
+
+  return {
+    id: generateConditionId(),
+    indicatorInstanceId: null, // Multi-timeframe conditions are not linked to chart indicators
+    leftOperand: {
+      ...leftOperand,
+      timeframe: timeframe,
+    },
+    operator: operator,
+    rightOperand: rightOperand,
+    section: resolvedSection,
+    isMultiTimeframe: true,
+    isNew: true,
+  };
+}
+
+/**
+ * Get the display label for a timeframe code
+ * @param {string} timeframeCode - The timeframe code (M1, H4, D, etc.)
+ * @returns {string} The human-readable timeframe label
+ */
+export function getTimeframeLabel(timeframeCode) {
+  return TIMEFRAME_LABELS[timeframeCode] || timeframeCode;
+}
+
+/**
+ * Get the short display badge for a timeframe
+ * @param {string} timeframeCode - The timeframe code
+ * @returns {string} The badge text (e.g., "[H4]")
+ */
+export function getTimeframeBadge(timeframeCode) {
+  return `[${timeframeCode}]`;
+}
+
+/**
+ * Validate if adding a new timeframe would exceed the limit
+ * @param {Array} referenceIndicators - Current reference indicators
+ * @param {string} newTimeframe - The timeframe to add
+ * @returns {Object} Validation result { isValid: boolean, errorMessage: string|null, currentCount: number }
+ */
+export function validateTimeframeLimits(referenceIndicators, newTimeframe) {
+  // Get unique timeframes currently in use
+  const currentTimeframes = new Set(referenceIndicators.map(ri => ri.timeframe));
+
+  // If this timeframe is already in use, no new timeframe is added
+  if (currentTimeframes.has(newTimeframe)) {
+    return {
+      isValid: true,
+      errorMessage: null,
+      currentCount: currentTimeframes.size,
+    };
+  }
+
+  // Check if adding would exceed limit
+  if (currentTimeframes.size >= MAX_REFERENCE_TIMEFRAMES) {
+    return {
+      isValid: false,
+      errorMessage: `Maximum ${MAX_REFERENCE_TIMEFRAMES} additional timeframes per strategy. Remove a reference indicator from another timeframe first.`,
+      currentCount: currentTimeframes.size,
+    };
+  }
+
+  return {
+    isValid: true,
+    errorMessage: null,
+    currentCount: currentTimeframes.size,
+  };
+}
+
+/**
+ * Validate a reference indicator
+ * @param {Object} referenceIndicator - The reference indicator to validate
+ * @param {Array} indicatorDefinitions - Array of indicator definitions (INDICATORS)
+ * @returns {Object} Validation result { isValid: boolean, errorMessage: string|null }
+ */
+export function validateReferenceIndicator(referenceIndicator, indicatorDefinitions) {
+  if (!referenceIndicator) {
+    return { isValid: false, errorMessage: 'Reference indicator is undefined' };
+  }
+
+  // Check timeframe is valid
+  if (!AVAILABLE_TIMEFRAMES.includes(referenceIndicator.timeframe)) {
+    return {
+      isValid: false,
+      errorMessage: `Invalid timeframe: ${referenceIndicator.timeframe}`,
+    };
+  }
+
+  // Check indicator exists
+  const indicatorDef = indicatorDefinitions.find(ind => ind.id === referenceIndicator.indicatorId);
+  if (!indicatorDef) {
+    return {
+      isValid: false,
+      errorMessage: `Unknown indicator: ${referenceIndicator.indicatorId}`,
+    };
+  }
+
+  return { isValid: true, errorMessage: null };
+}
+
+/**
+ * Get reference indicators grouped by timeframe
+ * @param {Array} referenceIndicators - Array of reference indicators
+ * @returns {Object} Object with timeframe keys and arrays of indicators
+ */
+export function groupReferenceIndicatorsByTimeframe(referenceIndicators) {
+  const grouped = {};
+
+  referenceIndicators.forEach(ri => {
+    if (!grouped[ri.timeframe]) {
+      grouped[ri.timeframe] = [];
+    }
+    grouped[ri.timeframe].push(ri);
+  });
+
+  // Sort timeframes by their order in AVAILABLE_TIMEFRAMES
+  const sortedGrouped = {};
+  AVAILABLE_TIMEFRAMES.forEach(tf => {
+    if (grouped[tf]) {
+      sortedGrouped[tf] = grouped[tf];
+    }
+  });
+
+  return sortedGrouped;
+}
+
+/**
+ * Find conditions that use a specific reference indicator
+ * @param {string} referenceIndicatorId - The reference indicator ID
+ * @param {Array} conditions - All conditions
+ * @returns {Array} Conditions that reference this indicator
+ */
+export function findConditionsUsingReferenceIndicator(referenceIndicatorId, conditions) {
+  return conditions.filter(c => {
+    const usedInLeft = c.leftOperand?.referenceIndicatorId === referenceIndicatorId;
+    const usedInRight = c.rightOperand?.referenceIndicatorId === referenceIndicatorId;
+    return usedInLeft || usedInRight;
+  });
+}
+
+/**
+ * Get available timeframes excluding the current chart timeframe
+ * @param {string} currentTimeframe - The current chart timeframe
+ * @returns {Array} Available timeframes for reference
+ */
+export function getAvailableReferenceTimeframes(currentTimeframe) {
+  return AVAILABLE_TIMEFRAMES.filter(tf => tf !== currentTimeframe);
 }
 
 // =============================================================================

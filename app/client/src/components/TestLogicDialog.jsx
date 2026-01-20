@@ -9,7 +9,10 @@ import {
   TrendingDown,
   Activity,
   BarChart3,
+  Timer,
 } from 'lucide-react';
+import { groupReferenceIndicatorsByTimeframe } from '../app/conditionDefaults';
+import { TIMEFRAME_LABELS } from '../app/constants';
 import {
   CONDITION_SECTION_LABELS,
   GROUP_OPERATOR_LABELS,
@@ -35,6 +38,8 @@ import {
  * @param {Object} patternDetections - Map of pattern instanceId -> boolean
  * @param {Object} previousCandleData - Previous candle data
  * @param {Object} previousIndicatorValues - Previous indicator values
+ * @param {Object} referenceIndicatorValues - Map of reference indicator ID -> current value
+ * @param {Array} referenceIndicators - Array of reference indicator objects
  */
 function TestLogicDialog({
   isOpen,
@@ -47,6 +52,8 @@ function TestLogicDialog({
   patternDetections = {},
   previousCandleData = null,
   previousIndicatorValues = null,
+  referenceIndicatorValues = {},
+  referenceIndicators = [],
 }) {
   // Evaluate logic
   const evaluationResult = useMemo(() => {
@@ -279,6 +286,50 @@ function TestLogicDialog({
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Reference Indicator Values (Multi-Timeframe) */}
+          {referenceIndicators.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <Timer className="h-3 w-3" />
+                Reference Timeframes
+              </h4>
+              {(() => {
+                const grouped = groupReferenceIndicatorsByTimeframe(referenceIndicators);
+                return Object.entries(grouped).map(([timeframe, indicators]) => (
+                  <div key={timeframe} className="mb-2">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs font-semibold mb-1">
+                      {timeframe}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      {TIMEFRAME_LABELS[timeframe]}
+                    </span>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {indicators.map(ri => {
+                        const value = referenceIndicatorValues[ri.id];
+                        return (
+                          <span
+                            key={ri.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
+                            style={{ borderLeft: `3px solid ${ri.color || 'hsl(var(--border))'}` }}
+                          >
+                            <span className="text-muted-foreground">{ri.shortName || ri.indicatorId}:</span>
+                            <span className="font-mono">
+                              {value === null || value === undefined
+                                ? 'N/A'
+                                : typeof value === 'object'
+                                  ? Object.entries(value).map(([k, v]) => `${k}: ${formatValue(v)}`).join(', ')
+                                  : formatValue(value)}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           )}
         </div>

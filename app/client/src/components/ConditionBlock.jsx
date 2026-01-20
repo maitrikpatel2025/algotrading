@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { cn } from '../lib/utils';
-import { X, GripVertical, AlertTriangle } from 'lucide-react';
+import { X, GripVertical, AlertTriangle, Clock } from 'lucide-react';
 import ConditionDropdown from './ConditionDropdown';
 import {
   OPERATORS,
@@ -32,6 +32,7 @@ import { INDICATORS } from '../app/indicators';
  * @param {string} indicatorColor - The color of the associated indicator
  * @param {boolean} isInGroup - Whether the condition is inside a group
  * @param {string} groupOperator - The group operator (and/or) for visual connector
+ * @param {Array} referenceIndicators - List of reference indicators for validation
  */
 function ConditionBlock({
   condition,
@@ -45,6 +46,7 @@ function ConditionBlock({
   indicatorColor,
   isInGroup = false,
   groupOperator = null,
+  referenceIndicators = [],
 }) {
   const [isNew, setIsNew] = useState(condition.isNew);
   const [isDragging, setIsDragging] = useState(false);
@@ -170,9 +172,13 @@ function ConditionBlock({
   }, []);
 
   // Validate the condition using the comprehensive validation function
-  const validation = validateCondition(condition, activeIndicators, activePatterns);
+  const validation = validateCondition(condition, activeIndicators, activePatterns, referenceIndicators);
   const hasValidIndicator = validation.isValid;
   const validationErrorMessage = validation.errorMessage;
+
+  // Check if this is a multi-timeframe condition
+  const isMultiTimeframe = condition.isMultiTimeframe || condition.leftOperand?.timeframe;
+  const timeframeBadge = condition.leftOperand?.timeframe;
 
   // Generate natural language preview
   const naturalLanguagePreview = formatNaturalLanguageCondition(condition);
@@ -211,6 +217,19 @@ function ConditionBlock({
 
       {/* Content */}
       <div className="p-3 pl-6">
+        {/* Multi-Timeframe Badge */}
+        {isMultiTimeframe && timeframeBadge && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className={cn(
+              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold",
+              "bg-primary/10 text-primary border border-primary/20"
+            )}>
+              <Clock className="h-3 w-3" />
+              {timeframeBadge}
+            </span>
+          </div>
+        )}
+
         {/* Warning for invalid condition */}
         {!hasValidIndicator && (
           <div

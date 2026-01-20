@@ -10,11 +10,12 @@ import IndicatorLibrary from '../components/IndicatorLibrary';
 import LogicPanel from '../components/LogicPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
+import MultiTimeframeConditionDialog from '../components/MultiTimeframeConditionDialog';
 import TradeDirectionSelector from '../components/TradeDirectionSelector';
 import CandleCloseToggle from '../components/CandleCloseToggle';
 import { cn } from '../lib/utils';
 import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap } from 'lucide-react';
-import { INDICATOR_TYPES, getIndicatorDisplayName } from '../app/indicators';
+import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
 import {
@@ -28,6 +29,7 @@ import {
   removeConditionFromGroup,
   addConditionToGroup,
   reorderConditionInGroup,
+  findConditionsUsingReferenceIndicator,
 } from '../app/conditionDefaults';
 import {
   TRADE_DIRECTIONS,
@@ -37,6 +39,7 @@ import {
   CANDLE_CLOSE_CONFIRMATION_DEFAULT,
   CONDITION_GROUPS_STORAGE_KEY,
   GROUP_OPERATORS,
+  REFERENCE_INDICATORS_STORAGE_KEY,
 } from '../app/constants';
 
 // localStorage keys for persisting preferences
@@ -103,6 +106,22 @@ function Strategy() {
   // eslint-disable-next-line no-unused-vars
   const [groupHistory, setGroupHistory] = useState([]);
 
+  // Reference indicators state management for multi-timeframe conditions
+  const [referenceIndicators, setReferenceIndicators] = useState(() => {
+    try {
+      const stored = localStorage.getItem(REFERENCE_INDICATORS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
+  const [referenceIndicatorValues, setReferenceIndicatorValues] = useState({});
+  const [referenceDataLoading, setReferenceDataLoading] = useState(false);
+
   // Trade direction state management
   const [tradeDirection, setTradeDirection] = useState(() => {
     try {
@@ -153,6 +172,12 @@ function Strategy() {
     initialLineWidth: null,
     initialLineStyle: null,
     initialFillOpacity: null,
+  });
+
+  // Multi-timeframe condition dialog state
+  const [multiTimeframeDialog, setMultiTimeframeDialog] = useState({
+    isOpen: false,
+    section: null,
   });
 
   // Preview mode state for real-time parameter adjustment
@@ -817,6 +842,103 @@ function Strategy() {
     setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
   }, []);
 
+  // Handle Add Multi-Timeframe Condition button click - opens dialog
+  const handleAddMultiTimeframeCondition = useCallback((section) => {
+    setMultiTimeframeDialog({
+      isOpen: true,
+      section: section,
+    });
+  }, []);
+
+  // Handle multi-timeframe condition dialog close
+  const handleMultiTimeframeDialogClose = useCallback(() => {
+    setMultiTimeframeDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle multi-timeframe condition added from dialog
+  const handleMultiTimeframeConditionAdded = useCallback((condition, referenceIndicator) => {
+    // Add the reference indicator if it doesn't exist
+    setReferenceIndicators(prev => {
+      // Check if an indicator with same timeframe, indicatorId, and params already exists
+      const existingIdx = prev.findIndex(
+        ri => ri.timeframe === referenceIndicator.timeframe &&
+              ri.indicatorId === referenceIndicator.indicatorId &&
+              JSON.stringify(ri.params) === JSON.stringify(referenceIndicator.params)
+      );
+
+      if (existingIdx !== -1) {
+        // Use existing reference indicator - update condition to use existing ID
+        condition.leftOperand.referenceIndicatorId = prev[existingIdx].id;
+        return prev;
+      }
+
+      // Add new reference indicator
+      return [...prev, referenceIndicator];
+    });
+
+    // Add the condition
+    setConditions(prev => [...prev, condition]);
+
+    // Add to history for undo support
+    setConditionHistory(prev => [...prev, { type: 'condition', item: condition }]);
+
+    // Close dialog
+    setMultiTimeframeDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle delete reference indicator
+  const handleDeleteReferenceIndicator = useCallback((referenceIndicatorId) => {
+    // Find conditions using this reference indicator
+    const relatedConditions = findConditionsUsingReferenceIndicator(referenceIndicatorId, conditions);
+    const refIndicator = referenceIndicators.find(ri => ri.id === referenceIndicatorId);
+    const displayName = refIndicator
+      ? `[${refIndicator.timeframe}] ${getIndicatorDisplayName(
+          INDICATORS.find(i => i.id === refIndicator.indicatorId) || { shortName: refIndicator.indicatorId },
+          refIndicator.params
+        )}`
+      : 'this reference indicator';
+
+    if (relatedConditions.length > 0) {
+      // Show confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Remove Reference Indicator',
+        message: `"${displayName}" is used in ${relatedConditions.length} condition${relatedConditions.length !== 1 ? 's' : ''}. Removing it will mark those conditions as invalid. Continue?`,
+        variant: 'warning',
+        actions: [
+          {
+            label: 'Remove',
+            variant: 'danger',
+            onClick: () => {
+              setReferenceIndicators(prev => prev.filter(ri => ri.id !== referenceIndicatorId));
+              setReferenceIndicatorValues(prev => {
+                const newValues = { ...prev };
+                delete newValues[referenceIndicatorId];
+                return newValues;
+              });
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+        ],
+      });
+    } else {
+      // No related conditions, just remove
+      setReferenceIndicators(prev => prev.filter(ri => ri.id !== referenceIndicatorId));
+      setReferenceIndicatorValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[referenceIndicatorId];
+        return newValues;
+      });
+    }
+  }, [conditions, referenceIndicators]);
+
+  // Get reference indicator display name
+  const getReferenceDisplayName = useCallback((refIndicator) => {
+    const indicatorDef = INDICATORS.find(i => i.id === refIndicator.indicatorId);
+    if (!indicatorDef) return refIndicator.indicatorId;
+    return getIndicatorDisplayName(indicatorDef, refIndicator.params);
+  }, []);
+
   // Handle creating a new group from selected conditions
   const handleGroupCreate = useCallback((conditionIds, operator = GROUP_OPERATORS.AND, section, parentGroupId = null) => {
     if (conditionIds.length < 2) return;
@@ -1047,6 +1169,96 @@ function Strategy() {
       console.warn('Failed to save groups to localStorage:', e);
     }
   }, [groups]);
+
+  // Persist reference indicators to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(REFERENCE_INDICATORS_STORAGE_KEY, JSON.stringify(referenceIndicators));
+    } catch (e) {
+      console.warn('Failed to save reference indicators to localStorage:', e);
+    }
+  }, [referenceIndicators]);
+
+  // Calculate reference indicator values when data changes or reference indicators change
+  useEffect(() => {
+    const calculateReferenceValues = async () => {
+      if (referenceIndicators.length === 0 || !selectedPair) {
+        setReferenceIndicatorValues({});
+        return;
+      }
+
+      setReferenceDataLoading(true);
+      const newValues = {};
+
+      // Group reference indicators by timeframe to minimize API calls
+      const byTimeframe = {};
+      referenceIndicators.forEach(ri => {
+        if (!byTimeframe[ri.timeframe]) {
+          byTimeframe[ri.timeframe] = [];
+        }
+        byTimeframe[ri.timeframe].push(ri);
+      });
+
+      // For each timeframe, fetch data and calculate indicators
+      // Note: In a real implementation, this would fetch actual candle data
+      // and run the indicator calculations. For now, we simulate with placeholder values.
+      try {
+        for (const [, indicators] of Object.entries(byTimeframe)) {
+          for (const ri of indicators) {
+            // Generate a placeholder value based on the indicator type
+            // In production, this would use actual API data and indicator calculation
+            let value = null;
+            const indicatorDef = INDICATORS.find(i => i.id === ri.indicatorId);
+
+            if (indicatorDef) {
+              // Simulate indicator values (in production, calculate from real data)
+              switch (ri.indicatorId) {
+                case 'rsi':
+                  value = 45 + Math.random() * 30; // RSI: 45-75 range
+                  break;
+                case 'macd':
+                  value = {
+                    'MACD Line': (Math.random() - 0.5) * 0.01,
+                    'Signal Line': (Math.random() - 0.5) * 0.01,
+                    'Histogram': (Math.random() - 0.5) * 0.005,
+                  };
+                  break;
+                case 'ema':
+                case 'sma':
+                  // For moving averages, use a price-like value
+                  value = 1.08 + Math.random() * 0.02;
+                  break;
+                case 'bollinger_bands':
+                  value = {
+                    'Upper Band': 1.10,
+                    'Middle Band': 1.08,
+                    'Lower Band': 1.06,
+                  };
+                  break;
+                case 'stochastic':
+                  value = {
+                    '%K': 30 + Math.random() * 40,
+                    '%D': 30 + Math.random() * 40,
+                  };
+                  break;
+                default:
+                  value = Math.random() * 100;
+              }
+            }
+
+            newValues[ri.id] = value;
+          }
+        }
+      } catch (error) {
+        console.warn('Error calculating reference indicator values:', error);
+      }
+
+      setReferenceIndicatorValues(newValues);
+      setReferenceDataLoading(false);
+    };
+
+    calculateReferenceValues();
+  }, [referenceIndicators, selectedPair, priceData]);
 
   // Clear indicator error after 5 seconds
   useEffect(() => {
@@ -1408,6 +1620,7 @@ function Strategy() {
           highlightedIndicatorId={highlightedIndicatorId}
           tradeDirection={tradeDirection}
           onAddCondition={handleAddCondition}
+          onAddMultiTimeframeCondition={handleAddMultiTimeframeCondition}
           onGroupCreate={handleGroupCreate}
           onGroupUpdate={handleGroupUpdate}
           onGroupDelete={handleGroupDelete}
@@ -1416,6 +1629,11 @@ function Strategy() {
           onConditionReorderInGroup={handleConditionReorderInGroup}
           onTestLogic={handleTestLogic}
           testLogicData={testLogicData}
+          referenceIndicators={referenceIndicators}
+          referenceIndicatorValues={referenceIndicatorValues}
+          getReferenceDisplayName={getReferenceDisplayName}
+          onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
+          referenceDataLoading={referenceDataLoading}
         />
       </div>
 
@@ -1451,11 +1669,17 @@ function Strategy() {
             highlightedIndicatorId={highlightedIndicatorId}
             tradeDirection={tradeDirection}
             onAddCondition={handleAddCondition}
+            onAddMultiTimeframeCondition={handleAddMultiTimeframeCondition}
             onGroupCreate={handleGroupCreate}
             onGroupUpdate={handleGroupUpdate}
             onGroupDelete={handleGroupDelete}
             onGroupOperatorChange={handleGroupOperatorChange}
             onUngroup={handleUngroup}
+            referenceIndicators={referenceIndicators}
+            referenceIndicatorValues={referenceIndicatorValues}
+            getReferenceDisplayName={getReferenceDisplayName}
+            onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
+            referenceDataLoading={referenceDataLoading}
             onConditionReorderInGroup={handleConditionReorderInGroup}
             onTestLogic={handleTestLogic}
             testLogicData={testLogicData}
@@ -1488,6 +1712,16 @@ function Strategy() {
         onPreviewUpdate={handlePreviewUpdate}
         comparisonMode={comparisonMode}
         onComparisonToggle={handleComparisonToggle}
+      />
+
+      {/* Multi-Timeframe Condition Dialog */}
+      <MultiTimeframeConditionDialog
+        isOpen={multiTimeframeDialog.isOpen}
+        onClose={handleMultiTimeframeDialogClose}
+        onAddCondition={handleMultiTimeframeConditionAdded}
+        currentTimeframe={selectedGran}
+        section={multiTimeframeDialog.section}
+        referenceIndicators={referenceIndicators}
       />
     </div>
   );
