@@ -270,3 +270,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting condition validation or invalid condition warnings
     - When working with createStandaloneCondition in conditionDefaults.js
     - When implementing autocomplete/search for indicator references in conditions
+
+- app_docs/feature-cc3d2663-indicator-based-conditions.md
+  - Conditions:
+    - When working with indicator-based conditions (RSI > 70, MACD Histogram > 0)
+    - When implementing range conditions (between X and Y)
+    - When working with indicator numeric bounds validation
+    - When adding new operators to the condition system
+    - When working with createIndicatorCondition or createRangeCondition functions
+    - When implementing percentage value inputs for conditions
+    - When troubleshooting out-of-bounds validation warnings
+    - When extending buildOperandOptions with new operand types
