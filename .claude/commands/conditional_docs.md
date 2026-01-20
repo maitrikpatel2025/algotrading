@@ -258,3 +258,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting Logic Panel collapse/expand or resize issues
     - When working with condition section color coding (green for long, red for short)
     - When implementing drag-and-drop between condition sections
+
+- app_docs/feature-f5db94d8-price-based-conditions.md
+  - Conditions:
+    - When working with standalone price-based conditions in the Logic Panel
+    - When implementing or modifying the "Add Condition" button functionality
+    - When working with natural language condition previews
+    - When implementing or modifying condition validation logic
+    - When working with formatNaturalLanguageCondition or validateCondition functions
+    - When implementing conditions that compare price elements (Open, High, Low, Close)
+    - When troubleshooting condition validation or invalid condition warnings
+    - When working with createStandaloneCondition in conditionDefaults.js
+    - When implementing autocomplete/search for indicator references in conditions
