@@ -13,7 +13,10 @@ export const OPERATORS = [
   { id: 'crosses_below', label: 'crosses below', description: 'Value crosses from above to below' },
   { id: 'is_above', label: 'is above', description: 'Value is greater than' },
   { id: 'is_below', label: 'is below', description: 'Value is less than' },
+  { id: 'is_greater_or_equal', label: 'is greater or equal', description: 'Value is greater than or equal to (>=)' },
+  { id: 'is_less_or_equal', label: 'is less or equal', description: 'Value is less than or equal to (<=)' },
   { id: 'equals', label: 'equals', description: 'Value is equal to' },
+  { id: 'is_between', label: 'is between', description: 'Value is within a range (inclusive)' },
   { id: 'is_detected', label: 'is detected', description: 'Pattern is detected on the chart' },
 ];
 
@@ -269,9 +272,12 @@ export function getPriceSourceLabel(priceSourceId) {
  * Build dropdown options for a condition operand
  * @param {Array} activeIndicators - List of active indicators on the chart
  * @param {Function} getDisplayName - Function to get indicator display name
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.isLeftOperand - Whether this is for the left operand (includes Indicator Values group)
+ * @param {boolean} options.includePercentage - Whether to include percentage value option
  * @returns {Array} Grouped options for dropdown
  */
-export function buildOperandOptions(activeIndicators, getDisplayName) {
+export function buildOperandOptions(activeIndicators, getDisplayName, { isLeftOperand = false, includePercentage = false } = {}) {
   const options = [];
 
   // Price sources group
@@ -285,7 +291,49 @@ export function buildOperandOptions(activeIndicators, getDisplayName) {
     })),
   });
 
-  // Indicators group
+  // Indicator Values group (only for left operand - allows indicator as the primary subject)
+  if (isLeftOperand && activeIndicators.length > 0) {
+    const indicatorValueOptions = [];
+
+    activeIndicators.forEach(indicator => {
+      const displayName = getDisplayName(indicator);
+
+      if (indicator.components && indicator.components.length > 0) {
+        // Multi-component indicator: add each component as an option
+        indicator.components.forEach(component => {
+          indicatorValueOptions.push({
+            type: 'indicator',
+            instanceId: indicator.instanceId,
+            component: component,
+            label: `${displayName} ${component}`,
+            color: indicator.color,
+            indicatorId: indicator.id,
+            isIndicatorValue: true, // Flag to distinguish from right-operand indicators
+          });
+        });
+      } else {
+        // Single-component indicator
+        indicatorValueOptions.push({
+          type: 'indicator',
+          instanceId: indicator.instanceId,
+          component: null,
+          label: displayName,
+          color: indicator.color,
+          indicatorId: indicator.id,
+          isIndicatorValue: true,
+        });
+      }
+    });
+
+    if (indicatorValueOptions.length > 0) {
+      options.push({
+        group: 'Indicator Values',
+        options: indicatorValueOptions,
+      });
+    }
+  }
+
+  // Indicators group (for comparison - used primarily for right operand)
   if (activeIndicators.length > 0) {
     const indicatorOptions = [];
 
@@ -301,6 +349,7 @@ export function buildOperandOptions(activeIndicators, getDisplayName) {
             component: component,
             label: `${displayName} ${component}`,
             color: indicator.color,
+            indicatorId: indicator.id,
           });
         });
       } else {
@@ -311,6 +360,7 @@ export function buildOperandOptions(activeIndicators, getDisplayName) {
           component: null,
           label: displayName,
           color: indicator.color,
+          indicatorId: indicator.id,
         });
       }
     });
@@ -323,18 +373,32 @@ export function buildOperandOptions(activeIndicators, getDisplayName) {
     }
   }
 
-  // Numeric value option (for thresholds)
+  // Numeric value options (for thresholds)
+  const valueOptions = [
+    {
+      type: 'value',
+      value: 0,
+      label: 'Custom Value',
+      description: 'Enter a numeric threshold',
+      isCustom: true,
+    },
+  ];
+
+  // Add percentage option if enabled
+  if (includePercentage) {
+    valueOptions.push({
+      type: 'percentage',
+      value: 0,
+      label: 'Percentage Value',
+      description: 'Enter a percentage (0-100%)',
+      isCustom: true,
+      isPercentage: true,
+    });
+  }
+
   options.push({
     group: 'Values',
-    options: [
-      {
-        type: 'value',
-        value: 0,
-        label: 'Custom Value',
-        description: 'Enter a numeric threshold',
-        isCustom: true,
-      },
-    ],
+    options: valueOptions,
   });
 
   return options;
@@ -384,6 +448,25 @@ export function formatNaturalLanguageCondition(condition) {
     return `When ${leftLabel} ${operatorLabel}`;
   }
 
+  // Handle range conditions (is_between operator with two values)
+  if (operator === 'is_between') {
+    const minValue = rightOperand?.value;
+    const maxValue = condition.rightOperandMax?.value;
+
+    if (minValue === undefined || minValue === null) {
+      return `When ${leftLabel} ${operatorLabel} ... and ...`;
+    }
+    if (maxValue === undefined || maxValue === null) {
+      return `When ${leftLabel} ${operatorLabel} ${minValue} and ...`;
+    }
+
+    // Format percentage values if applicable
+    const minLabel = rightOperand?.isPercentage ? `${minValue}%` : String(minValue);
+    const maxLabel = condition.rightOperandMax?.isPercentage ? `${maxValue}%` : String(maxValue);
+
+    return `When ${leftLabel} ${operatorLabel} ${minLabel} and ${maxLabel}`;
+  }
+
   // For non-pattern conditions, we need a right operand
   if (!rightOperand) {
     // Return partial preview with placeholder
@@ -391,9 +474,14 @@ export function formatNaturalLanguageCondition(condition) {
   }
 
   // Get the right operand label
-  const rightLabel = rightOperand.label || getOperandLabel(rightOperand);
+  let rightLabel = rightOperand.label || getOperandLabel(rightOperand);
   if (!rightLabel) {
     return `When ${leftLabel} ${operatorLabel} ...`;
+  }
+
+  // Format percentage values
+  if (rightOperand.isPercentage) {
+    rightLabel = `${rightOperand.value}%`;
   }
 
   return `When ${leftLabel} ${operatorLabel} ${rightLabel}`;
@@ -551,4 +639,181 @@ export function createStandaloneCondition(section = CONDITION_SECTIONS_V2.LONG_E
     section: resolvedSection,
     isNew: true, // Flag for animation
   };
+}
+
+/**
+ * Check if a condition is a range condition (uses 'is_between' operator)
+ * @param {Object} condition - The condition to check
+ * @returns {boolean} True if the condition is a range condition
+ */
+export function isRangeCondition(condition) {
+  return condition?.operator === 'is_between';
+}
+
+/**
+ * Create an indicator-based condition where the left operand is an indicator value
+ * @param {Object} indicatorInstance - The indicator instance from activeIndicators
+ * @param {string} displayName - The indicator display name (e.g., "RSI (14)")
+ * @param {string} component - Optional component name for multi-component indicators
+ * @param {string} section - Optional section override (V2 format)
+ * @returns {Object} A new condition object with indicator as left operand
+ */
+export function createIndicatorCondition(indicatorInstance, displayName, component = null, section = null) {
+  // Determine section - use V2 format, migrate legacy if needed
+  let resolvedSection = section;
+  if (!resolvedSection) {
+    resolvedSection = CONDITION_SECTIONS_V2.LONG_ENTRY;
+  }
+  resolvedSection = migrateSectionToV2(resolvedSection);
+
+  const leftOperand = {
+    type: 'indicator',
+    instanceId: indicatorInstance.instanceId,
+    component: component,
+    label: component ? `${displayName} ${component}` : displayName,
+    color: indicatorInstance.color,
+    indicatorId: indicatorInstance.id,
+  };
+
+  return {
+    id: generateConditionId(),
+    indicatorInstanceId: indicatorInstance.instanceId,
+    leftOperand,
+    operator: 'is_above',
+    rightOperand: null, // User will select this
+    section: resolvedSection,
+    isNew: true, // Flag for animation
+  };
+}
+
+/**
+ * Create a range condition with 'is_between' operator
+ * @param {Object} leftOperand - The left operand (indicator or price)
+ * @param {number} minValue - The minimum value of the range
+ * @param {number} maxValue - The maximum value of the range
+ * @param {string} section - Optional section override (V2 format)
+ * @returns {Object} A new range condition object
+ */
+export function createRangeCondition(leftOperand, minValue, maxValue, section = null) {
+  // Determine section - use V2 format, migrate legacy if needed
+  let resolvedSection = section;
+  if (!resolvedSection) {
+    resolvedSection = CONDITION_SECTIONS_V2.LONG_ENTRY;
+  }
+  resolvedSection = migrateSectionToV2(resolvedSection);
+
+  return {
+    id: generateConditionId(),
+    indicatorInstanceId: leftOperand.instanceId || null,
+    leftOperand,
+    operator: 'is_between',
+    rightOperand: {
+      type: 'value',
+      value: minValue,
+      label: String(minValue),
+    },
+    rightOperandMax: {
+      type: 'value',
+      value: maxValue,
+      label: String(maxValue),
+    },
+    section: resolvedSection,
+    isNew: true, // Flag for animation
+  };
+}
+
+/**
+ * Get the numeric bounds for an indicator based on its ID
+ * @param {string} indicatorId - The indicator ID (e.g., 'rsi', 'stochastic')
+ * @param {Array} indicators - Array of indicator definitions (from INDICATORS)
+ * @returns {Object|null} The numeric bounds object { min, max, commonThresholds } or null if not found
+ */
+export function getIndicatorBounds(indicatorId, indicators) {
+  if (!indicatorId || !indicators) {
+    return null;
+  }
+  const indicator = indicators.find(ind => ind.id === indicatorId);
+  return indicator?.numericBounds || null;
+}
+
+/**
+ * Validate a numeric value against indicator bounds
+ * @param {number} value - The value to validate
+ * @param {Object} bounds - The bounds object { min, max, commonThresholds }
+ * @returns {Object} Validation result { isValid: boolean, isOutOfBounds: boolean, warningMessage: string|null, boundsDescription: string|null }
+ */
+export function validateNumericBounds(value, bounds) {
+  // No bounds to validate against
+  if (!bounds || (bounds.min === null && bounds.max === null)) {
+    return {
+      isValid: true,
+      isOutOfBounds: false,
+      warningMessage: null,
+      boundsDescription: null,
+    };
+  }
+
+  const { min, max } = bounds;
+  let boundsDescription = null;
+
+  if (min !== null && max !== null) {
+    boundsDescription = `Valid range: ${min} to ${max}`;
+  } else if (min !== null) {
+    boundsDescription = `Minimum value: ${min}`;
+  } else if (max !== null) {
+    boundsDescription = `Maximum value: ${max}`;
+  }
+
+  // Check if value is outside absolute bounds
+  const belowMin = min !== null && value < min;
+  const aboveMax = max !== null && value > max;
+  const isOutOfBounds = belowMin || aboveMax;
+
+  if (isOutOfBounds) {
+    let warningMessage;
+    if (belowMin) {
+      warningMessage = `Value ${value} is below the minimum (${min})`;
+    } else {
+      warningMessage = `Value ${value} is above the maximum (${max})`;
+    }
+
+    return {
+      isValid: false,
+      isOutOfBounds: true,
+      warningMessage,
+      boundsDescription,
+    };
+  }
+
+  return {
+    isValid: true,
+    isOutOfBounds: false,
+    warningMessage: null,
+    boundsDescription,
+  };
+}
+
+/**
+ * Get indicator bounds from an operand
+ * @param {Object} operand - The operand to get bounds for
+ * @param {Array} activeIndicators - List of active indicators
+ * @param {Array} indicatorDefinitions - Array of indicator definitions (INDICATORS)
+ * @returns {Object|null} The numeric bounds or null
+ */
+export function getOperandBounds(operand, activeIndicators, indicatorDefinitions) {
+  if (!operand || operand.type !== 'indicator') {
+    return null;
+  }
+
+  // Find the indicator instance
+  const indicatorInstance = activeIndicators.find(
+    ind => ind.instanceId === operand.instanceId
+  );
+  if (!indicatorInstance) {
+    return null;
+  }
+
+  // Get the indicator ID and look up bounds
+  const indicatorId = operand.indicatorId || indicatorInstance.id;
+  return getIndicatorBounds(indicatorId, indicatorDefinitions);
 }

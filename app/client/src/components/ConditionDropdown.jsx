@@ -1,18 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '../lib/utils';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, Search, X, Percent } from 'lucide-react';
 
 /**
  * ConditionDropdown Component
  *
  * A searchable dropdown with grouped options for selecting condition operands.
- * Supports price sources, indicator instances, and custom numeric values.
+ * Supports price sources, indicator instances, custom numeric values, and percentages.
  *
  * @param {Object} value - Current selected value
  * @param {Array} options - Grouped options array
  * @param {Function} onChange - Callback when value changes
  * @param {string} placeholder - Placeholder text
  * @param {string} className - Additional CSS classes
+ * @param {boolean} showPercentageToggle - Whether to show percentage toggle for numeric values
+ * @param {Object} boundsValidation - Optional bounds validation { isValid, warningMessage, boundsDescription }
  */
 function ConditionDropdown({
   value,
@@ -20,11 +22,14 @@ function ConditionDropdown({
   onChange,
   placeholder = 'Select...',
   className,
+  showPercentageToggle = false,
+  boundsValidation = null,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [customValue, setCustomValue] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [isPercentageMode, setIsPercentageMode] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -60,7 +65,9 @@ function ConditionDropdown({
   const handleSelect = useCallback((option) => {
     if (option.isCustom) {
       setShowCustomInput(true);
-      setCustomValue(value?.type === 'value' ? String(value.value) : '');
+      setCustomValue(value?.type === 'value' || value?.type === 'percentage' ? String(value.value) : '');
+      // Set percentage mode based on option type
+      setIsPercentageMode(option.isPercentage || false);
     } else {
       onChange(option);
       setIsOpen(false);
@@ -71,16 +78,29 @@ function ConditionDropdown({
   const handleCustomValueSubmit = useCallback(() => {
     const numValue = parseFloat(customValue);
     if (!isNaN(numValue)) {
-      onChange({
-        type: 'value',
-        value: numValue,
-        label: String(numValue),
-      });
+      if (isPercentageMode) {
+        onChange({
+          type: 'percentage',
+          value: numValue,
+          label: `${numValue}%`,
+          isPercentage: true,
+        });
+      } else {
+        onChange({
+          type: 'value',
+          value: numValue,
+          label: String(numValue),
+        });
+      }
       setIsOpen(false);
       setSearchTerm('');
       setShowCustomInput(false);
     }
-  }, [customValue, onChange]);
+  }, [customValue, onChange, isPercentageMode]);
+
+  const togglePercentageMode = useCallback(() => {
+    setIsPercentageMode(prev => !prev);
+  }, []);
 
   const handleCustomKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -93,8 +113,15 @@ function ConditionDropdown({
   // Get display label for current value
   const getDisplayLabel = () => {
     if (!value) return placeholder;
+    // Format percentage values with % suffix
+    if (value.isPercentage && value.type === 'percentage') {
+      return `${value.value}%`;
+    }
     return value.label || placeholder;
   };
+
+  // Check if current value has validation warnings
+  const hasValidationWarning = boundsValidation && !boundsValidation.isValid;
 
   // Get color indicator for the value
   const getColorIndicator = () => {
@@ -117,17 +144,21 @@ function ConditionDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex items-center justify-between w-full px-2.5 py-1.5",
-          "text-sm bg-background border border-border rounded-md",
+          "text-sm bg-background border rounded-md",
           "hover:bg-muted/50 transition-colors",
           "focus:outline-none focus:ring-2 focus:ring-primary/50",
-          isOpen && "ring-2 ring-primary/50"
+          isOpen && "ring-2 ring-primary/50",
+          hasValidationWarning ? "border-amber-500" : "border-border"
         )}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        title={hasValidationWarning ? boundsValidation.warningMessage : boundsValidation?.boundsDescription || undefined}
       >
         <span className="flex items-center truncate">
           {getColorIndicator()}
-          <span className="truncate">{getDisplayLabel()}</span>
+          <span className={cn("truncate", hasValidationWarning && "text-amber-600")}>
+            {getDisplayLabel()}
+          </span>
         </span>
         <ChevronDown
           className={cn(
@@ -179,19 +210,42 @@ function ConditionDropdown({
           {showCustomInput && (
             <div className="p-2 border-b border-border bg-muted/30">
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={customValue}
-                  onChange={(e) => setCustomValue(e.target.value)}
-                  onKeyDown={handleCustomKeyDown}
-                  placeholder="Enter value..."
-                  className={cn(
-                    "flex-1 px-2 py-1.5 text-sm",
-                    "bg-background border border-border rounded",
-                    "focus:outline-none focus:ring-1 focus:ring-primary/50"
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    value={customValue}
+                    onChange={(e) => setCustomValue(e.target.value)}
+                    onKeyDown={handleCustomKeyDown}
+                    placeholder={isPercentageMode ? "Enter percentage..." : "Enter value..."}
+                    className={cn(
+                      "w-full px-2 py-1.5 text-sm",
+                      "bg-background border border-border rounded",
+                      "focus:outline-none focus:ring-1 focus:ring-primary/50",
+                      isPercentageMode && "pr-8"
+                    )}
+                    autoFocus
+                  />
+                  {isPercentageMode && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      %
+                    </span>
                   )}
-                  autoFocus
-                />
+                </div>
+                {showPercentageToggle && (
+                  <button
+                    type="button"
+                    onClick={togglePercentageMode}
+                    className={cn(
+                      "p-1.5 rounded transition-colors",
+                      isPercentageMode
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                    title={isPercentageMode ? "Switch to absolute value" : "Switch to percentage"}
+                  >
+                    <Percent className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCustomValueSubmit}
@@ -200,6 +254,11 @@ function ConditionDropdown({
                   Set
                 </button>
               </div>
+              {boundsValidation?.boundsDescription && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {boundsValidation.boundsDescription}
+                </p>
+              )}
             </div>
           )}
 
