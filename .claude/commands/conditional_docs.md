@@ -349,3 +349,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When extending StrategyConfig data model with new fields
     - When implementing duplicate name detection or overwrite confirmation
     - When working with strategy_service.py Supabase operations
+
+- app_docs/feature-61b69256-strategy-management.md
+  - Conditions:
+    - When working with strategy load, duplicate, delete, export, or import functionality
+    - When implementing or modifying LoadStrategyDialog or ImportStrategyDialog components
+    - When working with /api/strategies/extended, /api/strategies/{id}/duplicate, /api/strategies/{id}/export, or /api/strategies/import endpoints
+    - When implementing strategy browser or strategy list features
+    - When working with strategy export JSON schema or import validation
+    - When troubleshooting strategy management operations or undo delete functionality
+    - When extending StrategyListItemExtended or StrategyExport data models
+    - When implementing conflict resolution for strategy name conflicts

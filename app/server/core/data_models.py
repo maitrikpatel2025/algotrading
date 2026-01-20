@@ -462,3 +462,82 @@ class StrategyDraft(BaseModel):
     strategy: StrategyConfig = Field(..., description="Draft strategy configuration")
     saved_at: datetime = Field(..., description="When the draft was saved")
     is_auto_save: bool = Field(default=True, description="Whether this was auto-saved")
+
+
+# =============================================================================
+# Strategy Management Models (Load, Duplicate, Export, Import)
+# =============================================================================
+
+class StrategyListItemExtended(BaseModel):
+    """Extended strategy list item with additional metadata for browsing."""
+    id: str = Field(..., description="Strategy ID")
+    name: str = Field(..., description="Strategy name")
+    description: Optional[str] = Field(None, description="Strategy description")
+    tags: List[str] = Field(default=[], description="Strategy tags")
+    trade_direction: Literal["long", "short", "both"] = Field(..., description="Trade direction")
+    pair: Optional[str] = Field(None, description="Currency pair")
+    timeframe: Optional[str] = Field(None, description="Timeframe")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    # Extended metadata
+    indicator_count: int = Field(default=0, description="Number of indicators")
+    condition_count: int = Field(default=0, description="Number of conditions")
+    drawing_count: int = Field(default=0, description="Number of drawings")
+    pattern_count: int = Field(default=0, description="Number of patterns")
+
+
+class ListStrategiesExtendedResponse(BaseModel):
+    """Response from listing strategies with extended metadata."""
+    success: bool = Field(..., description="Whether the list was successful")
+    strategies: List[StrategyListItemExtended] = Field(default=[], description="List of strategies with extended metadata")
+    count: int = Field(0, description="Number of strategies")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class StrategyExport(BaseModel):
+    """Export schema for strategy files."""
+    schema_version: str = Field(default="1.0", description="Export schema version")
+    export_date: datetime = Field(..., description="When the export was created")
+    strategy: StrategyConfig = Field(..., description="Full strategy configuration")
+
+
+class DuplicateStrategyResponse(BaseModel):
+    """Response from duplicating a strategy."""
+    success: bool = Field(..., description="Whether the duplicate was successful")
+    strategy_id: Optional[str] = Field(None, description="ID of the new duplicated strategy")
+    strategy_name: Optional[str] = Field(None, description="Name of the new duplicated strategy")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class ImportValidationResult(BaseModel):
+    """Result of validating an import file."""
+    valid: bool = Field(..., description="Whether the import data is valid")
+    errors: List[str] = Field(default=[], description="Validation errors")
+    warnings: List[str] = Field(default=[], description="Validation warnings")
+    strategy_preview: Optional[Dict[str, Any]] = Field(None, description="Preview of strategy data if valid")
+    name_conflict: bool = Field(default=False, description="Whether the name conflicts with existing strategy")
+    conflicting_strategy_id: Optional[str] = Field(None, description="ID of conflicting strategy if any")
+
+
+class ImportStrategyRequest(BaseModel):
+    """Request to import a strategy."""
+    strategy_data: Dict[str, Any] = Field(..., description="Raw strategy JSON data")
+
+
+class ImportStrategySaveRequest(BaseModel):
+    """Request to save an imported strategy."""
+    strategy_data: Dict[str, Any] = Field(..., description="Validated strategy data")
+    name_override: Optional[str] = Field(None, description="Optional name to use instead of original")
+    conflict_resolution: Optional[Literal["rename", "replace", "keep_both"]] = Field(
+        None, description="How to resolve name conflicts"
+    )
+
+
+class ImportStrategyResponse(BaseModel):
+    """Response from importing a strategy."""
+    success: bool = Field(..., description="Whether the import was successful")
+    strategy_id: Optional[str] = Field(None, description="ID of the imported strategy")
+    strategy_name: Optional[str] = Field(None, description="Name of the imported strategy")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
