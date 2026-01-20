@@ -73,3 +73,29 @@ export const CANDLE_CLOSE_CONFIRMATION_LABELS = {
 export const CANDLE_CLOSE_CONFIRMATION_STORAGE_KEY = 'forex_dash_candle_close_confirmation';
 export const CANDLE_CLOSE_CONFIRMATION_DEFAULT = CANDLE_CLOSE_CONFIRMATION.YES;
 export const CANDLE_CLOSE_CONFIRMATION_TOOLTIP = 'Waiting for candle close reduces false signals but may delay entries';
+
+// Group Operator Constants for AND/OR Logic
+export const GROUP_OPERATORS = {
+  AND: 'and',
+  OR: 'or',
+};
+
+export const GROUP_OPERATOR_LABELS = {
+  [GROUP_OPERATORS.AND]: 'AND',
+  [GROUP_OPERATORS.OR]: 'OR',
+};
+
+// Maximum nesting depth for condition groups
+export const MAX_NESTING_DEPTH = 3;
+
+// Logic view mode constants
+export const LOGIC_VIEW_MODES = {
+  INLINE: 'inline',
+  TREE: 'tree',
+};
+
+// localStorage key for logic view mode
+export const LOGIC_VIEW_MODE_STORAGE_KEY = 'forex_dash_logic_view_mode';
+
+// localStorage key for condition groups
+export const CONDITION_GROUPS_STORAGE_KEY = 'forex_dash_condition_groups';

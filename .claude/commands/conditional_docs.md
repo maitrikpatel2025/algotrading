@@ -290,3 +290,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When adding new strategy configuration toggles to the Controls Card
     - When troubleshooting localStorage persistence for strategy settings
     - When implementing real-time vs candle-based signal evaluation
+
+- app_docs/feature-6d049c54-combine-conditions-and-or-logic.md
+  - Conditions:
+    - When working with condition grouping or AND/OR logic operators
+    - When implementing or modifying the ConditionGroup component
+    - When working with nested condition groups or group depth limits
+    - When implementing or modifying the LogicTreeView component
+    - When working with the Test Logic dialog or condition evaluation
+    - When troubleshooting group persistence or group state management
+    - When implementing drag-and-drop within condition groups
+    - When working with group operators (AND/OR toggle)
+    - When extending the Logic Panel with grouping functionality

@@ -7,9 +7,17 @@ import {
   LogOut,
   Sparkles,
   Plus,
+  ListTree,
+  List,
+  FlaskConical,
+  FolderPlus,
+  Check,
 } from 'lucide-react';
 import ConditionBlock from './ConditionBlock';
-import { CONDITION_SECTIONS_V2, migrateSectionToV2 } from '../app/conditionDefaults';
+import ConditionGroup from './ConditionGroup';
+import LogicTreeView from './LogicTreeView';
+import TestLogicDialog from './TestLogicDialog';
+import { CONDITION_SECTIONS_V2, migrateSectionToV2, getConditionParentGroup } from '../app/conditionDefaults';
 import {
   TRADE_DIRECTIONS,
   CONDITION_SECTION_LABELS,
@@ -19,6 +27,8 @@ import {
   LOGIC_PANEL_MIN_WIDTH,
   LOGIC_PANEL_MAX_WIDTH,
   LOGIC_PANEL_DEFAULT_WIDTH,
+  LOGIC_VIEW_MODES,
+  LOGIC_VIEW_MODE_STORAGE_KEY,
 } from '../app/constants';
 
 // localStorage key for panel collapsed state
@@ -30,8 +40,10 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  * A collapsible, resizable right sidebar panel displaying trading conditions.
  * Features four sections (Long Entry, Long Exit, Short Entry, Short Exit) based
  * on trade direction, with drag-and-drop support for moving conditions between sections.
+ * Supports condition grouping with AND/OR operators, tree view, and Test Logic.
  *
  * @param {Array} conditions - Array of condition objects
+ * @param {Array} groups - Array of condition group objects
  * @param {Array} activeIndicators - Array of active indicator instances
  * @param {Array} activePatterns - Array of active pattern instances
  * @param {Function} getIndicatorDisplayName - Function to get indicator display name
@@ -42,9 +54,18 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  * @param {string} highlightedIndicatorId - ID of indicator to highlight
  * @param {string} tradeDirection - Trade direction: 'long', 'short', or 'both'
  * @param {Function} onAddCondition - Callback when Add Condition button is clicked
+ * @param {Function} onGroupCreate - Callback when creating a new group
+ * @param {Function} onGroupUpdate - Callback when updating a group
+ * @param {Function} onGroupDelete - Callback when deleting a group
+ * @param {Function} onGroupOperatorChange - Callback when toggling group operator
+ * @param {Function} onUngroup - Callback when ungrouping conditions
+ * @param {Function} onConditionReorderInGroup - Callback when reordering within group
+ * @param {Function} onTestLogic - Callback to get test logic data
+ * @param {Object} testLogicData - Data for Test Logic dialog (candleData, indicatorValues, etc.)
  */
 function LogicPanel({
   conditions = [],
+  groups = [],
   activeIndicators = [],
   activePatterns = [],
   getIndicatorDisplayName,
@@ -55,6 +76,14 @@ function LogicPanel({
   highlightedIndicatorId,
   tradeDirection = TRADE_DIRECTIONS.BOTH,
   onAddCondition,
+  onGroupCreate,
+  onGroupUpdate,
+  onGroupDelete,
+  onGroupOperatorChange,
+  onUngroup,
+  onConditionReorderInGroup,
+  onTestLogic,
+  testLogicData = null,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -84,6 +113,25 @@ function LogicPanel({
   const [dragOverSection, setDragOverSection] = useState(null);
   const panelRef = useRef(null);
 
+  // View mode state (inline vs tree)
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LOGIC_VIEW_MODE_STORAGE_KEY);
+      return stored === LOGIC_VIEW_MODES.TREE ? LOGIC_VIEW_MODES.TREE : LOGIC_VIEW_MODES.INLINE;
+    } catch {
+      return LOGIC_VIEW_MODES.INLINE;
+    }
+  });
+
+  // Selection state for grouping
+  const [selectedConditions, setSelectedConditions] = useState(new Set());
+
+  // Test Logic dialog state
+  const [testLogicDialog, setTestLogicDialog] = useState({
+    isOpen: false,
+    section: null,
+  });
+
   // Persist collapsed state
   useEffect(() => {
     try {
@@ -101,6 +149,15 @@ function LogicPanel({
       console.warn('Failed to save logic panel width:', e);
     }
   }, [panelWidth]);
+
+  // Persist view mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOGIC_VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch (e) {
+      console.warn('Failed to save view mode:', e);
+    }
+  }, [viewMode]);
 
   // Handle resize mouse events
   useEffect(() => {
@@ -151,6 +208,11 @@ function LogicPanel({
     setIsResizing(true);
   }, []);
 
+  // Toggle view mode
+  const handleViewModeToggle = useCallback(() => {
+    setViewMode(prev => prev === LOGIC_VIEW_MODES.INLINE ? LOGIC_VIEW_MODES.TREE : LOGIC_VIEW_MODES.INLINE);
+  }, []);
+
   // Migrate conditions to V2 sections and filter by section
   const getConditionsForSection = useCallback((sectionV2) => {
     return conditions.filter(c => {
@@ -158,6 +220,21 @@ function LogicPanel({
       return migratedSection === sectionV2;
     });
   }, [conditions]);
+
+  // Get groups for a section
+  const getGroupsForSection = useCallback((sectionV2) => {
+    return groups.filter(g => g.section === sectionV2 && !g.parentGroupId);
+  }, [groups]);
+
+  // Get ungrouped conditions for a section
+  const getUngroupedConditionsForSection = useCallback((sectionV2) => {
+    const sectionConditions = getConditionsForSection(sectionV2);
+    const groupedConditionIds = new Set();
+    groups.forEach(group => {
+      group.conditionIds.forEach(id => groupedConditionIds.add(id));
+    });
+    return sectionConditions.filter(c => !groupedConditionIds.has(c.id));
+  }, [getConditionsForSection, groups]);
 
   // Determine which sections to show based on trade direction
   const getSectionsToShow = useCallback(() => {
@@ -211,20 +288,102 @@ function LogicPanel({
   }, [onConditionMove]);
 
   // Handle Add Condition button click
-  const handleAddConditionClick = useCallback((section) => {
+  const handleAddConditionClick = useCallback((section, groupId = null) => {
     if (onAddCondition) {
-      onAddCondition(section);
+      onAddCondition(section, groupId);
     }
   }, [onAddCondition]);
+
+  // Handle condition selection toggle
+  const handleConditionSelect = useCallback((conditionId) => {
+    setSelectedConditions(prev => {
+      const next = new Set(prev);
+      if (next.has(conditionId)) {
+        next.delete(conditionId);
+      } else {
+        next.add(conditionId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Clear selection
+  const clearSelection = useCallback(() => {
+    setSelectedConditions(new Set());
+  }, []);
+
+  // Handle group selected conditions
+  const handleGroupSelected = useCallback((section) => {
+    if (selectedConditions.size < 2) return;
+
+    // Get selected conditions that belong to this section and are not already in a group
+    const sectionConditions = getConditionsForSection(section);
+    const selectedInSection = sectionConditions.filter(c =>
+      selectedConditions.has(c.id) && !getConditionParentGroup(c.id, groups)
+    );
+
+    if (selectedInSection.length >= 2 && onGroupCreate) {
+      const conditionIds = selectedInSection.map(c => c.id);
+      onGroupCreate(conditionIds, 'and', section);
+      clearSelection();
+    }
+  }, [selectedConditions, getConditionsForSection, groups, onGroupCreate, clearSelection]);
+
+  // Handle condition reorder (within or between groups)
+  const handleConditionReorder = useCallback((conditionId, targetGroupId, targetIndex, sourceGroupId) => {
+    if (onConditionReorderInGroup) {
+      onConditionReorderInGroup(conditionId, targetGroupId, targetIndex, sourceGroupId);
+    }
+  }, [onConditionReorderInGroup]);
+
+  // Handle create subgroup
+  const handleCreateSubgroup = useCallback((parentGroupId) => {
+    const parentGroup = groups.find(g => g.id === parentGroupId);
+    if (!parentGroup) return;
+
+    // Get selected conditions within this group
+    const groupConditionIds = parentGroup.conditionIds.filter(id =>
+      selectedConditions.has(id) && !groups.find(g => g.id === id)
+    );
+
+    if (groupConditionIds.length >= 2 && onGroupCreate) {
+      onGroupCreate(groupConditionIds, 'and', parentGroup.section, parentGroupId);
+      clearSelection();
+    }
+  }, [groups, selectedConditions, onGroupCreate, clearSelection]);
+
+  // Handle Test Logic button click
+  const handleTestLogicClick = useCallback((section) => {
+    if (onTestLogic) {
+      onTestLogic(section);
+    }
+    setTestLogicDialog({ isOpen: true, section });
+  }, [onTestLogic]);
+
+  // Close Test Logic dialog
+  const handleCloseTestLogic = useCallback(() => {
+    setTestLogicDialog({ isOpen: false, section: null });
+  }, []);
+
+  // Get selected count for a section
+  const getSelectedCountForSection = useCallback((section) => {
+    const sectionConditions = getConditionsForSection(section);
+    return sectionConditions.filter(c =>
+      selectedConditions.has(c.id) && !getConditionParentGroup(c.id, groups)
+    ).length;
+  }, [getConditionsForSection, selectedConditions, groups]);
 
   // Render a single section
   const renderSection = (sectionKey, isLast = false) => {
     const sectionConditions = getConditionsForSection(sectionKey);
+    const sectionGroups = getGroupsForSection(sectionKey);
+    const ungroupedConditions = getUngroupedConditionsForSection(sectionKey);
     const sectionLabel = CONDITION_SECTION_LABELS[sectionKey];
     const sectionColor = CONDITION_SECTION_COLORS[sectionKey];
     const sectionType = CONDITION_SECTION_TYPES[sectionKey];
     const isEntry = sectionType === 'entry';
     const Icon = isEntry ? LogIn : LogOut;
+    const selectedCount = getSelectedCountForSection(sectionKey);
 
     return (
       <div
@@ -254,45 +413,155 @@ function LogicPanel({
           )}
         </div>
 
-        {/* Section Conditions List */}
-        <div className="p-3 space-y-3 min-h-[80px]">
-          {sectionConditions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                Drag indicators to chart or click Add Condition
-              </p>
-            </div>
+        {/* Section Content */}
+        <div className="p-3 space-y-3 min-h-[80px] overflow-visible">
+          {/* Tree View */}
+          {viewMode === LOGIC_VIEW_MODES.TREE ? (
+            <LogicTreeView
+              conditions={conditions}
+              groups={groups}
+              section={sectionKey}
+              onConditionSelect={handleConditionSelect}
+            />
           ) : (
-            sectionConditions.map((condition) => (
-              <ConditionBlock
-                key={condition.id}
-                condition={condition}
-                activeIndicators={activeIndicators}
-                activePatterns={activePatterns}
-                getIndicatorDisplayName={getIndicatorDisplayName}
-                onUpdate={onConditionUpdate}
-                onDelete={onConditionDelete}
-                onHover={onIndicatorHover}
-                isHighlighted={highlightedIndicatorId === (condition.indicatorInstanceId || condition.patternInstanceId)}
-                indicatorColor={getConditionColor(condition)}
-              />
-            ))
+            <>
+              {/* Inline View - Groups first, then ungrouped conditions */}
+              {sectionConditions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Drag indicators to chart or click Add Condition
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Render groups */}
+                  {sectionGroups.map((group) => (
+                    <ConditionGroup
+                      key={group.id}
+                      group={group}
+                      conditions={conditions}
+                      groups={groups}
+                      activeIndicators={activeIndicators}
+                      activePatterns={activePatterns}
+                      getIndicatorDisplayName={getIndicatorDisplayName}
+                      onOperatorChange={onGroupOperatorChange}
+                      onConditionReorder={handleConditionReorder}
+                      onUngroup={onUngroup}
+                      onAddCondition={handleAddConditionClick}
+                      onCreateSubgroup={handleCreateSubgroup}
+                      onConditionUpdate={onConditionUpdate}
+                      onConditionDelete={onConditionDelete}
+                      onIndicatorHover={onIndicatorHover}
+                      highlightedIndicatorId={highlightedIndicatorId}
+                      onGroupDelete={onGroupDelete}
+                      depth={0}
+                    />
+                  ))}
+
+                  {/* Render ungrouped conditions */}
+                  {ungroupedConditions.map((condition) => (
+                    <div
+                      key={condition.id}
+                      className="relative"
+                    >
+                      {/* Selection checkbox */}
+                      <button
+                        type="button"
+                        onClick={() => handleConditionSelect(condition.id)}
+                        className={cn(
+                          "absolute -left-1 top-1/2 -translate-y-1/2 z-10",
+                          "w-5 h-5 rounded border flex items-center justify-center",
+                          "transition-colors",
+                          selectedConditions.has(condition.id)
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-border bg-background hover:border-primary/50"
+                        )}
+                      >
+                        {selectedConditions.has(condition.id) && (
+                          <Check className="h-3 w-3" />
+                        )}
+                      </button>
+
+                      <div className="ml-5">
+                        <ConditionBlock
+                          condition={condition}
+                          activeIndicators={activeIndicators}
+                          activePatterns={activePatterns}
+                          getIndicatorDisplayName={getIndicatorDisplayName}
+                          onUpdate={onConditionUpdate}
+                          onDelete={onConditionDelete}
+                          onHover={onIndicatorHover}
+                          isHighlighted={highlightedIndicatorId === (condition.indicatorInstanceId || condition.patternInstanceId)}
+                          indicatorColor={getConditionColor(condition)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
           )}
-          {/* Add Condition Button */}
-          <button
-            type="button"
-            onClick={() => handleAddConditionClick(sectionKey)}
-            className={cn(
-              "w-full flex items-center justify-center gap-2 py-2 px-3",
-              "text-sm text-muted-foreground",
-              "border border-dashed border-border rounded-md",
-              "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
-              "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+
+          {/* Action buttons */}
+          <div className="space-y-2 pt-2">
+            {/* Primary action buttons row */}
+            <div className="flex flex-wrap gap-2">
+              {/* Add Condition Button */}
+              <button
+                type="button"
+                onClick={() => handleAddConditionClick(sectionKey)}
+                className={cn(
+                  "flex items-center gap-2 py-2 px-3",
+                  "text-sm text-muted-foreground",
+                  "border border-dashed border-border rounded-md",
+                  "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
+                  "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                )}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Condition</span>
+              </button>
+
+              {/* Group Selected Button */}
+              {selectedCount >= 2 && viewMode === LOGIC_VIEW_MODES.INLINE && (
+                <button
+                  type="button"
+                  onClick={() => handleGroupSelected(sectionKey)}
+                  className={cn(
+                    "flex items-center gap-2 py-2 px-3",
+                    "text-sm text-primary-foreground bg-primary",
+                    "rounded-md",
+                    "hover:bg-primary/90",
+                    "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  <span>Group Selected ({selectedCount})</span>
+                </button>
+              )}
+            </div>
+
+            {/* Test Logic Button - separate row for visibility */}
+            {sectionConditions.length > 0 && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  data-testid="test-logic-button"
+                  onClick={() => handleTestLogicClick(sectionKey)}
+                  className={cn(
+                    "flex items-center gap-2 py-2 px-3",
+                    "text-sm text-muted-foreground",
+                    "border border-border rounded-md",
+                    "hover:bg-muted/50 hover:text-foreground",
+                    "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                >
+                  <FlaskConical className="h-4 w-4" />
+                  <span>Test Logic</span>
+                </button>
+              </div>
             )}
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Condition</span>
-          </button>
+          </div>
         </div>
       </div>
     );
@@ -344,73 +613,112 @@ function LogicPanel({
 
   // Expanded state - full panel
   return (
-    <div
-      ref={panelRef}
-      className={cn(
-        "flex flex-col bg-card border-l border-border relative",
-        "min-h-full",
-        "transition-all duration-200 ease-out"
-      )}
-      style={{ width: `${panelWidth}px` }}
-    >
-      {/* Resize Handle */}
+    <>
       <div
+        ref={panelRef}
         className={cn(
-          "absolute left-0 top-0 bottom-0 w-1.5",
-          "cursor-ew-resize hover:bg-primary/30 transition-colors",
-          "group",
-          isResizing && "bg-primary/50"
+          "flex flex-col bg-card border-l border-border relative",
+          "min-h-full",
+          "transition-all duration-200 ease-out"
         )}
-        onMouseDown={handleResizeStart}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize logic panel"
+        style={{ width: `${panelWidth}px` }}
       >
-        <div className={cn(
-          "absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8",
-          "bg-muted-foreground/30 rounded-full",
-          "group-hover:bg-primary/50 transition-colors",
-          isResizing && "bg-primary"
-        )} />
-      </div>
-
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">Logic Panel</h2>
-        </div>
-        <button
-          type="button"
-          onClick={handleToggle}
+        {/* Resize Handle */}
+        <div
           className={cn(
-            "p-1.5 rounded-md text-muted-foreground",
-            "hover:bg-muted hover:text-foreground",
-            "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+            "absolute left-0 top-0 bottom-0 w-1.5",
+            "cursor-ew-resize hover:bg-primary/30 transition-colors",
+            "group",
+            isResizing && "bg-primary/50"
           )}
-          aria-label="Collapse logic panel"
+          onMouseDown={handleResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize logic panel"
         >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+          <div className={cn(
+            "absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8",
+            "bg-muted-foreground/30 rounded-full",
+            "group-hover:bg-primary/50 transition-colors",
+            isResizing && "bg-primary"
+          )} />
+        </div>
+
+        {/* Panel Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Logic Panel</h2>
+          </div>
+          <div className="flex items-center gap-1">
+            {/* View mode toggle */}
+            <button
+              type="button"
+              onClick={handleViewModeToggle}
+              data-testid="view-mode-toggle"
+              className={cn(
+                "p-1.5 rounded-md text-muted-foreground",
+                "hover:bg-muted hover:text-foreground",
+                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+              )}
+              aria-label={viewMode === LOGIC_VIEW_MODES.INLINE ? "Switch to tree view" : "Switch to inline view"}
+              title={viewMode === LOGIC_VIEW_MODES.INLINE ? "Tree view" : "Inline view"}
+            >
+              {viewMode === LOGIC_VIEW_MODES.INLINE ? (
+                <ListTree className="h-4 w-4" />
+              ) : (
+                <List className="h-4 w-4" />
+              )}
+            </button>
+
+            {/* Collapse button */}
+            <button
+              type="button"
+              onClick={handleToggle}
+              className={cn(
+                "p-1.5 rounded-md text-muted-foreground",
+                "hover:bg-muted hover:text-foreground",
+                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+              )}
+              aria-label="Collapse logic panel"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          {sectionsToShow.map((sectionKey, index) =>
+            renderSection(sectionKey, index === sectionsToShow.length - 1)
+          )}
+        </div>
+
+        {/* Panel Footer */}
+        <div className="px-4 py-3 border-t border-border bg-muted/30">
+          <p className="text-xs text-muted-foreground text-center">
+            {conditions.length === 0
+              ? 'Add indicators to create conditions'
+              : `${conditions.length} condition${conditions.length !== 1 ? 's' : ''} defined${groups.length > 0 ? `, ${groups.length} group${groups.length !== 1 ? 's' : ''}` : ''}`
+            }
+          </p>
+        </div>
       </div>
 
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
-        {sectionsToShow.map((sectionKey, index) =>
-          renderSection(sectionKey, index === sectionsToShow.length - 1)
-        )}
-      </div>
-
-      {/* Panel Footer */}
-      <div className="px-4 py-3 border-t border-border bg-muted/30">
-        <p className="text-xs text-muted-foreground text-center">
-          {conditions.length === 0
-            ? 'Add indicators to create conditions'
-            : `${conditions.length} condition${conditions.length !== 1 ? 's' : ''} defined`
-          }
-        </p>
-      </div>
-    </div>
+      {/* Test Logic Dialog */}
+      <TestLogicDialog
+        isOpen={testLogicDialog.isOpen}
+        onClose={handleCloseTestLogic}
+        section={testLogicDialog.section}
+        conditions={conditions}
+        groups={groups}
+        candleData={testLogicData?.candleData}
+        indicatorValues={testLogicData?.indicatorValues}
+        patternDetections={testLogicData?.patternDetections}
+        previousCandleData={testLogicData?.previousCandleData}
+        previousIndicatorValues={testLogicData?.previousIndicatorValues}
+      />
+    </>
   );
 }
 

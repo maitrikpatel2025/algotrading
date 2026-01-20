@@ -30,6 +30,8 @@ import { INDICATORS } from '../app/indicators';
  * @param {Function} onHover - Callback when hovering over the block
  * @param {boolean} isHighlighted - Whether the block should be highlighted
  * @param {string} indicatorColor - The color of the associated indicator
+ * @param {boolean} isInGroup - Whether the condition is inside a group
+ * @param {string} groupOperator - The group operator (and/or) for visual connector
  */
 function ConditionBlock({
   condition,
@@ -41,6 +43,8 @@ function ConditionBlock({
   onHover,
   isHighlighted,
   indicatorColor,
+  isInGroup = false,
+  groupOperator = null,
 }) {
   const [isNew, setIsNew] = useState(condition.isNew);
   const [isDragging, setIsDragging] = useState(false);
@@ -187,7 +191,8 @@ function ConditionBlock({
         "bg-card hover:bg-muted/30",
         isHighlighted && "ring-2 ring-primary bg-primary/5",
         isDragging && "opacity-50",
-        isNew && "animate-slide-in-right"
+        isNew && "animate-slide-in-right",
+        isInGroup && "bg-muted/20 border-dashed"
       )}
       style={{
         borderLeftWidth: '3px',
