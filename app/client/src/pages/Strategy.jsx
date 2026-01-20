@@ -4,7 +4,6 @@ import { COUNTS, calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
 import Button from '../components/Button';
 import PriceChart from '../components/PriceChart';
 import PairSelector from '../components/PairSelector';
-import Select from '../components/Select';
 import Technicals from '../components/Technicals';
 import IndicatorLibrary from '../components/IndicatorLibrary';
 import LogicPanel from '../components/LogicPanel';
@@ -19,7 +18,7 @@ import LoadStrategyDialog from '../components/LoadStrategyDialog';
 import ImportStrategyDialog from '../components/ImportStrategyDialog';
 import Toast, { useToast } from '../components/Toast';
 import { cn } from '../lib/utils';
-import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Clock, Zap, Save, FolderOpen, Upload, Download, Copy } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Save, FolderOpen, Upload, Download, Copy, Edit2, X, Settings, PanelLeftClose, PanelRightClose } from 'lucide-react';
 import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
@@ -66,6 +65,17 @@ import DrawingPropertiesDialog from '../components/DrawingPropertiesDialog';
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
 const PANEL_COLLAPSED_KEY = 'forex_dash_indicator_panel_collapsed';
+const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
+
+// Timeframe button definitions
+const TIMEFRAME_BUTTONS = [
+  { value: 'M1', label: '1m' },
+  { value: 'M5', label: '5m' },
+  { value: 'M15', label: '15m' },
+  { value: 'H1', label: '1h' },
+  { value: 'H4', label: '4h' },
+  { value: 'D', label: '1d' },
+];
 
 // Indicator limits
 const MAX_OVERLAY_INDICATORS = 5;
@@ -83,7 +93,7 @@ function Strategy() {
   const [error, setError] = useState(null);
   const [infoMessage, setInfoMessage] = useState(null);
 
-  // Indicator panel state
+  // Indicator panel state (left sidebar)
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem(PANEL_COLLAPSED_KEY);
@@ -92,6 +102,20 @@ function Strategy() {
       return false;
     }
   });
+
+  // Logic panel state (right sidebar)
+  const [isLogicPanelCollapsed, setIsLogicPanelCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LOGIC_PANEL_COLLAPSED_KEY);
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Editable strategy name state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState('');
 
   // New state for advanced chart features
   const [chartType, setChartType] = useState('candlestick');
@@ -468,7 +492,7 @@ function Strategy() {
     setInfoMessage(null);
   };
 
-  // Handle panel collapse toggle with localStorage persistence
+  // Handle panel collapse toggle with localStorage persistence (left sidebar)
   const handlePanelToggle = useCallback(() => {
     setIsPanelCollapsed(prev => {
       const newValue = !prev;
@@ -480,6 +504,42 @@ function Strategy() {
       return newValue;
     });
   }, []);
+
+  // Handle logic panel collapse toggle with localStorage persistence (right sidebar)
+  const handleLogicPanelToggle = useCallback(() => {
+    setIsLogicPanelCollapsed(prev => {
+      const newValue = !prev;
+      try {
+        localStorage.setItem(LOGIC_PANEL_COLLAPSED_KEY, String(newValue));
+      } catch (e) {
+        console.warn('Failed to save logic panel state to localStorage:', e);
+      }
+      return newValue;
+    });
+  }, []);
+
+  // Handle strategy name editing
+  const handleStartEditingName = useCallback(() => {
+    setEditingNameValue(currentStrategyName || 'Untitled Strategy');
+    setIsEditingName(true);
+  }, [currentStrategyName]);
+
+  const handleFinishEditingName = useCallback(() => {
+    const trimmedName = editingNameValue.trim();
+    if (trimmedName && trimmedName !== currentStrategyName) {
+      setCurrentStrategyName(trimmedName);
+    }
+    setIsEditingName(false);
+  }, [editingNameValue, currentStrategyName]);
+
+  const handleNameKeyDown = useCallback((e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleFinishEditingName();
+    } else if (e.key === 'Escape') {
+      setIsEditingName(false);
+    }
+  }, [handleFinishEditingName]);
 
   // Helper to get indicator display name - use custom params if available
   const getDisplayName = useCallback((indicator) => {
@@ -2204,48 +2264,215 @@ function Strategy() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] animate-fade-in">
-      {/* Indicator Library Panel - Left Sidebar */}
-      <div
-        className={cn(
-          "hidden md:flex flex-shrink-0 transition-all duration-200 ease-out",
-          isPanelCollapsed ? "w-10" : "w-64"
-        )}
-      >
-        <IndicatorLibrary
-          isCollapsed={isPanelCollapsed}
-          onToggleCollapse={handlePanelToggle}
-        />
+    <div className="min-h-[calc(100vh-4rem)] animate-fade-in flex flex-col">
+      {/* Page Header Bar */}
+      <div className="border-b border-border bg-card">
+        <div className="py-4 px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Editable Strategy Name */}
+          <div className="flex items-center gap-3">
+            {isEditingName ? (
+              <input
+                type="text"
+                value={editingNameValue}
+                onChange={(e) => setEditingNameValue(e.target.value)}
+                onBlur={handleFinishEditingName}
+                onKeyDown={handleNameKeyDown}
+                className="text-xl font-semibold text-foreground bg-transparent border-b-2 border-primary outline-none px-1 py-0.5 min-w-[200px]"
+                autoFocus
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartEditingName}
+                className="flex items-center gap-2 text-xl font-semibold text-foreground hover:text-primary transition-colors group"
+              >
+                <span>{currentStrategyName || 'Untitled Strategy'}</span>
+                <Edit2 className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              text="Load"
+              handleClick={handleOpenLoadDialog}
+              icon={FolderOpen}
+              className="btn-secondary"
+            />
+            <Button
+              text="Import"
+              handleClick={handleOpenImportDialog}
+              icon={Upload}
+              className="btn-secondary"
+            />
+            <Button
+              text="Export"
+              handleClick={handleExportCurrentStrategy}
+              icon={Download}
+              className="btn-secondary"
+              disabled={!existingStrategyId}
+            />
+            <Button
+              text="Duplicate"
+              handleClick={handleDuplicateCurrentStrategy}
+              icon={Copy}
+              className="btn-secondary"
+              disabled={!existingStrategyId}
+            />
+            <Button
+              text="Save"
+              handleClick={handleOpenSaveDialog}
+              icon={Save}
+              className="btn-primary"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Mobile Indicator Panel - Overlay */}
-      <div
-        className={cn(
-          "md:hidden fixed inset-0 z-50 transition-opacity duration-200",
-          !isPanelCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={handlePanelToggle}
-        />
-        {/* Panel */}
-        <div
-          className={cn(
-            "absolute left-0 top-0 h-full transition-transform duration-200",
-            !isPanelCollapsed ? "translate-x-0" : "-translate-x-full"
+      {/* Control Bar */}
+      <div className="border-b border-border bg-card/50">
+        <div className="py-3 px-6 flex flex-col lg:flex-row lg:items-center gap-4 flex-wrap">
+          {/* Left: Pair Selector & Timeframe Buttons */}
+          <div className="flex flex-wrap items-center gap-4">
+            <PairSelector
+              options={options.pairs}
+              defaultValue={selectedPair}
+              onSelected={setSelectedPair}
+              hasLoadedData={!!(technicalsData || priceData)}
+              className="w-44"
+            />
+
+            {/* Timeframe Button Group */}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              {TIMEFRAME_BUTTONS.map((tf) => (
+                <button
+                  key={tf.value}
+                  type="button"
+                  onClick={() => handleTimeframeChange(tf.value)}
+                  className={cn(
+                    "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                    selectedGran === tf.value
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10"
+                  )}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Load Button */}
+            <Button
+              text={loadingData ? "Loading..." : "Load Data"}
+              handleClick={() => loadTechnicals()}
+              disabled={loadingData}
+              icon={loadingData ? RefreshCw : Play}
+              className={cn("btn-primary", loadingData && "[&_svg]:animate-spin")}
+            />
+          </div>
+
+          {/* Center: Active Indicators Chips */}
+          {activeIndicators.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap flex-1">
+              <span className="text-xs text-muted-foreground font-medium">Active:</span>
+              {activeIndicators.map((indicator) => {
+                const displayName = getDisplayName(indicator);
+                const isPreview = indicator.isPreview;
+                const isBeingPreviewed = previewIndicator && previewIndicator.instanceId === indicator.instanceId && !comparisonMode;
+
+                if (isBeingPreviewed && !indicator.isPreview) {
+                  return null;
+                }
+
+                return (
+                  <span
+                    key={indicator.instanceId}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
+                      isPreview
+                        ? "bg-amber-500/20 text-foreground border border-amber-500/30 border-dashed"
+                        : "bg-muted text-foreground",
+                      "cursor-pointer hover:bg-muted/80 transition-colors group"
+                    )}
+                    style={{ borderLeft: `3px solid ${indicator.color}` }}
+                    onClick={(e) => {
+                      if (e.target.closest('button')) return;
+                      if (!isPreview) {
+                        handleEditIndicator(indicator.instanceId);
+                      }
+                    }}
+                    title={!isPreview ? `Click to edit ${displayName}` : displayName}
+                  >
+                    {displayName}
+                    {isPreview && <span className="text-amber-600 dark:text-amber-400">(Preview)</span>}
+                    {!isPreview && (
+                      <Settings className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                    {!isPreview && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveIndicator(indicator.instanceId);
+                        }}
+                        className="ml-0.5 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
+                        title={`Remove ${displayName}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
           )}
-        >
-          <IndicatorLibrary
-            isCollapsed={false}
-            onToggleCollapse={handlePanelToggle}
-          />
+
+          {/* Right: Trade Direction, Candle Close, Layout Toggles */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <TradeDirectionSelector
+              value={tradeDirection}
+              onChange={handleTradeDirectionChange}
+            />
+            <CandleCloseToggle
+              value={confirmOnCandleClose}
+              onChange={handleCandleCloseChange}
+            />
+            {/* Layout Toggle Buttons */}
+            <div className="hidden lg:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handlePanelToggle}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  isPanelCollapsed
+                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-primary bg-primary/10"
+                )}
+                title={isPanelCollapsed ? "Show Indicator Library" : "Hide Indicator Library"}
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleLogicPanelToggle}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  isLogicPanelCollapsed
+                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-primary bg-primary/10"
+                )}
+                title={isLogicPanelCollapsed ? "Show Logic Panel" : "Hide Logic Panel"}
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Mobile Panel Toggle Buttons */}
-      <div className="md:hidden fixed bottom-6 z-40 flex gap-4 left-4 right-4 justify-between pointer-events-none">
+      <div className="lg:hidden fixed bottom-6 z-40 flex gap-4 left-4 right-4 justify-between pointer-events-none">
         <button
           type="button"
           onClick={handlePanelToggle}
@@ -2274,129 +2501,98 @@ function Strategy() {
         </button>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0 py-8 px-4 md:px-6 lg:px-8 space-y-8">
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-h2 text-foreground">Strategy</h1>
-            <p className="text-muted-foreground">
-              Analyze currency pairs, timeframes, and technical indicators for trading decisions
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Load Strategy */}
-            <Button
-              text="Load"
-              handleClick={handleOpenLoadDialog}
-              icon={FolderOpen}
-              className="btn-secondary"
-            />
-            {/* Import Strategy */}
-            <Button
-              text="Import"
-              handleClick={handleOpenImportDialog}
-              icon={Upload}
-              className="btn-secondary"
-            />
-            {/* Export Current Strategy */}
-            <Button
-              text="Export"
-              handleClick={handleExportCurrentStrategy}
-              icon={Download}
-              className="btn-secondary"
-              disabled={!existingStrategyId}
-            />
-            {/* Duplicate Current Strategy */}
-            <Button
-              text="Duplicate"
-              handleClick={handleDuplicateCurrentStrategy}
-              icon={Copy}
-              className="btn-secondary"
-              disabled={!existingStrategyId}
-            />
-            {/* Save Strategy */}
-            <Button
-              text="Save"
-              handleClick={handleOpenSaveDialog}
-              icon={Save}
-              className="btn-primary"
-            />
-          </div>
-        </div>
-
-        {/* Controls Section */}
-        <div className="card p-6 lg:p-8">
-          <div className="flex flex-col md:flex-row items-start md:items-end gap-6 flex-wrap">
-            {/* Pair & Granularity Selectors */}
-            <div className="flex flex-wrap items-end gap-4">
-              <PairSelector
-                options={options.pairs}
-                defaultValue={selectedPair}
-                onSelected={setSelectedPair}
-                hasLoadedData={!!(technicalsData || priceData)}
-                className="w-48"
-              />
-              <Select
-                name="Granularity"
-                title="Timeframe"
-                options={options.granularities}
-                defaultValue={selectedGran}
-                onSelected={handleTimeframeChange}
-                className="w-32"
-              />
-            </div>
-
-            {/* Trade Direction Selector */}
-            <TradeDirectionSelector
-              value={tradeDirection}
-              onChange={handleTradeDirectionChange}
-            />
-
-            {/* Candle Close Confirmation Toggle */}
-            <CandleCloseToggle
-              value={confirmOnCandleClose}
-              onChange={handleCandleCloseChange}
-            />
-
-            {/* Load Button */}
-            <Button
-              text={loadingData ? "Loading..." : "Load Data"}
-              handleClick={() => loadTechnicals()}
-              disabled={loadingData}
-              icon={loadingData ? RefreshCw : Play}
-              className={loadingData ? "[&_svg]:animate-spin" : ""}
-            />
-          </div>
-
-          {/* Selected Info Badge */}
-          {selectedPair && selectedGran && (
-            <div className="mt-6 pt-6 border-t border-border">
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  <span>
-                    Analyzing <span className="font-semibold text-foreground">{selectedPair}</span> on{' '}
-                    <span className="font-semibold text-foreground">{selectedGran}</span> timeframe
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {confirmOnCandleClose === CANDLE_CLOSE_CONFIRMATION.YES ? (
-                    <>
-                      <Clock className="h-4 w-4 text-blue-500" />
-                      <span>Signals confirmed on candle close</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 text-amber-500" />
-                      <span>Real-time signal evaluation</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+      {/* Mobile Indicator Panel - Overlay */}
+      <div
+        className={cn(
+          "lg:hidden fixed inset-0 z-50 transition-opacity duration-200",
+          !isPanelCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={handlePanelToggle}
+        />
+        <div
+          className={cn(
+            "absolute left-0 top-0 h-full transition-transform duration-200",
+            !isPanelCollapsed ? "translate-x-0" : "-translate-x-full"
           )}
+        >
+          <IndicatorLibrary
+            isCollapsed={false}
+            onToggleCollapse={handlePanelToggle}
+          />
         </div>
+      </div>
+
+      {/* Mobile Logic Panel - Overlay */}
+      <div
+        className={cn(
+          "lg:hidden fixed inset-0 z-50 transition-opacity duration-200",
+          isLogicPanelMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => setIsLogicPanelMobileOpen(false)}
+        />
+        <div
+          className={cn(
+            "absolute right-0 top-0 h-full transition-transform duration-200",
+            isLogicPanelMobileOpen ? "translate-x-0" : "translate-x-full"
+          )}
+        >
+          <LogicPanel
+            conditions={conditions}
+            groups={groups}
+            activeIndicators={activeIndicators}
+            activePatterns={activePatterns}
+            getIndicatorDisplayName={getDisplayName}
+            onConditionUpdate={handleConditionUpdate}
+            onConditionDelete={handleConditionDelete}
+            onConditionMove={handleConditionMove}
+            onIndicatorHover={handleIndicatorHover}
+            highlightedIndicatorId={highlightedIndicatorId}
+            tradeDirection={tradeDirection}
+            onAddCondition={handleAddCondition}
+            onAddMultiTimeframeCondition={handleAddMultiTimeframeCondition}
+            onGroupCreate={handleGroupCreate}
+            onGroupUpdate={handleGroupUpdate}
+            onGroupDelete={handleGroupDelete}
+            onGroupOperatorChange={handleGroupOperatorChange}
+            onUngroup={handleUngroup}
+            referenceIndicators={referenceIndicators}
+            referenceIndicatorValues={referenceIndicatorValues}
+            getReferenceDisplayName={getReferenceDisplayName}
+            onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
+            referenceDataLoading={referenceDataLoading}
+            onConditionReorderInGroup={handleConditionReorderInGroup}
+            onTestLogic={handleTestLogic}
+            testLogicData={testLogicData}
+            timeFilter={timeFilter}
+            onTimeFilterEdit={handleTimeFilterEdit}
+            onTimeFilterClear={handleTimeFilterClear}
+          />
+        </div>
+      </div>
+
+      {/* Three-Column Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Indicator Library */}
+        <div
+          className={cn(
+            "hidden lg:flex flex-shrink-0 border-r border-border transition-all duration-200 ease-out",
+            isPanelCollapsed ? "w-10" : "w-[280px]"
+          )}
+        >
+          <IndicatorLibrary
+            isCollapsed={isPanelCollapsed}
+            onToggleCollapse={handlePanelToggle}
+          />
+        </div>
+
+        {/* Center - Main Content Area */}
+        <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-6">
 
         {/* Error Display */}
         {error && (
@@ -2554,60 +2750,13 @@ function Strategy() {
             </div>
           </div>
         )}
-      </div>
+        </div>
 
-      {/* Logic Panel - Right Sidebar (Desktop) */}
-      <div className="hidden md:flex flex-shrink-0">
-        <LogicPanel
-          conditions={conditions}
-          groups={groups}
-          activeIndicators={activeIndicators}
-          activePatterns={activePatterns}
-          getIndicatorDisplayName={getDisplayName}
-          onConditionUpdate={handleConditionUpdate}
-          onConditionDelete={handleConditionDelete}
-          onConditionMove={handleConditionMove}
-          onIndicatorHover={handleIndicatorHover}
-          highlightedIndicatorId={highlightedIndicatorId}
-          tradeDirection={tradeDirection}
-          onAddCondition={handleAddCondition}
-          onAddMultiTimeframeCondition={handleAddMultiTimeframeCondition}
-          onGroupCreate={handleGroupCreate}
-          onGroupUpdate={handleGroupUpdate}
-          onGroupDelete={handleGroupDelete}
-          onGroupOperatorChange={handleGroupOperatorChange}
-          onUngroup={handleUngroup}
-          onConditionReorderInGroup={handleConditionReorderInGroup}
-          onTestLogic={handleTestLogic}
-          testLogicData={testLogicData}
-          referenceIndicators={referenceIndicators}
-          referenceIndicatorValues={referenceIndicatorValues}
-          getReferenceDisplayName={getReferenceDisplayName}
-          onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
-          referenceDataLoading={referenceDataLoading}
-          timeFilter={timeFilter}
-          onTimeFilterEdit={handleTimeFilterEdit}
-          onTimeFilterClear={handleTimeFilterClear}
-        />
-      </div>
-
-      {/* Mobile Logic Panel - Overlay */}
-      <div
-        className={cn(
-          "md:hidden fixed inset-0 z-50 transition-opacity duration-200",
-          isLogicPanelMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={() => setIsLogicPanelMobileOpen(false)}
-        />
-        {/* Panel */}
+        {/* Right Sidebar - Logic Panel */}
         <div
           className={cn(
-            "absolute right-0 top-0 h-full transition-transform duration-200",
-            isLogicPanelMobileOpen ? "translate-x-0" : "translate-x-full"
+            "hidden lg:flex flex-shrink-0 border-l border-border transition-all duration-200 ease-out",
+            isLogicPanelCollapsed ? "w-10" : "w-[320px]"
           )}
         >
           <LogicPanel
@@ -2629,17 +2778,19 @@ function Strategy() {
             onGroupDelete={handleGroupDelete}
             onGroupOperatorChange={handleGroupOperatorChange}
             onUngroup={handleUngroup}
+            onConditionReorderInGroup={handleConditionReorderInGroup}
+            onTestLogic={handleTestLogic}
+            testLogicData={testLogicData}
             referenceIndicators={referenceIndicators}
             referenceIndicatorValues={referenceIndicatorValues}
             getReferenceDisplayName={getReferenceDisplayName}
             onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
             referenceDataLoading={referenceDataLoading}
-            onConditionReorderInGroup={handleConditionReorderInGroup}
-            onTestLogic={handleTestLogic}
-            testLogicData={testLogicData}
             timeFilter={timeFilter}
             onTimeFilterEdit={handleTimeFilterEdit}
             onTimeFilterClear={handleTimeFilterClear}
+            isCollapsed={isLogicPanelCollapsed}
+            onToggleCollapse={handleLogicPanelToggle}
           />
         </div>
       </div>
