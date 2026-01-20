@@ -360,3 +360,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting strategy management operations or undo delete functionality
     - When extending StrategyListItemExtended or StrategyExport data models
     - When implementing conflict resolution for strategy name conflicts
+
+- app_docs/feature-81b4393a-strategy-builder-layout.md
+  - Conditions:
+    - When working with the Strategy Builder three-column layout
+    - When implementing or modifying the Page Header Bar or Control Bar on the Strategy page
+    - When working with collapsible sidebars (Indicator Library or Logic Panel)
+    - When implementing editable strategy name functionality
+    - When working with timeframe toggle buttons or active indicator chips
+    - When modifying responsive behavior for the Strategy page (mobile/tablet views)
+    - When troubleshooting sidebar collapse/expand or layout issues on Strategy page
+    - When working with layout toggle buttons or panel visibility state
