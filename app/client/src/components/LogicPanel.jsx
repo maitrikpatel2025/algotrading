@@ -105,8 +105,11 @@ function LogicPanel({
   timeFilter = null,
   onTimeFilterEdit,
   onTimeFilterClear,
+  isCollapsed: isCollapsedProp,
+  onToggleCollapse: onToggleCollapseProp,
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(() => {
+  // Support both controlled (props) and uncontrolled (internal state) modes
+  const [internalIsCollapsed, setInternalIsCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem(LOGIC_PANEL_COLLAPSED_KEY);
       return stored === 'true';
@@ -114,6 +117,18 @@ function LogicPanel({
       return false;
     }
   });
+
+  // Use prop if provided, otherwise fall back to internal state
+  const isCollapsed = isCollapsedProp !== undefined ? isCollapsedProp : internalIsCollapsed;
+
+  // Toggle handler that works for both controlled and uncontrolled modes
+  const handleToggleCollapse = useCallback(() => {
+    if (onToggleCollapseProp) {
+      onToggleCollapseProp();
+    } else {
+      setInternalIsCollapsed(prev => !prev);
+    }
+  }, [onToggleCollapseProp]);
 
   const [panelWidth, setPanelWidth] = useState(() => {
     try {
@@ -153,14 +168,16 @@ function LogicPanel({
     section: null,
   });
 
-  // Persist collapsed state
+  // Persist collapsed state (only if using internal state)
   useEffect(() => {
-    try {
-      localStorage.setItem(LOGIC_PANEL_COLLAPSED_KEY, String(isCollapsed));
-    } catch (e) {
-      console.warn('Failed to save logic panel state:', e);
+    if (isCollapsedProp === undefined) {
+      try {
+        localStorage.setItem(LOGIC_PANEL_COLLAPSED_KEY, String(internalIsCollapsed));
+      } catch (e) {
+        console.warn('Failed to save logic panel state:', e);
+      }
     }
-  }, [isCollapsed]);
+  }, [internalIsCollapsed, isCollapsedProp]);
 
   // Persist panel width
   useEffect(() => {
@@ -218,10 +235,8 @@ function LogicPanel({
     };
   }, [isResizing]);
 
-  // Toggle panel collapse
-  const handleToggle = useCallback(() => {
-    setIsCollapsed(prev => !prev);
-  }, []);
+  // Toggle panel collapse - use the unified handler
+  const handleToggle = handleToggleCollapse;
 
   // Start resize
   const handleResizeStart = useCallback((e) => {
