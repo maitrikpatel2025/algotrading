@@ -5,19 +5,18 @@ Unit tests for the strategy service module including
 duplicate, export, import, and validation functions.
 """
 
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from core.data_models import (
+    ImportValidationResult,
     StrategyConfig,
     StrategyExport,
-    ImportValidationResult,
 )
 from core.strategy_service import (
+    SUPPORTED_SCHEMA_VERSIONS,
     _generate_copy_name,
     validate_import,
-    SUPPORTED_SCHEMA_VERSIONS,
 )
 
 

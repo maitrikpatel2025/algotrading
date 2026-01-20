@@ -5,11 +5,11 @@ Service layer for strategy CRUD operations with Supabase.
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-import re
 from core.data_models import (
     CheckNameResponse,
     ImportValidationResult,

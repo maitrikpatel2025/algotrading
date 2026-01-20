@@ -46,7 +46,6 @@ from core.data_models import (
     SaveStrategyRequest,
     SaveStrategyResponse,
     SpreadResponse,
-    StrategyExport,
     TradeHistoryItem,
     TradeHistoryResponse,
     TradeInfo,
