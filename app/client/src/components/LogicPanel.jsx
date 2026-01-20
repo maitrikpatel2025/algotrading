@@ -464,6 +464,7 @@ function LogicPanel({
                       groups={groups}
                       activeIndicators={activeIndicators}
                       activePatterns={activePatterns}
+                      referenceIndicators={referenceIndicators}
                       getIndicatorDisplayName={getIndicatorDisplayName}
                       onOperatorChange={onGroupOperatorChange}
                       onConditionReorder={handleConditionReorder}
@@ -508,6 +509,7 @@ function LogicPanel({
                           condition={condition}
                           activeIndicators={activeIndicators}
                           activePatterns={activePatterns}
+                          referenceIndicators={referenceIndicators}
                           getIndicatorDisplayName={getIndicatorDisplayName}
                           onUpdate={onConditionUpdate}
                           onDelete={onConditionDelete}
