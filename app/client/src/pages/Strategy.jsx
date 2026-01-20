@@ -43,7 +43,16 @@ import {
   REFERENCE_INDICATORS_STORAGE_KEY,
   TIME_FILTER_STORAGE_KEY,
   DEFAULT_TIME_FILTER,
+  DRAWINGS_STORAGE_KEY,
 } from '../app/constants';
+import { DRAWING_TOOLS } from '../app/drawingTypes';
+import {
+  findConditionsUsingDrawing,
+  serializeDrawings,
+  deserializeDrawings,
+  getDrawingDisplayName,
+} from '../app/drawingUtils';
+import DrawingPropertiesDialog from '../components/DrawingPropertiesDialog';
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
@@ -201,6 +210,27 @@ function Strategy() {
   // Preview mode state for real-time parameter adjustment
   const [previewIndicator, setPreviewIndicator] = useState(null);
   const [comparisonMode, setComparisonMode] = useState(false);
+
+  // Drawing state management
+  const [drawings, setDrawings] = useState(() => {
+    try {
+      const stored = localStorage.getItem(DRAWINGS_STORAGE_KEY);
+      if (stored) {
+        return deserializeDrawings(stored);
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
+  const [activeDrawingTool, setActiveDrawingTool] = useState(DRAWING_TOOLS.POINTER);
+  const [drawingError, setDrawingError] = useState(null);
+
+  // Drawing properties dialog state
+  const [drawingDialog, setDrawingDialog] = useState({
+    isOpen: false,
+    drawing: null,
+  });
 
   // Debounce timer ref for timeframe changes
   const debounceTimerRef = useRef(null);
@@ -978,6 +1008,151 @@ function Strategy() {
     setTimeFilterDialogOpen(false);
   }, []);
 
+  // =============================================================================
+  // DRAWING HANDLERS
+  // =============================================================================
+
+  // Persist drawings to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAWINGS_STORAGE_KEY, serializeDrawings(drawings));
+    } catch (e) {
+      console.warn('Failed to save drawings to localStorage:', e);
+    }
+  }, [drawings]);
+
+  // Handle drawing tool change
+  const handleDrawingToolChange = useCallback((tool) => {
+    setActiveDrawingTool(tool);
+    setDrawingError(null);
+  }, []);
+
+  // Handle adding a new drawing
+  const handleDrawingAdd = useCallback((drawing) => {
+    setDrawings(prev => [...prev, drawing]);
+    // Switch back to pointer tool after single-click drawings
+    if (drawing.type === DRAWING_TOOLS.HORIZONTAL_LINE) {
+      // Optionally keep the tool active for rapid drawing
+      // setActiveDrawingTool(DRAWING_TOOLS.POINTER);
+    }
+  }, []);
+
+  // Handle updating an existing drawing
+  const handleDrawingUpdate = useCallback((updatedDrawing) => {
+    setDrawings(prev => prev.map(d =>
+      d.id === updatedDrawing.id ? updatedDrawing : d
+    ));
+    setDrawingDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle deleting a drawing with confirmation for condition-linked drawings
+  const handleDrawingDelete = useCallback((drawingId) => {
+    const drawing = drawings.find(d => d.id === drawingId);
+    if (!drawing) return;
+
+    // Check if drawing is used in conditions
+    const relatedConditions = findConditionsUsingDrawing(drawingId, conditions);
+
+    if (relatedConditions.length > 0) {
+      // Show confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Delete Drawing',
+        message: `"${getDrawingDisplayName(drawing)}" is used in ${relatedConditions.length} condition${relatedConditions.length !== 1 ? 's' : ''}. Deleting this drawing will also remove the related conditions. Continue?`,
+        variant: 'warning',
+        actions: [
+          {
+            label: 'Delete All',
+            variant: 'danger',
+            onClick: () => {
+              setDrawings(prev => prev.filter(d => d.id !== drawingId));
+              // Remove related conditions
+              setConditions(prev => prev.filter(c =>
+                !(c.leftOperand?.type === 'horizontalLine' && c.leftOperand?.drawingId === drawingId) &&
+                !(c.rightOperand?.type === 'horizontalLine' && c.rightOperand?.drawingId === drawingId)
+              ));
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          },
+        ],
+      });
+    } else {
+      // No related conditions, just delete
+      setDrawings(prev => prev.filter(d => d.id !== drawingId));
+    }
+  }, [drawings, conditions]);
+
+  // Handle editing a drawing (open properties dialog)
+  const handleDrawingEdit = useCallback((drawing) => {
+    setDrawingDialog({
+      isOpen: true,
+      drawing,
+    });
+  }, []);
+
+  // Handle closing drawing properties dialog
+  const handleDrawingDialogClose = useCallback(() => {
+    setDrawingDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle drawing properties dialog confirm
+  const handleDrawingDialogConfirm = useCallback((updates) => {
+    if (!drawingDialog.drawing) return;
+
+    const updatedDrawing = {
+      ...drawingDialog.drawing,
+      ...updates,
+    };
+
+    setDrawings(prev => prev.map(d =>
+      d.id === updatedDrawing.id ? updatedDrawing : d
+    ));
+    setDrawingDialog(prev => ({ ...prev, isOpen: false }));
+  }, [drawingDialog.drawing]);
+
+  // Handle using a horizontal line in a condition
+  const handleDrawingUseInCondition = useCallback((drawing) => {
+    if (drawing.type !== DRAWING_TOOLS.HORIZONTAL_LINE) {
+      setDrawingError('Only horizontal lines can be used in conditions.');
+      return;
+    }
+
+    // Determine condition section based on trade direction
+    const conditionSection = getDefaultSection(tradeDirection, 'entry');
+
+    // Create a condition with the horizontal line as a reference
+    const newCondition = createStandaloneCondition('price', conditionSection);
+    newCondition.rightOperand = {
+      type: 'horizontalLine',
+      drawingId: drawing.id,
+      price: drawing.price,
+      label: drawing.label || `Line @ ${drawing.price.toFixed(5)}`,
+    };
+    newCondition.operator = 'crosses_above';
+
+    setConditions(prev => [...prev, newCondition]);
+    setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
+  }, [tradeDirection]);
+
+  // Get drawing IDs that are used in conditions
+  const conditionDrawingIds = useMemo(() => {
+    const ids = new Set();
+    conditions.forEach(c => {
+      if (c.leftOperand?.type === 'horizontalLine' && c.leftOperand?.drawingId) {
+        ids.add(c.leftOperand.drawingId);
+      }
+      if (c.rightOperand?.type === 'horizontalLine' && c.rightOperand?.drawingId) {
+        ids.add(c.rightOperand.drawingId);
+      }
+    });
+    return Array.from(ids);
+  }, [conditions]);
+
+  // Clear drawing error
+  const handleDrawingErrorClear = useCallback(() => {
+    setDrawingError(null);
+  }, []);
+
   // Handle creating a new group from selected conditions
   const handleGroupCreate = useCallback((conditionIds, operator = GROUP_OPERATORS.AND, section, parentGroupId = null) => {
     if (conditionIds.length < 2) return;
@@ -1614,6 +1789,19 @@ function Strategy() {
                   onIndicatorDuplicate={handleIndicatorDuplicate}
                   previewIndicator={previewIndicator}
                   comparisonMode={comparisonMode}
+                  // Drawing props
+                  drawings={drawings}
+                  activeDrawingTool={activeDrawingTool}
+                  onDrawingToolChange={handleDrawingToolChange}
+                  onDrawingAdd={handleDrawingAdd}
+                  onDrawingUpdate={handleDrawingUpdate}
+                  onDrawingDelete={handleDrawingDelete}
+                  onDrawingEdit={handleDrawingEdit}
+                  onDrawingUseInCondition={handleDrawingUseInCondition}
+                  conditionDrawingIds={conditionDrawingIds}
+                  conditions={conditions}
+                  drawingError={drawingError}
+                  onDrawingErrorClear={handleDrawingErrorClear}
                 />
               </div>
             )}
@@ -1784,6 +1972,14 @@ function Strategy() {
         onClose={handleTimeFilterDialogClose}
         onSave={handleTimeFilterSave}
         initialFilter={timeFilter}
+      />
+
+      {/* Drawing Properties Dialog */}
+      <DrawingPropertiesDialog
+        isOpen={drawingDialog.isOpen}
+        onClose={handleDrawingDialogClose}
+        onConfirm={handleDrawingDialogConfirm}
+        drawing={drawingDialog.drawing}
       />
     </div>
   );

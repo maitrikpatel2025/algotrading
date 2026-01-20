@@ -8,6 +8,21 @@ import { getPatternDisplayName } from '../app/patterns';
 import { LineChart, BarChart2, X, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 import IndicatorContextMenu from './IndicatorContextMenu';
+import DrawingToolbar from './DrawingToolbar';
+import DrawingContextMenu from './DrawingContextMenu';
+import {
+  DRAWING_TOOLS,
+  DRAWING_TOOL_SHORTCUTS,
+  createDefaultHorizontalLine,
+  createDefaultTrendline,
+  createDefaultFibonacci,
+  wouldExceedDrawingLimit,
+  getDrawingLimitWarning,
+} from '../app/drawingTypes';
+import {
+  generateDrawingId,
+  findNearestOHLC,
+} from '../app/drawingUtils';
 
 function PriceChart({
   priceData,
@@ -34,6 +49,19 @@ function PriceChart({
   onIndicatorDuplicate,
   previewIndicator = null,
   comparisonMode = false,
+  // Drawing props
+  drawings = [],
+  activeDrawingTool = DRAWING_TOOLS.POINTER,
+  onDrawingToolChange,
+  onDrawingAdd,
+  onDrawingUpdate,
+  onDrawingDelete,
+  onDrawingEdit,
+  onDrawingUseInCondition,
+  conditionDrawingIds = [],
+  conditions = [],
+  drawingError = null,
+  onDrawingErrorClear,
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
@@ -46,6 +74,16 @@ function PriceChart({
     indicatorInstanceId: null,
     indicatorName: '',
   });
+
+  // Drawing state
+  const [drawingContextMenu, setDrawingContextMenu] = useState({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    drawing: null,
+  });
+  const [pendingDrawing, setPendingDrawing] = useState(null); // For multi-click drawings (trendline, fibonacci)
+  // eslint-disable-next-line no-unused-vars
+  const [snapEnabled, _setSnapEnabled] = useState(true); // Future: allow toggling snap behavior
 
   // Touch device detection and interaction hint initialization
   useEffect(() => {
@@ -78,7 +116,7 @@ function PriceChart({
         }
       }
 
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns);
+      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns, drawings, conditionDrawingIds);
 
       // Get chart element reference
       const chartElement = document.getElementById('chartDiv');
@@ -184,7 +222,7 @@ function PriceChart({
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode, drawings, conditionDrawingIds]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
@@ -217,6 +255,33 @@ function PriceChart({
       };
 
       let newRange = null;
+
+      // Check for drawing tool shortcuts first
+      const drawingShortcutKey = event.key.toUpperCase();
+      if (DRAWING_TOOL_SHORTCUTS[drawingShortcutKey] && onDrawingToolChange) {
+        event.preventDefault();
+        onDrawingToolChange(DRAWING_TOOL_SHORTCUTS[drawingShortcutKey]);
+        // Cancel any pending drawing when switching tools
+        setPendingDrawing(null);
+        return;
+      }
+
+      // Escape key handling - cancel drawing or switch to pointer
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (pendingDrawing) {
+          setPendingDrawing(null);
+        } else if (activeDrawingTool !== DRAWING_TOOLS.POINTER && onDrawingToolChange) {
+          onDrawingToolChange(DRAWING_TOOLS.POINTER);
+        }
+        return;
+      }
+
+      // Delete key - delete selected drawing (future feature)
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Could implement drawing selection and deletion here in the future
+        return;
+      }
 
       switch (event.key) {
         case '+':
@@ -269,13 +334,173 @@ function PriceChart({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [priceData]);
+  }, [priceData, activeDrawingTool, pendingDrawing, onDrawingToolChange]);
 
   // Dismiss interaction hint
   const dismissInteractionHint = () => {
     localStorage.setItem('chart-interaction-hint-dismissed', 'true');
     setShowInteractionHint(false);
   };
+
+  // Handle chart click for drawing tools
+  const handleChartDrawingClick = useCallback((event) => {
+    // Only handle if a drawing tool is active
+    if (activeDrawingTool === DRAWING_TOOLS.POINTER || !priceData || !onDrawingAdd) {
+      return;
+    }
+
+    const chartElement = document.getElementById('chartDiv');
+    if (!chartElement) return;
+
+    // Get chart layout
+    const layout = chartElement.layout;
+    if (!layout || !layout.xaxis || !layout.yaxis) return;
+
+    // Calculate click position relative to chart
+    const rect = chartElement.getBoundingClientRect();
+    const xPx = event.clientX - rect.left;
+    const yPx = event.clientY - rect.top;
+
+    // Get the plot area dimensions (rough approximation)
+    const margin = layout.margin || { l: 60, r: 60, t: 50, b: 50 };
+    const plotWidth = rect.width - margin.l - margin.r;
+    const plotHeight = rect.height - margin.t - margin.b;
+
+    // Calculate relative position within plot area
+    const relX = (xPx - margin.l) / plotWidth;
+    const relY = (yPx - margin.t) / plotHeight;
+
+    // Check if click is within plot area
+    if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
+
+    // Get axis ranges
+    const xRange = layout.xaxis.range || [priceData.time[0], priceData.time[priceData.time.length - 1]];
+    const yRange = layout.yaxis.range || [Math.min(...priceData.mid_l), Math.max(...priceData.mid_h)];
+
+    // Calculate price from pixel position (y-axis is inverted)
+    const clickedPrice = yRange[1] - relY * (yRange[1] - yRange[0]);
+
+    // Calculate time from pixel position
+    const startTime = new Date(xRange[0]).getTime();
+    const endTime = new Date(xRange[1]).getTime();
+    const clickedTime = new Date(startTime + relX * (endTime - startTime)).toISOString();
+
+    // Apply snap-to-price if enabled
+    let finalPrice = clickedPrice;
+    let finalTime = clickedTime;
+
+    if (snapEnabled) {
+      const snapResult = findNearestOHLC(new Date(clickedTime).getTime(), clickedPrice, priceData);
+      if (snapResult.didSnap) {
+        finalPrice = snapResult.snappedPrice;
+      }
+      if (snapResult.candle) {
+        finalTime = snapResult.candle.time;
+      }
+    }
+
+    // Check for drawing limits
+    if (wouldExceedDrawingLimit(drawings, activeDrawingTool)) {
+      console.warn(getDrawingLimitWarning(activeDrawingTool));
+      return;
+    }
+
+    // Handle different drawing tool types
+    switch (activeDrawingTool) {
+      case DRAWING_TOOLS.HORIZONTAL_LINE: {
+        // Horizontal line is single-click
+        const newDrawing = {
+          id: generateDrawingId(),
+          ...createDefaultHorizontalLine(finalPrice),
+        };
+        onDrawingAdd(newDrawing);
+        break;
+      }
+
+      case DRAWING_TOOLS.TRENDLINE: {
+        if (!pendingDrawing) {
+          // First click - set starting point
+          setPendingDrawing({
+            type: DRAWING_TOOLS.TRENDLINE,
+            point1: { time: finalTime, price: finalPrice },
+          });
+        } else {
+          // Second click - complete the trendline
+          const newDrawing = {
+            id: generateDrawingId(),
+            ...createDefaultTrendline(
+              pendingDrawing.point1,
+              { time: finalTime, price: finalPrice }
+            ),
+          };
+          onDrawingAdd(newDrawing);
+          setPendingDrawing(null);
+        }
+        break;
+      }
+
+      case DRAWING_TOOLS.FIBONACCI: {
+        if (!pendingDrawing) {
+          // First click - set starting point
+          setPendingDrawing({
+            type: DRAWING_TOOLS.FIBONACCI,
+            startPoint: { time: finalTime, price: finalPrice },
+          });
+        } else {
+          // Second click - complete the fibonacci
+          const newDrawing = {
+            id: generateDrawingId(),
+            ...createDefaultFibonacci(
+              pendingDrawing.startPoint,
+              { time: finalTime, price: finalPrice }
+            ),
+          };
+          onDrawingAdd(newDrawing);
+          setPendingDrawing(null);
+        }
+        break;
+      }
+
+      default:
+        // Pointer tool or unknown tool - do nothing
+        break;
+    }
+  }, [activeDrawingTool, priceData, onDrawingAdd, drawings, pendingDrawing, snapEnabled]);
+
+  // Handle drawing context menu (for future: chart right-click detection on drawings)
+  // eslint-disable-next-line no-unused-vars
+  const handleDrawingContextMenu = useCallback((event, drawing) => {
+    event.preventDefault();
+    setDrawingContextMenu({
+      isOpen: true,
+      position: { x: event.clientX, y: event.clientY },
+      drawing,
+    });
+  }, []);
+
+  // Close drawing context menu
+  const closeDrawingContextMenu = useCallback(() => {
+    setDrawingContextMenu(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Handle drawing flip (fibonacci)
+  const handleDrawingFlip = useCallback(() => {
+    const drawing = drawingContextMenu.drawing;
+    if (!drawing || drawing.type !== DRAWING_TOOLS.FIBONACCI || !onDrawingUpdate) return;
+
+    // Swap start and end points
+    const flipped = {
+      ...drawing,
+      startPoint: drawing.endPoint,
+      endPoint: drawing.startPoint,
+    };
+    onDrawingUpdate(flipped);
+  }, [drawingContextMenu.drawing, onDrawingUpdate]);
+
+  // Check if drawing is used in a condition
+  const isDrawingUsedInCondition = useCallback((drawingId) => {
+    return conditionDrawingIds.includes(drawingId);
+  }, [conditionDrawingIds]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e) => {
@@ -378,6 +603,16 @@ function PriceChart({
               <BarChart2 className="h-4 w-4" />
               <span className="hidden sm:inline">Vol</span>
             </button>
+
+            {/* Drawing Toolbar */}
+            {onDrawingToolChange && (
+              <DrawingToolbar
+                activeTool={activeDrawingTool}
+                onToolSelect={onDrawingToolChange}
+                drawings={drawings}
+                disabled={!priceData || loading}
+              />
+            )}
           </div>
         </div>
 
@@ -536,9 +771,21 @@ function PriceChart({
             )}
             <div
               id="chartDiv"
-              className="w-full rounded-lg bg-muted/30 min-h-[500px]"
+              className={cn(
+                "w-full rounded-lg bg-muted/30 min-h-[500px]",
+                activeDrawingTool !== DRAWING_TOOLS.POINTER && "cursor-crosshair"
+              )}
               style={{ height: 'calc(100vh - 450px)' }}
+              onClick={handleChartDrawingClick}
             />
+
+            {/* Pending drawing indicator */}
+            {pendingDrawing && (
+              <div className="absolute top-4 right-4 z-40 bg-amber-500/90 text-white px-3 py-2 rounded-md shadow-lg text-sm font-medium flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                Click to set {pendingDrawing.type === DRAWING_TOOLS.TRENDLINE ? 'end point' : 'end point'} • Press Esc to cancel
+              </div>
+            )}
 
             {/* Interaction Hints Tooltip */}
             {showInteractionHint && (
@@ -603,6 +850,41 @@ function PriceChart({
           }
         }}
         onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
+      />
+
+      {/* Drawing Context Menu */}
+      <DrawingContextMenu
+        isOpen={drawingContextMenu.isOpen}
+        position={drawingContextMenu.position}
+        drawing={drawingContextMenu.drawing}
+        onEdit={() => {
+          if (onDrawingEdit && drawingContextMenu.drawing) {
+            onDrawingEdit(drawingContextMenu.drawing);
+          }
+        }}
+        onDuplicate={() => {
+          if (onDrawingAdd && drawingContextMenu.drawing) {
+            const duplicate = {
+              ...drawingContextMenu.drawing,
+              id: generateDrawingId(),
+              label: '', // Clear label for duplicate
+            };
+            onDrawingAdd(duplicate);
+          }
+        }}
+        onDelete={() => {
+          if (onDrawingDelete && drawingContextMenu.drawing) {
+            onDrawingDelete(drawingContextMenu.drawing.id);
+          }
+        }}
+        onUseInCondition={() => {
+          if (onDrawingUseInCondition && drawingContextMenu.drawing) {
+            onDrawingUseInCondition(drawingContextMenu.drawing);
+          }
+        }}
+        onFlip={handleDrawingFlip}
+        onClose={closeDrawingContextMenu}
+        isUsedInCondition={drawingContextMenu.drawing ? isDrawingUsedInCondition(drawingContextMenu.drawing.id) : false}
       />
     </div>
   );

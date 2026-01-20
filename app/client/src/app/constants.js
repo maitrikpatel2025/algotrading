@@ -246,3 +246,10 @@ export const DEFAULT_TIME_FILTER = {
   days: [...DEFAULT_TRADING_DAYS],
   timezone: 'UTC',
 };
+
+// =============================================================================
+// DRAWING TOOL CONSTANTS - Chart annotation drawing tools
+// =============================================================================
+
+// localStorage key for drawings persistence
+export const DRAWINGS_STORAGE_KEY = 'forex_dash_drawings';

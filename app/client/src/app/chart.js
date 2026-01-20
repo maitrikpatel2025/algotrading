@@ -24,6 +24,14 @@ import {
   DEFAULT_LINE_STYLE,
   DEFAULT_FILL_OPACITY
 } from './chartConstants';
+import {
+  DRAWING_TOOLS,
+  DRAWING_LINE_STYLES,
+} from './drawingTypes';
+import {
+  calculateAllFibonacciLevels,
+  extendTrendline,
+} from './drawingUtils';
 
 // Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
@@ -1026,7 +1034,336 @@ function createPatternMarkerTraces(chartData, pattern) {
 }
 
 /**
- * Draw the chart with support for multiple chart types, volume subplot, indicators, patterns, and advanced interactions.
+ * Convert drawing line style to Plotly dash format
+ * @param {string} style - The drawing line style (solid, dash, dot)
+ * @returns {string} Plotly dash value
+ */
+function getPlotlyDash(style) {
+  switch (style) {
+    case DRAWING_LINE_STYLES.DASHED:
+      return 'dash';
+    case DRAWING_LINE_STYLES.DOTTED:
+      return 'dot';
+    case DRAWING_LINE_STYLES.SOLID:
+    default:
+      return 'solid';
+  }
+}
+
+/**
+ * Create Plotly shapes for all drawings
+ * @param {Array} drawings - Array of drawing objects
+ * @param {Object} chartData - The chart data
+ * @param {Array} conditionDrawingIds - Array of drawing IDs used in conditions (for special styling)
+ * @returns {Array} Array of Plotly shape objects
+ */
+function createDrawingShapes(drawings, chartData, conditionDrawingIds = []) {
+  if (!drawings || !Array.isArray(drawings) || drawings.length === 0) {
+    return [];
+  }
+
+  const shapes = [];
+  const dataRange = chartData && chartData.time && chartData.time.length > 0
+    ? {
+        startTime: chartData.time[0],
+        endTime: chartData.time[chartData.time.length - 1],
+      }
+    : null;
+
+  drawings.forEach(drawing => {
+    const isUsedInCondition = conditionDrawingIds.includes(drawing.id);
+    const dash = getPlotlyDash(drawing.lineStyle);
+
+    switch (drawing.type) {
+      case DRAWING_TOOLS.HORIZONTAL_LINE: {
+        // Horizontal line extends across the entire chart (paper coordinates for x)
+        shapes.push({
+          type: 'line',
+          xref: 'paper',
+          yref: 'y',
+          x0: 0,
+          x1: 1,
+          y0: drawing.price,
+          y1: drawing.price,
+          line: {
+            color: drawing.color,
+            width: drawing.lineWidth || 2,
+            dash: dash,
+          },
+          // Store drawing ID for interaction handling
+          meta: {
+            drawingId: drawing.id,
+            drawingType: drawing.type,
+            isUsedInCondition,
+          },
+        });
+
+        // Add glow effect for lines used in conditions
+        if (isUsedInCondition) {
+          shapes.push({
+            type: 'line',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: drawing.price,
+            y1: drawing.price,
+            line: {
+              color: drawing.color,
+              width: (drawing.lineWidth || 2) + 4,
+              dash: dash,
+            },
+            opacity: 0.2,
+            layer: 'below',
+          });
+        }
+        break;
+      }
+
+      case DRAWING_TOOLS.TRENDLINE: {
+        let startPoint = drawing.point1;
+        let endPoint = drawing.point2;
+
+        // Apply extensions if enabled
+        if ((drawing.extendLeft || drawing.extendRight) && dataRange) {
+          const extended = extendTrendline(
+            drawing.point1,
+            drawing.point2,
+            drawing.extendLeft,
+            drawing.extendRight,
+            dataRange
+          );
+          startPoint = extended.extendedStart;
+          endPoint = extended.extendedEnd;
+        }
+
+        shapes.push({
+          type: 'line',
+          xref: 'x',
+          yref: 'y',
+          x0: startPoint.time,
+          y0: startPoint.price,
+          x1: endPoint.time,
+          y1: endPoint.price,
+          line: {
+            color: drawing.color,
+            width: drawing.lineWidth || 2,
+            dash: dash,
+          },
+          meta: {
+            drawingId: drawing.id,
+            drawingType: drawing.type,
+          },
+        });
+        break;
+      }
+
+      case DRAWING_TOOLS.FIBONACCI: {
+        // Calculate all enabled Fibonacci levels
+        const allLevels = calculateAllFibonacciLevels(
+          drawing.startPoint.price,
+          drawing.endPoint.price,
+          drawing.levels,
+          drawing.extensionLevels
+        );
+
+        // Create a horizontal line for each level
+        allLevels.forEach(level => {
+          shapes.push({
+            type: 'line',
+            xref: 'x',
+            yref: 'y',
+            x0: drawing.startPoint.time,
+            x1: drawing.endPoint.time,
+            y0: level.price,
+            y1: level.price,
+            line: {
+              color: drawing.levelColors?.[level.value] || drawing.color,
+              width: level.value === 0 || level.value === 1 ? drawing.lineWidth || 2 : (drawing.lineWidth || 2) * 0.67,
+              dash: level.value >= 1 && level.value !== 1 ? 'dash' : dash,
+            },
+            meta: {
+              drawingId: drawing.id,
+              drawingType: drawing.type,
+              fibLevel: level.value,
+            },
+          });
+        });
+
+        // Add vertical connecting lines at start and end
+        const minPrice = Math.min(drawing.startPoint.price, drawing.endPoint.price);
+        const maxPrice = Math.max(drawing.startPoint.price, drawing.endPoint.price);
+
+        shapes.push({
+          type: 'line',
+          xref: 'x',
+          yref: 'y',
+          x0: drawing.startPoint.time,
+          x1: drawing.startPoint.time,
+          y0: minPrice,
+          y1: maxPrice,
+          line: {
+            color: drawing.color,
+            width: 1,
+            dash: 'dot',
+          },
+          opacity: 0.5,
+        });
+
+        shapes.push({
+          type: 'line',
+          xref: 'x',
+          yref: 'y',
+          x0: drawing.endPoint.time,
+          x1: drawing.endPoint.time,
+          y0: minPrice,
+          y1: maxPrice,
+          line: {
+            color: drawing.color,
+            width: 1,
+            dash: 'dot',
+          },
+          opacity: 0.5,
+        });
+        break;
+      }
+
+      default:
+        console.warn(`Unknown drawing type: ${drawing.type}`);
+    }
+  });
+
+  return shapes;
+}
+
+/**
+ * Create Plotly annotations for drawing labels
+ * @param {Array} drawings - Array of drawing objects
+ * @param {Object} chartData - The chart data
+ * @param {Array} conditionDrawingIds - Array of drawing IDs used in conditions
+ * @returns {Array} Array of Plotly annotation objects
+ */
+function createDrawingAnnotations(drawings, chartData, conditionDrawingIds = []) {
+  if (!drawings || !Array.isArray(drawings) || drawings.length === 0) {
+    return [];
+  }
+
+  const annotations = [];
+
+  drawings.forEach(drawing => {
+    const isUsedInCondition = conditionDrawingIds.includes(drawing.id);
+
+    switch (drawing.type) {
+      case DRAWING_TOOLS.HORIZONTAL_LINE: {
+        // Price label on the right side
+        const labelText = drawing.label
+          ? `${drawing.label} (${drawing.price.toFixed(5)})`
+          : drawing.price.toFixed(5);
+
+        annotations.push({
+          x: 1,
+          xref: 'paper',
+          xanchor: 'left',
+          y: drawing.price,
+          yref: 'y',
+          text: isUsedInCondition ? `✦ ${labelText}` : labelText,
+          showarrow: false,
+          font: {
+            family: 'JetBrains Mono, monospace',
+            size: 10,
+            color: drawing.color,
+          },
+          bgcolor: 'rgba(24, 24, 27, 0.8)',
+          bordercolor: drawing.color,
+          borderwidth: 1,
+          borderpad: 3,
+          xshift: 5,
+        });
+        break;
+      }
+
+      case DRAWING_TOOLS.FIBONACCI: {
+        // Calculate all enabled Fibonacci levels
+        const allLevels = calculateAllFibonacciLevels(
+          drawing.startPoint.price,
+          drawing.endPoint.price,
+          drawing.levels,
+          drawing.extensionLevels
+        );
+
+        // Add label for each level
+        allLevels.forEach(level => {
+          let labelParts = [];
+          if (drawing.showPercentages !== false) {
+            labelParts.push(level.label);
+          }
+          if (drawing.showPrices !== false) {
+            labelParts.push(level.price.toFixed(5));
+          }
+          const labelText = labelParts.join(' - ');
+
+          if (labelText) {
+            annotations.push({
+              x: drawing.endPoint.time,
+              xref: 'x',
+              xanchor: 'left',
+              y: level.price,
+              yref: 'y',
+              text: labelText,
+              showarrow: false,
+              font: {
+                family: 'JetBrains Mono, monospace',
+                size: 9,
+                color: drawing.levelColors?.[level.value] || drawing.color,
+              },
+              bgcolor: 'rgba(24, 24, 27, 0.7)',
+              borderpad: 2,
+              xshift: 5,
+            });
+          }
+        });
+        break;
+      }
+
+      // Trendlines don't typically need annotations unless label is set
+      case DRAWING_TOOLS.TRENDLINE: {
+        if (drawing.label) {
+          // Place label at the midpoint of the trendline
+          const midTime = new Date((new Date(drawing.point1.time).getTime() + new Date(drawing.point2.time).getTime()) / 2);
+          const midPrice = (drawing.point1.price + drawing.point2.price) / 2;
+
+          annotations.push({
+            x: midTime.toISOString(),
+            xref: 'x',
+            y: midPrice,
+            yref: 'y',
+            text: drawing.label,
+            showarrow: false,
+            font: {
+              family: 'Anek Odia, system-ui, sans-serif',
+              size: 10,
+              color: drawing.color,
+            },
+            bgcolor: 'rgba(24, 24, 27, 0.8)',
+            bordercolor: drawing.color,
+            borderwidth: 1,
+            borderpad: 3,
+          });
+        }
+        break;
+      }
+
+      default:
+        // Unknown drawing type - no annotation
+        break;
+    }
+  });
+
+  return annotations;
+}
+
+/**
+ * Draw the chart with support for multiple chart types, volume subplot, indicators, patterns, drawings, and advanced interactions.
  * @param {Object} chartData - The chart data with time, mid_o, mid_h, mid_l, mid_c, and optionally volume
  * @param {string} p - Pair name (e.g., "EUR_USD")
  * @param {string} g - Granularity (e.g., "H1")
@@ -1035,8 +1372,10 @@ function createPatternMarkerTraces(chartData, pattern) {
  * @param {boolean} showVolume - Whether to show the volume subplot
  * @param {Array} activeIndicators - Array of active indicator objects to render
  * @param {Array} activePatterns - Array of active pattern objects to render
+ * @param {Array} drawings - Array of drawing objects to render
+ * @param {Array} conditionDrawingIds - Array of drawing IDs used in conditions (for special styling)
  */
-export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = []) {
+export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = [], drawings = [], conditionDrawingIds = []) {
   const data = [];
 
   // Add main price trace
@@ -1168,6 +1507,10 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
     },
     // Enable drag mode for panning
     dragmode: 'pan',
+    // Add drawing shapes
+    shapes: createDrawingShapes(drawings, chartData, conditionDrawingIds),
+    // Add drawing annotations/labels
+    annotations: createDrawingAnnotations(drawings, chartData, conditionDrawingIds),
   };
 
   // Add volume y-axis if showing volume
