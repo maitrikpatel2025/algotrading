@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { cn } from '../lib/utils';
 import { X, GripVertical, AlertTriangle } from 'lucide-react';
 import ConditionDropdown from './ConditionDropdown';
@@ -8,7 +8,11 @@ import {
   getOperatorLabel,
   formatNaturalLanguageCondition,
   validateCondition,
+  isRangeCondition,
+  getOperandBounds,
+  validateNumericBounds,
 } from '../app/conditionDefaults';
+import { INDICATORS } from '../app/indicators';
 
 /**
  * ConditionBlock Component
@@ -55,8 +59,45 @@ function ConditionBlock({
     }
   }, [isNew, condition, onUpdate]);
 
-  // Build operand options for dropdowns
-  const operandOptions = buildOperandOptions(activeIndicators, getIndicatorDisplayName);
+  // Build operand options for dropdowns - left operand includes Indicator Values group
+  const leftOperandOptions = useMemo(() =>
+    buildOperandOptions(activeIndicators, getIndicatorDisplayName, { isLeftOperand: true, includePercentage: false }),
+    [activeIndicators, getIndicatorDisplayName]
+  );
+
+  // Right operand options (standard)
+  const rightOperandOptions = useMemo(() =>
+    buildOperandOptions(activeIndicators, getIndicatorDisplayName, { isLeftOperand: false, includePercentage: true }),
+    [activeIndicators, getIndicatorDisplayName]
+  );
+
+  // Get indicator bounds for the left operand (if it's an indicator)
+  const leftOperandBounds = useMemo(() =>
+    getOperandBounds(condition.leftOperand, activeIndicators, INDICATORS),
+    [condition.leftOperand, activeIndicators]
+  );
+
+  // Validate right operand numeric bounds
+  const rightOperandBoundsValidation = useMemo(() => {
+    if (!condition.rightOperand || condition.rightOperand.type !== 'value') {
+      return null;
+    }
+    return validateNumericBounds(condition.rightOperand.value, leftOperandBounds);
+  }, [condition.rightOperand, leftOperandBounds]);
+
+  // Validate right operand max (for range conditions) numeric bounds
+  const rightOperandMaxBoundsValidation = useMemo(() => {
+    if (!condition.rightOperandMax || condition.rightOperandMax.type !== 'value') {
+      return null;
+    }
+    return validateNumericBounds(condition.rightOperandMax.value, leftOperandBounds);
+  }, [condition.rightOperandMax, leftOperandBounds]);
+
+  // Check if this is a range condition
+  const isRange = isRangeCondition(condition);
+
+  // Keep backwards compatibility
+  const operandOptions = rightOperandOptions;
 
   // Operator options for the operator dropdown
   const operatorOptions = [{
@@ -88,6 +129,14 @@ function ConditionBlock({
     onUpdate({
       ...condition,
       rightOperand: newValue,
+    });
+  }, [condition, onUpdate]);
+
+  // Handler for range condition max value
+  const handleRightOperandMaxChange = useCallback((newValue) => {
+    onUpdate({
+      ...condition,
+      rightOperandMax: newValue,
     });
   }, [condition, onUpdate]);
 
@@ -187,10 +236,10 @@ function ConditionBlock({
             </div>
           ) : (
             <>
-              {/* Left Operand */}
+              {/* Left Operand - uses leftOperandOptions which includes Indicator Values group */}
               <ConditionDropdown
                 value={condition.leftOperand}
-                options={operandOptions}
+                options={leftOperandOptions}
                 onChange={handleLeftOperandChange}
                 placeholder="Select..."
                 className="min-w-[120px] flex-1"
@@ -205,17 +254,57 @@ function ConditionBlock({
                 className="min-w-[100px]"
               />
 
-              {/* Right Operand */}
-              <ConditionDropdown
-                value={condition.rightOperand}
-                options={operandOptions}
-                onChange={handleRightOperandChange}
-                placeholder="Select..."
-                className="min-w-[120px] flex-1"
-              />
+              {/* Range Condition: shows two value inputs */}
+              {isRange ? (
+                <>
+                  {/* Min Value */}
+                  <ConditionDropdown
+                    value={condition.rightOperand}
+                    options={operandOptions}
+                    onChange={handleRightOperandChange}
+                    placeholder="Min..."
+                    className="min-w-[90px] flex-1"
+                    showPercentageToggle={!!leftOperandBounds}
+                    boundsValidation={rightOperandBoundsValidation}
+                  />
+                  <span className="text-muted-foreground text-sm">and</span>
+                  {/* Max Value */}
+                  <ConditionDropdown
+                    value={condition.rightOperandMax}
+                    options={operandOptions}
+                    onChange={handleRightOperandMaxChange}
+                    placeholder="Max..."
+                    className="min-w-[90px] flex-1"
+                    showPercentageToggle={!!leftOperandBounds}
+                    boundsValidation={rightOperandMaxBoundsValidation}
+                  />
+                </>
+              ) : (
+                /* Standard Right Operand */
+                <ConditionDropdown
+                  value={condition.rightOperand}
+                  options={operandOptions}
+                  onChange={handleRightOperandChange}
+                  placeholder="Select..."
+                  className="min-w-[120px] flex-1"
+                  showPercentageToggle={!!leftOperandBounds}
+                  boundsValidation={rightOperandBoundsValidation}
+                />
+              )}
             </>
           )}
         </div>
+
+        {/* Bounds Validation Warning */}
+        {(rightOperandBoundsValidation?.isOutOfBounds || rightOperandMaxBoundsValidation?.isOutOfBounds) && (
+          <div className="mt-2 flex items-center gap-1.5 text-amber-600 text-xs">
+            <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+            <span>
+              {rightOperandBoundsValidation?.warningMessage || rightOperandMaxBoundsValidation?.warningMessage}
+              {leftOperandBounds && ` (${leftOperandBounds.min !== null ? `min: ${leftOperandBounds.min}` : ''}${leftOperandBounds.min !== null && leftOperandBounds.max !== null ? ', ' : ''}${leftOperandBounds.max !== null ? `max: ${leftOperandBounds.max}` : ''})`}
+            </span>
+          </div>
+        )}
 
         {/* Natural Language Preview */}
         {naturalLanguagePreview && !condition.isPatternCondition && (

@@ -161,6 +161,7 @@ export const INDICATORS = [
     },
     defaultLineWidth: 1.5,
     defaultLineStyle: 'solid',
+    numericBounds: { min: 0, max: 100, commonThresholds: [25, 50] },
   },
 
   // Momentum Indicators
@@ -181,6 +182,7 @@ export const INDICATORS = [
     },
     defaultLineWidth: 1.5,
     defaultLineStyle: 'solid',
+    numericBounds: { min: 0, max: 100, commonThresholds: [30, 70] },
   },
   {
     id: 'stochastic',
@@ -199,6 +201,7 @@ export const INDICATORS = [
     },
     defaultLineWidth: 1.5,
     defaultLineStyle: 'solid',
+    numericBounds: { min: 0, max: 100, commonThresholds: [20, 80] },
   },
   {
     id: 'cci',
@@ -217,6 +220,7 @@ export const INDICATORS = [
     },
     defaultLineWidth: 1.5,
     defaultLineStyle: 'solid',
+    numericBounds: { min: null, max: null, commonThresholds: [-100, 100] },
   },
   {
     id: 'williams_r',
@@ -235,6 +239,7 @@ export const INDICATORS = [
     },
     defaultLineWidth: 1.5,
     defaultLineStyle: 'solid',
+    numericBounds: { min: -100, max: 0, commonThresholds: [-80, -20] },
   },
 
   // Volatility Indicators
