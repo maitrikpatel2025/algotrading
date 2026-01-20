@@ -337,3 +337,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting drawing rendering, persistence, or interaction issues
     - When extending chart.js with additional shapes or annotations
     - When working with Plotly shapes API for chart overlays
+
+- app_docs/feature-f792fd5a-save-strategy.md
+  - Conditions:
+    - When working with strategy persistence or save/load functionality
+    - When implementing or modifying SaveStrategyDialog component
+    - When working with /api/strategies endpoints (save, list, get, delete, check-name)
+    - When implementing or modifying Toast notification components
+    - When working with auto-save draft or draft recovery functionality
+    - When troubleshooting strategy serialization or database persistence issues
+    - When extending StrategyConfig data model with new fields
+    - When implementing duplicate name detection or overwrite confirmation
+    - When working with strategy_service.py Supabase operations

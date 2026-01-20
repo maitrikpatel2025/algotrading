@@ -330,27 +330,75 @@ class StrategyIndicator(BaseModel):
 class StrategyCondition(BaseModel):
     """Condition in a strategy."""
     id: str = Field(..., description="Unique condition ID")
-    section: Literal["entry", "exit"] = Field(..., description="Condition section")
+    section: str = Field(..., description="Condition section (long_entry, long_exit, short_entry, short_exit, entry, exit)")
     left_operand: Dict[str, Any] = Field(..., description="Left operand configuration")
     operator: str = Field(..., description="Comparison operator")
     right_operand: Optional[Dict[str, Any]] = Field(None, description="Right operand configuration")
     indicator_instance_id: Optional[str] = Field(None, description="Associated indicator instance ID")
+    indicator_display_name: Optional[str] = Field(None, description="Display name of the indicator")
     pattern_instance_id: Optional[str] = Field(None, description="Associated pattern instance ID")
     is_pattern_condition: Optional[bool] = Field(False, description="Whether this is a pattern condition")
 
 
+class StrategyPattern(BaseModel):
+    """Pattern instance in a strategy."""
+    id: str = Field(..., description="Pattern type ID (e.g., 'hammer', 'doji')")
+    instance_id: str = Field(..., description="Unique instance ID")
+    name: Optional[str] = Field(None, description="Pattern name")
+    description: Optional[str] = Field(None, description="Pattern description")
+    type: Optional[str] = Field(None, description="Pattern type")
+    color: Optional[str] = Field(None, description="Pattern color")
+
+
+class ConditionGroup(BaseModel):
+    """Group of conditions with AND/OR logic."""
+    id: str = Field(..., description="Unique group ID")
+    operator: str = Field(default="AND", description="Group operator: AND or OR")
+    section: str = Field(..., description="Section this group belongs to")
+    condition_ids: List[str] = Field(default=[], description="IDs of conditions in this group")
+    parent_group_id: Optional[str] = Field(None, description="Parent group ID for nested groups")
+
+
+class ReferenceIndicator(BaseModel):
+    """Reference indicator for multi-timeframe conditions."""
+    id: str = Field(..., description="Unique reference indicator ID")
+    timeframe: str = Field(..., description="Timeframe for this indicator")
+    indicator_id: str = Field(..., description="Base indicator type ID")
+    params: Optional[Dict[str, Any]] = Field(None, description="Indicator parameters")
+
+
+class TimeFilter(BaseModel):
+    """Time-based filter for conditions."""
+    enabled: bool = Field(default=False, description="Whether time filter is enabled")
+    start_hour: Optional[int] = Field(None, description="Start hour (0-23)")
+    start_minute: Optional[int] = Field(None, description="Start minute (0-59)")
+    end_hour: Optional[int] = Field(None, description="End hour (0-23)")
+    end_minute: Optional[int] = Field(None, description="End minute (0-59)")
+    days_of_week: List[int] = Field(default=[], description="Days of week (0=Monday to 6=Sunday)")
+    timezone: Optional[str] = Field(None, description="Timezone for time filter")
+
+
 class StrategyConfig(BaseModel):
     """Complete strategy configuration."""
-    name: str = Field(..., description="Strategy name")
-    description: Optional[str] = Field(None, description="Strategy description")
+    id: Optional[str] = Field(None, description="Strategy ID (generated on save)")
+    name: str = Field(..., description="Strategy name", max_length=50)
+    description: Optional[str] = Field(None, description="Strategy description", max_length=500)
+    tags: List[str] = Field(default=[], description="Strategy tags")
     trade_direction: Literal["long", "short", "both"] = Field(
         default="both",
         description="Trade direction: long, short, or both"
     )
+    confirm_on_candle_close: str = Field(default="yes", description="Candle close confirmation setting")
     pair: Optional[str] = Field(None, description="Currency pair")
     timeframe: Optional[str] = Field(None, description="Timeframe")
+    candle_count: Optional[str] = Field(None, description="Number of candles to display")
     indicators: List[StrategyIndicator] = Field(default=[], description="Indicator instances")
+    patterns: List[StrategyPattern] = Field(default=[], description="Pattern instances")
     conditions: List[StrategyCondition] = Field(default=[], description="Trading conditions")
+    groups: List[ConditionGroup] = Field(default=[], description="Condition groups with AND/OR logic")
+    reference_indicators: List[ReferenceIndicator] = Field(default=[], description="Multi-timeframe reference indicators")
+    time_filter: Optional[TimeFilter] = Field(None, description="Time-based filter")
+    drawings: List[Dict[str, Any]] = Field(default=[], description="Chart drawings (horizontal lines, trendlines, etc.)")
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
@@ -380,6 +428,7 @@ class StrategyListItem(BaseModel):
     id: str = Field(..., description="Strategy ID")
     name: str = Field(..., description="Strategy name")
     description: Optional[str] = Field(None, description="Strategy description")
+    tags: List[str] = Field(default=[], description="Strategy tags")
     trade_direction: Literal["long", "short", "both"] = Field(..., description="Trade direction")
     pair: Optional[str] = Field(None, description="Currency pair")
     timeframe: Optional[str] = Field(None, description="Timeframe")
@@ -393,3 +442,23 @@ class ListStrategiesResponse(BaseModel):
     strategies: List[StrategyListItem] = Field(default=[], description="List of strategies")
     count: int = Field(0, description="Number of strategies")
     error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class CheckNameResponse(BaseModel):
+    """Response from checking if a strategy name exists."""
+    exists: bool = Field(..., description="Whether a strategy with this name exists")
+    strategy_id: Optional[str] = Field(None, description="ID of existing strategy if found")
+
+
+class DeleteStrategyResponse(BaseModel):
+    """Response from deleting a strategy."""
+    success: bool = Field(..., description="Whether the delete was successful")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class StrategyDraft(BaseModel):
+    """Auto-saved draft of a strategy."""
+    strategy: StrategyConfig = Field(..., description="Draft strategy configuration")
+    saved_at: datetime = Field(..., description="When the draft was saved")
+    is_auto_save: bool = Field(default=True, description="Whether this was auto-saved")

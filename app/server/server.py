@@ -29,10 +29,16 @@ from core.data_models import (
     BotControlResponse,
     BotStartRequest,
     BotStatusResponse,
+    CheckNameResponse,
+    DeleteStrategyResponse,
     HeadlineItem,
     HeadlinesResponse,
     HealthCheckResponse,
+    ListStrategiesResponse,
+    LoadStrategyResponse,
     OpenTradesResponse,
+    SaveStrategyRequest,
+    SaveStrategyResponse,
     SpreadResponse,
     TradeHistoryItem,
     TradeHistoryResponse,
@@ -40,6 +46,21 @@ from core.data_models import (
     TradingOptionsResponse,
 )
 from core.openfx_api import OpenFxApi
+from core.strategy_service import (
+    check_name_exists as service_check_name_exists,
+)
+from core.strategy_service import (
+    delete_strategy as service_delete_strategy,
+)
+from core.strategy_service import (
+    get_strategy as service_get_strategy,
+)
+from core.strategy_service import (
+    list_strategies as service_list_strategies,
+)
+from core.strategy_service import (
+    save_strategy as service_save_strategy,
+)
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
 
@@ -727,6 +748,201 @@ async def prices(pair: str, granularity: str, count: str):
         raise
     except Exception as e:
         logger.error(f"[ERROR] Prices fetch failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# =============================================================================
+# Strategy Routes
+# =============================================================================
+
+@app.post("/api/strategies", response_model=SaveStrategyResponse, tags=["Strategies"])
+async def save_strategy(request: SaveStrategyRequest):
+    """
+    Save a new strategy or update an existing one.
+
+    Args:
+        request: Strategy configuration to save
+
+    Returns:
+        JSON object with success status, strategy ID, and message
+    """
+    try:
+        strategy = request.strategy
+        logger.info(f"[STRATEGY] Save request received for strategy: {strategy.name}")
+
+        success, strategy_id, error = service_save_strategy(strategy)
+
+        if success:
+            logger.info(f"[SUCCESS] Strategy saved: {strategy.name} (ID: {strategy_id})")
+            return SaveStrategyResponse(
+                success=True,
+                strategy_id=strategy_id,
+                message=f"Strategy '{strategy.name}' saved successfully"
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy save failed: {error}")
+            return SaveStrategyResponse(
+                success=False,
+                message="Failed to save strategy",
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy save failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return SaveStrategyResponse(
+            success=False,
+            message="Failed to save strategy",
+            error=str(e)
+        )
+
+
+@app.get("/api/strategies", response_model=ListStrategiesResponse, tags=["Strategies"])
+async def list_strategies():
+    """
+    List all saved strategies.
+
+    Returns:
+        JSON object with list of strategy summaries
+    """
+    try:
+        logger.info("[STRATEGY] List strategies request received")
+
+        success, strategies, error = service_list_strategies()
+
+        if success:
+            logger.info(f"[SUCCESS] Listed {len(strategies)} strategies")
+            return ListStrategiesResponse(
+                success=True,
+                strategies=strategies,
+                count=len(strategies)
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy list failed: {error}")
+            return ListStrategiesResponse(
+                success=False,
+                strategies=[],
+                count=0,
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy list failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return ListStrategiesResponse(
+            success=False,
+            strategies=[],
+            count=0,
+            error=str(e)
+        )
+
+
+@app.get("/api/strategies/check-name/{name}", response_model=CheckNameResponse, tags=["Strategies"])
+async def check_strategy_name(name: str):
+    """
+    Check if a strategy with the given name already exists.
+
+    Args:
+        name: Strategy name to check
+
+    Returns:
+        JSON object indicating if the name exists and the strategy ID if found
+    """
+    try:
+        logger.info(f"[STRATEGY] Check name request for: {name}")
+
+        success, response, error = service_check_name_exists(name)
+
+        if success:
+            logger.info(f"[SUCCESS] Name check complete: exists={response.exists}")
+            return response
+        else:
+            logger.warning(f"[WARNING] Name check failed: {error}")
+            return CheckNameResponse(exists=False)
+
+    except Exception as e:
+        logger.error(f"[ERROR] Name check failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return CheckNameResponse(exists=False)
+
+
+@app.get("/api/strategies/{strategy_id}", response_model=LoadStrategyResponse, tags=["Strategies"])
+async def get_strategy(strategy_id: str):
+    """
+    Get a specific strategy by ID.
+
+    Args:
+        strategy_id: The strategy ID to retrieve
+
+    Returns:
+        JSON object with the strategy configuration
+    """
+    try:
+        logger.info(f"[STRATEGY] Get strategy request for ID: {strategy_id}")
+
+        success, strategy, error = service_get_strategy(strategy_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Strategy retrieved: {strategy.name}")
+            return LoadStrategyResponse(
+                success=True,
+                strategy=strategy
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy get failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Strategy not found: {strategy_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy get failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.delete("/api/strategies/{strategy_id}", response_model=DeleteStrategyResponse, tags=["Strategies"])
+async def delete_strategy(strategy_id: str):
+    """
+    Delete a strategy by ID.
+
+    Args:
+        strategy_id: The strategy ID to delete
+
+    Returns:
+        JSON object with success status and message
+    """
+    try:
+        logger.info(f"[STRATEGY] Delete strategy request for ID: {strategy_id}")
+
+        success, error = service_delete_strategy(strategy_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Strategy deleted: {strategy_id}")
+            return DeleteStrategyResponse(
+                success=True,
+                message="Strategy deleted successfully"
+            )
+        else:
+            logger.warning(f"[WARNING] Strategy delete failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Strategy not found: {strategy_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Strategy delete failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
