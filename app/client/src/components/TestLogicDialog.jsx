@@ -10,15 +10,16 @@ import {
   Activity,
   BarChart3,
   Timer,
+  Ban,
 } from 'lucide-react';
-import { groupReferenceIndicatorsByTimeframe } from '../app/conditionDefaults';
+import { groupReferenceIndicatorsByTimeframe, evaluateLogicWithTimeFilter } from '../app/conditionDefaults';
 import { TIMEFRAME_LABELS } from '../app/constants';
 import {
   CONDITION_SECTION_LABELS,
   GROUP_OPERATOR_LABELS,
+  TIME_FILTER_MODES,
 } from '../app/constants';
 import {
-  evaluateLogic,
   formatNaturalLanguageCondition,
 } from '../app/conditionDefaults';
 
@@ -27,6 +28,7 @@ import {
  *
  * Dialog displaying logic evaluation results against current market data.
  * Shows pass/fail status for each condition and group with values.
+ * Includes time filter status display.
  *
  * @param {boolean} isOpen - Whether the dialog is open
  * @param {Function} onClose - Callback to close the dialog
@@ -40,6 +42,7 @@ import {
  * @param {Object} previousIndicatorValues - Previous indicator values
  * @param {Object} referenceIndicatorValues - Map of reference indicator ID -> current value
  * @param {Array} referenceIndicators - Array of reference indicator objects
+ * @param {Object} timeFilter - Time filter configuration
  */
 function TestLogicDialog({
   isOpen,
@@ -54,12 +57,13 @@ function TestLogicDialog({
   previousIndicatorValues = null,
   referenceIndicatorValues = {},
   referenceIndicators = [],
+  timeFilter = null,
 }) {
-  // Evaluate logic
+  // Evaluate logic with time filter
   const evaluationResult = useMemo(() => {
     if (!isOpen || !section) return null;
 
-    return evaluateLogic(
+    return evaluateLogicWithTimeFilter(
       section,
       conditions,
       groups,
@@ -67,9 +71,10 @@ function TestLogicDialog({
       indicatorValues,
       patternDetections,
       previousCandleData,
-      previousIndicatorValues
+      previousIndicatorValues,
+      timeFilter
     );
-  }, [isOpen, section, conditions, groups, candleData, indicatorValues, patternDetections, previousCandleData, previousIndicatorValues]);
+  }, [isOpen, section, conditions, groups, candleData, indicatorValues, patternDetections, previousCandleData, previousIndicatorValues, timeFilter]);
 
   // Format number for display
   const formatValue = (value) => {
@@ -343,45 +348,102 @@ function TestLogicDialog({
 
           {evaluationResult ? (
             <div className="space-y-3">
+              {/* Time Filter Status */}
+              {evaluationResult.timeFilter && evaluationResult.timeFilter.isActive && (
+                <div className={cn(
+                  "flex items-center gap-3 p-3 rounded-lg",
+                  evaluationResult.timeFilter.passes
+                    ? "bg-primary/10 border border-primary/30"
+                    : "bg-amber-500/10 border border-amber-500/30"
+                )}>
+                  {evaluationResult.timeFilter.passes ? (
+                    <>
+                      <Clock className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium text-primary">Time Filter: Active</p>
+                        <p className="text-sm text-muted-foreground">
+                          {evaluationResult.timeFilter.reason}
+                        </p>
+                        {evaluationResult.timeFilter.currentTime && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Current: {evaluationResult.timeFilter.currentTime} ({evaluationResult.timeFilter.timezone}) - {evaluationResult.timeFilter.currentDay}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Ban className="h-5 w-5 text-amber-500" />
+                      <div>
+                        <p className="font-medium text-amber-600 dark:text-amber-400">
+                          Time Filter: {evaluationResult.timeFilter.mode === TIME_FILTER_MODES.EXCLUDE ? 'Blackout' : 'Outside Hours'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {evaluationResult.timeFilter.reason}
+                        </p>
+                        {evaluationResult.timeFilter.currentTime && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Current: {evaluationResult.timeFilter.currentTime} ({evaluationResult.timeFilter.timezone}) - {evaluationResult.timeFilter.currentDay}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Blocked by Time Filter Message */}
+              {evaluationResult.blockedByTimeFilter && (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Condition evaluation skipped due to time filter restrictions
+                  </p>
+                </div>
+              )}
+
               {/* Overall Result Banner */}
-              <div className={cn(
-                "flex items-center gap-3 p-4 rounded-lg",
-                evaluationResult.result
-                  ? "bg-success/10 border border-success/30"
-                  : "bg-destructive/10 border border-destructive/30"
-              )}>
-                {evaluationResult.result ? (
-                  <>
-                    <CheckCircle2 className="h-6 w-6 text-success" />
-                    <div>
-                      <p className="font-medium text-success">Signal Would Fire</p>
-                      <p className="text-sm text-muted-foreground">
-                        All conditions are met ({evaluationResult.summary.passed}/{evaluationResult.summary.total} passed)
-                      </p>
-                    </div>
-                    <TrendingUp className="h-5 w-5 text-success ml-auto" />
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-6 w-6 text-destructive" />
-                    <div>
-                      <p className="font-medium text-destructive">Signal Would Not Fire</p>
-                      <p className="text-sm text-muted-foreground">
-                        {evaluationResult.summary.failed} of {evaluationResult.summary.total} conditions failed
-                      </p>
-                    </div>
-                    <TrendingDown className="h-5 w-5 text-destructive ml-auto" />
-                  </>
-                )}
-              </div>
+              {!evaluationResult.blockedByTimeFilter && (
+                <div className={cn(
+                  "flex items-center gap-3 p-4 rounded-lg",
+                  evaluationResult.result
+                    ? "bg-success/10 border border-success/30"
+                    : "bg-destructive/10 border border-destructive/30"
+                )}>
+                  {evaluationResult.result ? (
+                    <>
+                      <CheckCircle2 className="h-6 w-6 text-success" />
+                      <div>
+                        <p className="font-medium text-success">Signal Would Fire</p>
+                        <p className="text-sm text-muted-foreground">
+                          All conditions are met ({evaluationResult.summary.passed}/{evaluationResult.summary.total} passed)
+                        </p>
+                      </div>
+                      <TrendingUp className="h-5 w-5 text-success ml-auto" />
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-6 w-6 text-destructive" />
+                      <div>
+                        <p className="font-medium text-destructive">Signal Would Not Fire</p>
+                        <p className="text-sm text-muted-foreground">
+                          {evaluationResult.summary.failed} of {evaluationResult.summary.total} conditions failed
+                        </p>
+                      </div>
+                      <TrendingDown className="h-5 w-5 text-destructive ml-auto" />
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Individual Results */}
-              <div className="space-y-2">
-                {evaluationResult.itemResults.map(result => renderResult(result, 0))}
-              </div>
+              {!evaluationResult.blockedByTimeFilter && (
+                <div className="space-y-2">
+                  {evaluationResult.itemResults.map(result => renderResult(result, 0))}
+                </div>
+              )}
 
               {/* Empty State */}
-              {evaluationResult.itemResults.length === 0 && (
+              {!evaluationResult.blockedByTimeFilter && evaluationResult.itemResults.length === 0 && (
                 <p className="text-center text-sm text-muted-foreground py-8">
                   No conditions to evaluate in this section
                 </p>

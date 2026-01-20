@@ -19,6 +19,7 @@ import ConditionGroup from './ConditionGroup';
 import LogicTreeView from './LogicTreeView';
 import TestLogicDialog from './TestLogicDialog';
 import ReferenceIndicatorsPanel from './ReferenceIndicatorsPanel';
+import TimeFilterBadge from './TimeFilterBadge';
 import { CONDITION_SECTIONS_V2, migrateSectionToV2, getConditionParentGroup } from '../app/conditionDefaults';
 import {
   TRADE_DIRECTIONS,
@@ -70,6 +71,9 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  * @param {Function} getReferenceDisplayName - Function to get reference indicator display name
  * @param {Function} onDeleteReferenceIndicator - Callback when reference indicator is deleted
  * @param {boolean} referenceDataLoading - Whether reference data is loading
+ * @param {Object} timeFilter - Time filter configuration
+ * @param {Function} onTimeFilterEdit - Callback when time filter badge is clicked (opens dialog)
+ * @param {Function} onTimeFilterClear - Callback when time filter is cleared
  */
 function LogicPanel({
   conditions = [],
@@ -98,6 +102,9 @@ function LogicPanel({
   getReferenceDisplayName,
   onDeleteReferenceIndicator,
   referenceDataLoading = false,
+  timeFilter = null,
+  onTimeFilterEdit,
+  onTimeFilterClear,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -727,6 +734,32 @@ function LogicPanel({
           </div>
         </div>
 
+        {/* Time Filter Section */}
+        <div className="px-4 py-2 border-b border-border bg-muted/20">
+          {timeFilter && timeFilter.enabled ? (
+            <TimeFilterBadge
+              timeFilter={timeFilter}
+              onEdit={onTimeFilterEdit}
+              onClear={onTimeFilterClear}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={onTimeFilterEdit}
+              className={cn(
+                "flex items-center gap-2 py-1.5 px-3",
+                "text-sm text-muted-foreground",
+                "border border-dashed border-border rounded-full",
+                "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
+                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+              )}
+            >
+              <Clock className="h-4 w-4" />
+              <span>Add Time Filter</span>
+            </button>
+          )}
+        </div>
+
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
           {sectionsToShow.map((sectionKey, index) =>
@@ -768,6 +801,7 @@ function LogicPanel({
         previousIndicatorValues={testLogicData?.previousIndicatorValues}
         referenceIndicatorValues={referenceIndicatorValues}
         referenceIndicators={referenceIndicators}
+        timeFilter={timeFilter}
       />
     </>
   );
