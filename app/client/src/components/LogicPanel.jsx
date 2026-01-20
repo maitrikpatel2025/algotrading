@@ -12,11 +12,13 @@ import {
   FlaskConical,
   FolderPlus,
   Check,
+  Clock,
 } from 'lucide-react';
 import ConditionBlock from './ConditionBlock';
 import ConditionGroup from './ConditionGroup';
 import LogicTreeView from './LogicTreeView';
 import TestLogicDialog from './TestLogicDialog';
+import ReferenceIndicatorsPanel from './ReferenceIndicatorsPanel';
 import { CONDITION_SECTIONS_V2, migrateSectionToV2, getConditionParentGroup } from '../app/conditionDefaults';
 import {
   TRADE_DIRECTIONS,
@@ -54,6 +56,7 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  * @param {string} highlightedIndicatorId - ID of indicator to highlight
  * @param {string} tradeDirection - Trade direction: 'long', 'short', or 'both'
  * @param {Function} onAddCondition - Callback when Add Condition button is clicked
+ * @param {Function} onAddMultiTimeframeCondition - Callback when Add Multi-Timeframe Condition is clicked
  * @param {Function} onGroupCreate - Callback when creating a new group
  * @param {Function} onGroupUpdate - Callback when updating a group
  * @param {Function} onGroupDelete - Callback when deleting a group
@@ -62,6 +65,11 @@ const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
  * @param {Function} onConditionReorderInGroup - Callback when reordering within group
  * @param {Function} onTestLogic - Callback to get test logic data
  * @param {Object} testLogicData - Data for Test Logic dialog (candleData, indicatorValues, etc.)
+ * @param {Array} referenceIndicators - Array of reference indicator objects
+ * @param {Object} referenceIndicatorValues - Map of reference indicator ID -> current value
+ * @param {Function} getReferenceDisplayName - Function to get reference indicator display name
+ * @param {Function} onDeleteReferenceIndicator - Callback when reference indicator is deleted
+ * @param {boolean} referenceDataLoading - Whether reference data is loading
  */
 function LogicPanel({
   conditions = [],
@@ -76,6 +84,7 @@ function LogicPanel({
   highlightedIndicatorId,
   tradeDirection = TRADE_DIRECTIONS.BOTH,
   onAddCondition,
+  onAddMultiTimeframeCondition,
   onGroupCreate,
   onGroupUpdate,
   onGroupDelete,
@@ -84,6 +93,11 @@ function LogicPanel({
   onConditionReorderInGroup,
   onTestLogic,
   testLogicData = null,
+  referenceIndicators = [],
+  referenceIndicatorValues = {},
+  getReferenceDisplayName,
+  onDeleteReferenceIndicator,
+  referenceDataLoading = false,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -294,6 +308,13 @@ function LogicPanel({
     }
   }, [onAddCondition]);
 
+  // Handle Add Multi-Timeframe Condition button click
+  const handleAddMultiTimeframeClick = useCallback((section) => {
+    if (onAddMultiTimeframeCondition) {
+      onAddMultiTimeframeCondition(section);
+    }
+  }, [onAddMultiTimeframeCondition]);
+
   // Handle condition selection toggle
   const handleConditionSelect = useCallback((conditionId) => {
     setSelectedConditions(prev => {
@@ -443,6 +464,7 @@ function LogicPanel({
                       groups={groups}
                       activeIndicators={activeIndicators}
                       activePatterns={activePatterns}
+                      referenceIndicators={referenceIndicators}
                       getIndicatorDisplayName={getIndicatorDisplayName}
                       onOperatorChange={onGroupOperatorChange}
                       onConditionReorder={handleConditionReorder}
@@ -487,6 +509,7 @@ function LogicPanel({
                           condition={condition}
                           activeIndicators={activeIndicators}
                           activePatterns={activePatterns}
+                          referenceIndicators={referenceIndicators}
                           getIndicatorDisplayName={getIndicatorDisplayName}
                           onUpdate={onConditionUpdate}
                           onDelete={onConditionDelete}
@@ -520,6 +543,23 @@ function LogicPanel({
               >
                 <Plus className="h-4 w-4" />
                 <span>Add Condition</span>
+              </button>
+
+              {/* Add Multi-Timeframe Condition Button */}
+              <button
+                type="button"
+                onClick={() => handleAddMultiTimeframeClick(sectionKey)}
+                className={cn(
+                  "flex items-center gap-2 py-2 px-3",
+                  "text-sm text-muted-foreground",
+                  "border border-dashed border-border rounded-md",
+                  "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
+                  "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                )}
+                title="Add condition referencing indicator from another timeframe"
+              >
+                <Clock className="h-4 w-4" />
+                <span>Multi-TF</span>
               </button>
 
               {/* Group Selected Button */}
@@ -692,6 +732,15 @@ function LogicPanel({
           {sectionsToShow.map((sectionKey, index) =>
             renderSection(sectionKey, index === sectionsToShow.length - 1)
           )}
+
+          {/* Reference Indicators Panel */}
+          <ReferenceIndicatorsPanel
+            referenceIndicators={referenceIndicators}
+            referenceIndicatorValues={referenceIndicatorValues}
+            getReferenceDisplayName={getReferenceDisplayName}
+            onDeleteReferenceIndicator={onDeleteReferenceIndicator}
+            loading={referenceDataLoading}
+          />
         </div>
 
         {/* Panel Footer */}
@@ -717,6 +766,8 @@ function LogicPanel({
         patternDetections={testLogicData?.patternDetections}
         previousCandleData={testLogicData?.previousCandleData}
         previousIndicatorValues={testLogicData?.previousIndicatorValues}
+        referenceIndicatorValues={referenceIndicatorValues}
+        referenceIndicators={referenceIndicators}
       />
     </>
   );

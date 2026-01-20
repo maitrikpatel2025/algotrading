@@ -47,6 +47,7 @@ function ConditionGroup({
   groups,
   activeIndicators,
   activePatterns = [],
+  referenceIndicators = [],
   getIndicatorDisplayName,
   onOperatorChange,
   onConditionReorder,
@@ -266,6 +267,7 @@ function ConditionGroup({
                     groups={groups}
                     activeIndicators={activeIndicators}
                     activePatterns={activePatterns}
+                    referenceIndicators={referenceIndicators}
                     getIndicatorDisplayName={getIndicatorDisplayName}
                     onOperatorChange={onOperatorChange}
                     onConditionReorder={onConditionReorder}
@@ -284,6 +286,7 @@ function ConditionGroup({
                     condition={item.data}
                     activeIndicators={activeIndicators}
                     activePatterns={activePatterns}
+                    referenceIndicators={referenceIndicators}
                     getIndicatorDisplayName={getIndicatorDisplayName}
                     onUpdate={onConditionUpdate}
                     onDelete={onConditionDelete}

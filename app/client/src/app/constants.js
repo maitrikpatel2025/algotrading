@@ -99,3 +99,29 @@ export const LOGIC_VIEW_MODE_STORAGE_KEY = 'forex_dash_logic_view_mode';
 
 // localStorage key for condition groups
 export const CONDITION_GROUPS_STORAGE_KEY = 'forex_dash_condition_groups';
+
+// Multi-Timeframe Conditions Constants
+
+// Available timeframes for reference indicators
+export const AVAILABLE_TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D', 'W1'];
+
+// Timeframe display labels
+export const TIMEFRAME_LABELS = {
+  M1: '1 Minute',
+  M5: '5 Minutes',
+  M15: '15 Minutes',
+  M30: '30 Minutes',
+  H1: '1 Hour',
+  H4: '4 Hours',
+  D: 'Daily',
+  W1: 'Weekly',
+};
+
+// Maximum number of different reference timeframes allowed per strategy
+export const MAX_REFERENCE_TIMEFRAMES = 3;
+
+// localStorage key for reference indicators persistence
+export const REFERENCE_INDICATORS_STORAGE_KEY = 'forex_dash_reference_indicators';
+
+// Performance warning message for multi-timeframe conditions
+export const MULTI_TIMEFRAME_WARNING_TEXT = 'Multi-timeframe conditions may increase backtest time';

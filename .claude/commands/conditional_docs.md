@@ -302,3 +302,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing drag-and-drop within condition groups
     - When working with group operators (AND/OR toggle)
     - When extending the Logic Panel with grouping functionality
+
+- app_docs/feature-27834e18-multi-timeframe-conditions.md
+  - Conditions:
+    - When working with multi-timeframe conditions or cross-timeframe analysis
+    - When implementing or modifying the MultiTimeframeConditionDialog component
+    - When working with reference indicators from different timeframes
+    - When implementing or modifying the ReferenceIndicatorsPanel component
+    - When working with timeframe-labeled conditions (e.g., [H4] EMA > 200)
+    - When troubleshooting reference indicator calculation or persistence issues
+    - When extending the Logic Panel with multi-timeframe functionality
+    - When working with AVAILABLE_TIMEFRAMES or MAX_REFERENCE_TIMEFRAMES constants
+    - When implementing background price data fetching for non-chart timeframes
