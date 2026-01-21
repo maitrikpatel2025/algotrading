@@ -394,3 +394,18 @@ This prompt helps you determine what documentation you should read based on the 
     - When creating E2E tests for Account page components
     - When auditing user-facing text for consistency with FXOpen API documentation
     - When working with empty state messages or section headers on the Account page
+
+- app_docs/feature-521004c3-indicators-pattern-loading.md
+  - Conditions:
+    - When troubleshooting strategies not loading correctly or indicators marked as "unknown"
+    - When working with indicator validation or pattern validation logic
+    - When implementing or modifying validateIndicators() or validatePatterns() functions
+    - When fixing array access patterns for INDICATORS or PATTERNS definitions
+    - When working with time filter save/load or data structure conversion
+    - When implementing convertTimeFilterToBackend() or convertTimeFilterFromBackend()
+    - When troubleshooting time filter settings being lost during save/load cycles
+    - When debugging patterns loading without metadata (patternType, candleCount, reliability)
+    - When working with URL-based strategy loading vs dialog-based loading inconsistencies
+    - When implementing chart refresh on strategy load
+    - When improving error messages for missing indicators or patterns
+    - When adding pattern detection user feedback (toast notifications)
