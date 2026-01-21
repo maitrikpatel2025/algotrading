@@ -102,6 +102,19 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with connection status indicators or WebSocket state management
     - When migrating from Plotly.js to TradingView Lightweight Charts
 
+- app_docs/bug-ac04f2b7-websocket-chart-connection-fix.md
+  - Conditions:
+    - When troubleshooting WebSocket connection failures or "Disconnected" status
+    - When enabling or configuring production FX Open WebSocket integration
+    - When working with WebSocketManager class or core/websocket_manager.py
+    - When debugging "Loading chart data..." issues or charts not displaying
+    - When implementing WebSocket authentication with FX Open API
+    - When working with on_tick callbacks or tick-to-candle aggregation
+    - When troubleshooting legacy Plotly.js code or chart.js references
+    - When investigating chart connection status indicators or error messages
+    - When cleaning up dead code after TradingView Lightweight Charts migration
+    - When fixing WebSocket endpoint configuration in server.py
+
 - app_docs/feature-947a25d2-chart-zoom-scroll-controls.md
   - Conditions:
     - When implementing or modifying chart zoom and scroll functionality
