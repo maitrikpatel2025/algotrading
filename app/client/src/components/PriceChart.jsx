@@ -1,25 +1,27 @@
+/**
+ * PriceChart Component (TradingView Lightweight Charts + WebSocket)
+ * ===================================================================
+ * Displays real-time price charts using TradingView Lightweight Charts.
+ * Connects to backend WebSocket for live price updates.
+ */
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import Plotly from 'plotly.js-dist';
-import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
-import { getIndicatorDisplayName } from '../app/indicators';
-import { getPatternDisplayName } from '../app/patterns';
-import { X, Settings } from 'lucide-react';
+import { X, Settings, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useWebSocket, CONNECTION_STATUS } from '../hooks/useWebSocket';
+import { useCandleAggregator } from '../hooks/useCandleAggregator';
+import {
+  createTradingViewChart,
+  addCandlestickSeries,
+  addLineSeries,
+  addPriceLine,
+  updateLastCandle,
+  fitChartContent,
+  destroyChart,
+  convertApiDataToCandles,
+} from '../app/tradingViewChart';
+import { getIndicatorDisplayName } from '../app/indicators';
 import IndicatorContextMenu from './IndicatorContextMenu';
-import DrawingContextMenu from './DrawingContextMenu';
-import {
-  DRAWING_TOOLS,
-  DRAWING_TOOL_SHORTCUTS,
-  createDefaultHorizontalLine,
-  createDefaultTrendline,
-  createDefaultFibonacci,
-  wouldExceedDrawingLimit,
-  getDrawingLimitWarning,
-} from '../app/drawingTypes';
-import {
-  generateDrawingId,
-  findNearestOHLC,
-} from '../app/drawingUtils';
 
 function PriceChart({
   priceData,
@@ -27,43 +29,21 @@ function PriceChart({
   selectedGranularity,
   selectedCount,
   handleCountChange,
-  chartType,
-  onChartTypeChange,
-  showVolume,
-  onVolumeToggle,
-  selectedDateRange,
-  onDateRangeChange,
   loading,
   activeIndicators = [],
-  activePatterns = [],
-  onIndicatorDrop,
   onRemoveIndicator,
   onEditIndicator,
-  onPatternDrop,
-  onRemovePattern,
   onIndicatorClick,
   onIndicatorConfigure,
   onIndicatorDuplicate,
   previewIndicator = null,
-  comparisonMode = false,
-  // Drawing props
-  drawings = [],
-  activeDrawingTool = DRAWING_TOOLS.POINTER,
-  onDrawingToolChange,
-  onDrawingAdd,
-  onDrawingUpdate,
-  onDrawingDelete,
-  onDrawingEdit,
-  onDrawingUseInCondition,
-  conditionDrawingIds = [],
-  conditions = [],
-  drawingError = null,
-  onDrawingErrorClear,
+  onIndicatorDrop,
 }) {
+  const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
-  const [visibleCandleCount, setVisibleCandleCount] = useState(null);
-  const [showInteractionHint, setShowInteractionHint] = useState(false);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const candlestickSeriesRef = useRef(null);
+  const indicatorSeriesRef = useRef({}); // Store indicator series by instance ID
+
   const [isDragOver, setIsDragOver] = useState(false);
   const [contextMenu, setContextMenu] = useState({
     isOpen: false,
@@ -72,731 +52,421 @@ function PriceChart({
     indicatorName: '',
   });
 
-  // Drawing state
-  const [drawingContextMenu, setDrawingContextMenu] = useState({
-    isOpen: false,
-    position: { x: 0, y: 0 },
-    drawing: null,
+  // WebSocket URL construction
+  const wsUrl = selectedPair && selectedGranularity
+    ? `ws://localhost:8000/ws/prices/${selectedPair}/${selectedGranularity}`
+    : null;
+
+  // Candle aggregator hook
+  const candleAggregator = useCandleAggregator(selectedGranularity, []);
+
+  // WebSocket hook
+  const {
+    status: wsStatus,
+    error: wsError,
+    isConnected,
+    connect: wsConnect,
+    disconnect: wsDisconnect,
+  } = useWebSocket(wsUrl, {
+    autoConnect: true,
+    autoReconnect: true,
+    onMessage: handleWebSocketMessage,
+    onOpen: () => {
+      console.log('[PriceChart] WebSocket connected');
+    },
+    onClose: () => {
+      console.log('[PriceChart] WebSocket disconnected');
+    },
+    onError: (error) => {
+      console.error('[PriceChart] WebSocket error:', error);
+    },
   });
-  const [pendingDrawing, setPendingDrawing] = useState(null); // For multi-click drawings (trendline, fibonacci)
-  // eslint-disable-next-line no-unused-vars
-  const [snapEnabled, _setSnapEnabled] = useState(true); // Future: allow toggling snap behavior
 
-  // Touch device detection and interaction hint initialization
-  useEffect(() => {
-    // Detect touch support
-    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    setIsTouchDevice(hasTouch);
+  /**
+   * Handle incoming WebSocket messages.
+   */
+  function handleWebSocketMessage(message) {
+    const { type, data } = message;
 
-    // Check if interaction hint has been dismissed
-    const hintDismissed = localStorage.getItem('chart-interaction-hint-dismissed');
-    if (!hintDismissed) {
-      setShowInteractionHint(true);
-    }
-  }, []);
-
-  // Draw chart and set up zoom event listener
-  useEffect(() => {
-    if (priceData && !loading) {
-      // Prepare indicators to render based on preview mode
-      let indicatorsToRender = [...activeIndicators];
-
-      if (previewIndicator) {
-        if (comparisonMode) {
-          // In comparison mode, show both original and preview
-          indicatorsToRender = [...activeIndicators, previewIndicator];
-        } else {
-          // In preview mode without comparison, replace the editing indicator with preview
-          indicatorsToRender = activeIndicators.map(ind =>
-            ind.instanceId === previewIndicator.instanceId ? previewIndicator : ind
-          );
-        }
-      }
-
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns, drawings, conditionDrawingIds);
-
-      // Get chart element reference
-      const chartElement = document.getElementById('chartDiv');
-      chartRef.current = chartElement;
-
-      // DIAGNOSTIC: Verify indicator metadata integrity
-      console.log('[PriceChart] Indicators passed to drawChart:', activeIndicators);
-      if (chartElement && chartElement.data) {
-        console.log('[PriceChart] Chart traces after render:', chartElement.data);
-        const tracesWithMetadata = chartElement.data.filter(trace => trace.meta && trace.meta.instanceId);
-        console.log(`[PriceChart] Traces with metadata: ${tracesWithMetadata.length} out of ${chartElement.data.length}`);
-      }
-
-      if (chartElement) {
-        // Set initial candle count
-        setVisibleCandleCount(priceData.time ? priceData.time.length : 0);
-
-        // Listen for zoom updates from chart.js
-        const handleZoomUpdate = (event) => {
-          setVisibleCandleCount(event.detail.visibleCandleCount);
-        };
-
-        chartElement.addEventListener('chartZoomUpdate', handleZoomUpdate);
-
-        // Handle left-click on indicator traces
-        const handlePlotlyClick = (eventData) => {
-          if (!eventData.points || eventData.points.length === 0) return;
-
-          const point = eventData.points[0];
-          // Check if the clicked trace has indicator metadata
-          if (point.data && point.data.meta && point.data.meta.instanceId) {
-            const instanceId = point.data.meta.instanceId;
-            if (onIndicatorClick) {
-              onIndicatorClick(instanceId);
-            }
-          }
-        };
-
-        // Handle right-click on indicator traces
-        const handleContextMenu = (event) => {
-          console.log('Context menu event triggered');
-
-          // Use Plotly.Fx.hover() to trigger a synthetic hover event at the exact cursor position
-          // This ensures accurate hit-testing instead of relying on stale hover data
-          try {
-            // Calculate cursor position relative to the chart element
-            const rect = chartElement.getBoundingClientRect();
-            const xPos = event.clientX - rect.left;
-            const yPos = event.clientY - rect.top;
-
-            // Trigger Plotly hover at the right-click coordinates
-            if (window.Plotly && window.Plotly.Fx && window.Plotly.Fx.hover) {
-              window.Plotly.Fx.hover(chartElement, [{ curveNumber: 0, pointNumber: 0 }], [xPos, yPos]);
-            }
-
-            // Now check if hover data contains an indicator trace
-            let indicatorAtPosition = null;
-            if (chartElement._hoverdata && chartElement._hoverdata.length > 0) {
-              const hoverPoint = chartElement._hoverdata[0];
-              if (hoverPoint.data && hoverPoint.data.meta && hoverPoint.data.meta.instanceId) {
-                indicatorAtPosition = {
-                  instanceId: hoverPoint.data.meta.instanceId,
-                  name: hoverPoint.data.name,
-                };
-              }
-            }
-
-            if (indicatorAtPosition) {
-              console.log('Indicator found at position:', indicatorAtPosition);
-              event.preventDefault();
-              setContextMenu({
-                isOpen: true,
-                position: { x: event.clientX, y: event.clientY },
-                indicatorInstanceId: indicatorAtPosition.instanceId,
-                indicatorName: indicatorAtPosition.name,
-              });
-            } else {
-              console.log('No indicator found at cursor position. Hover data:', chartElement._hoverdata);
-            }
-          } catch (error) {
-            console.error('Error in context menu hit-testing:', error);
-          }
-        };
-
-        // Attach both Plotly click and contextmenu event listeners after a short delay
-        // to ensure Plotly has fully rendered and won't replace DOM elements
-        setTimeout(() => {
-          if (chartElement.on) {
-            chartElement.on('plotly_click', handlePlotlyClick);
-          }
-          console.log('Attaching contextmenu listener to chartElement');
-          chartElement.addEventListener('contextmenu', handleContextMenu);
-        }, 100);
-
-        // Cleanup
-        return () => {
-          chartElement.removeEventListener('chartZoomUpdate', handleZoomUpdate);
-          chartElement.removeEventListener('contextmenu', handleContextMenu);
-          // Remove Plotly event listener if it exists
-          if (chartElement.removeAllListeners) {
-            chartElement.removeAllListeners('plotly_click');
-          }
-        };
-      }
-    }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode, drawings, conditionDrawingIds]);
-
-  // Keyboard navigation with focus management
-  useEffect(() => {
-    if (!priceData) return;
-
-    const handleKeyDown = (event) => {
-      // Don't trigger shortcuts when typing in inputs
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-        return;
-      }
-
-      // Don't trigger if any modifier keys are pressed (except Shift for +)
-      if (event.ctrlKey || event.metaKey || event.altKey) {
-        return;
-      }
-
-      const chartElement = chartRef.current;
-      if (!chartElement || !chartElement._chartData) return;
-
-      const chartData = chartElement._chartData;
-
-      // Get current axis range
-      const getCurrentRange = () => {
-        const layout = chartElement.layout;
-        if (layout && layout.xaxis && layout.xaxis.range) {
-          return layout.xaxis.range;
-        }
-        // Fallback to data range
-        return [chartData.time[0], chartData.time[chartData.time.length - 1]];
-      };
-
-      let newRange = null;
-
-      // Check for drawing tool shortcuts first
-      const drawingShortcutKey = event.key.toUpperCase();
-      if (DRAWING_TOOL_SHORTCUTS[drawingShortcutKey] && onDrawingToolChange) {
-        event.preventDefault();
-        onDrawingToolChange(DRAWING_TOOL_SHORTCUTS[drawingShortcutKey]);
-        // Cancel any pending drawing when switching tools
-        setPendingDrawing(null);
-        return;
-      }
-
-      // Escape key handling - cancel drawing or switch to pointer
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (pendingDrawing) {
-          setPendingDrawing(null);
-        } else if (activeDrawingTool !== DRAWING_TOOLS.POINTER && onDrawingToolChange) {
-          onDrawingToolChange(DRAWING_TOOLS.POINTER);
-        }
-        return;
-      }
-
-      // Delete key - delete selected drawing (future feature)
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Could implement drawing selection and deletion here in the future
-        return;
-      }
-
-      switch (event.key) {
-        case '+':
-        case '=':
-          // Zoom in by 20%
-          event.preventDefault();
-          newRange = computeZoomedInRange(getCurrentRange(), 0.8, 0.5);
-          break;
-
-        case '-':
-        case '_':
-          // Zoom out by 20%
-          event.preventDefault();
-          newRange = computeZoomedOutRange(getCurrentRange(), 1.2, 0.5);
-          break;
-
-        case 'ArrowLeft':
-          // Scroll left by 10%
-          event.preventDefault();
-          newRange = computeScrolledRange(getCurrentRange(), 'left', 0.1, chartData);
-          break;
-
-        case 'ArrowRight':
-          // Scroll right by 10%
-          event.preventDefault();
-          newRange = computeScrolledRange(getCurrentRange(), 'right', 0.1, chartData);
-          break;
-
-        default:
-          return;
-      }
-
-      if (newRange) {
-        // Use requestAnimationFrame for smooth updates
-        requestAnimationFrame(() => {
-          Plotly.relayout(chartElement, {
-            'xaxis.range': newRange
-          }, {
-            transition: {
-              duration: 150,
-              easing: 'cubic-in-out'
-            }
-          });
-        });
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [priceData, activeDrawingTool, pendingDrawing, onDrawingToolChange]);
-
-  // Dismiss interaction hint
-  const dismissInteractionHint = () => {
-    localStorage.setItem('chart-interaction-hint-dismissed', 'true');
-    setShowInteractionHint(false);
-  };
-
-  // Handle chart click for drawing tools
-  const handleChartDrawingClick = useCallback((event) => {
-    // Only handle if a drawing tool is active
-    if (activeDrawingTool === DRAWING_TOOLS.POINTER || activeDrawingTool === DRAWING_TOOLS.CROSSHAIR || !priceData || !onDrawingAdd) {
-      return;
-    }
-
-    const chartElement = document.getElementById('chartDiv');
-    if (!chartElement) return;
-
-    // Get chart layout
-    const layout = chartElement.layout;
-    if (!layout || !layout.xaxis || !layout.yaxis) return;
-
-    // Calculate click position relative to chart
-    const rect = chartElement.getBoundingClientRect();
-    const xPx = event.clientX - rect.left;
-    const yPx = event.clientY - rect.top;
-
-    // Get the plot area dimensions (rough approximation)
-    const margin = layout.margin || { l: 60, r: 60, t: 50, b: 50 };
-    const plotWidth = rect.width - margin.l - margin.r;
-    const plotHeight = rect.height - margin.t - margin.b;
-
-    // Calculate relative position within plot area
-    const relX = (xPx - margin.l) / plotWidth;
-    const relY = (yPx - margin.t) / plotHeight;
-
-    // Check if click is within plot area
-    if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
-
-    // Get axis ranges
-    const xRange = layout.xaxis.range || [priceData.time[0], priceData.time[priceData.time.length - 1]];
-    const yRange = layout.yaxis.range || [Math.min(...priceData.mid_l), Math.max(...priceData.mid_h)];
-
-    // Calculate price from pixel position (y-axis is inverted)
-    const clickedPrice = yRange[1] - relY * (yRange[1] - yRange[0]);
-
-    // Calculate time from pixel position
-    const startTime = new Date(xRange[0]).getTime();
-    const endTime = new Date(xRange[1]).getTime();
-    const clickedTime = new Date(startTime + relX * (endTime - startTime)).toISOString();
-
-    // Apply snap-to-price if enabled
-    let finalPrice = clickedPrice;
-    let finalTime = clickedTime;
-
-    if (snapEnabled) {
-      const snapResult = findNearestOHLC(new Date(clickedTime).getTime(), clickedPrice, priceData);
-      if (snapResult.didSnap) {
-        finalPrice = snapResult.snappedPrice;
-      }
-      if (snapResult.candle) {
-        finalTime = snapResult.candle.time;
-      }
-    }
-
-    // Check for drawing limits
-    if (wouldExceedDrawingLimit(drawings, activeDrawingTool)) {
-      console.warn(getDrawingLimitWarning(activeDrawingTool));
-      return;
-    }
-
-    // Handle different drawing tool types
-    switch (activeDrawingTool) {
-      case DRAWING_TOOLS.HORIZONTAL_LINE: {
-        // Horizontal line is single-click
-        const newDrawing = {
-          id: generateDrawingId(),
-          ...createDefaultHorizontalLine(finalPrice),
-        };
-        onDrawingAdd(newDrawing);
+    switch (type) {
+      case 'connection_status':
+        console.log('[PriceChart] Connection status:', data.status);
         break;
-      }
 
-      case DRAWING_TOOLS.TRENDLINE: {
-        if (!pendingDrawing) {
-          // First click - set starting point
-          setPendingDrawing({
-            type: DRAWING_TOOLS.TRENDLINE,
-            point1: { time: finalTime, price: finalPrice },
-          });
-        } else {
-          // Second click - complete the trendline
-          const newDrawing = {
-            id: generateDrawingId(),
-            ...createDefaultTrendline(
-              pendingDrawing.point1,
-              { time: finalTime, price: finalPrice }
-            ),
-          };
-          onDrawingAdd(newDrawing);
-          setPendingDrawing(null);
-        }
+      case 'candle_completed':
+        // Add completed candle to aggregator
+        candleAggregator.addCompletedCandle(data);
+        updateChartData();
         break;
-      }
 
-      case DRAWING_TOOLS.FIBONACCI: {
-        if (!pendingDrawing) {
-          // First click - set starting point
-          setPendingDrawing({
-            type: DRAWING_TOOLS.FIBONACCI,
-            startPoint: { time: finalTime, price: finalPrice },
-          });
-        } else {
-          // Second click - complete the fibonacci
-          const newDrawing = {
-            id: generateDrawingId(),
-            ...createDefaultFibonacci(
-              pendingDrawing.startPoint,
-              { time: finalTime, price: finalPrice }
-            ),
-          };
-          onDrawingAdd(newDrawing);
-          setPendingDrawing(null);
-        }
+      case 'candle_update':
+        // Update current candle
+        candleAggregator.updateCurrentCandle(data);
+        updateCurrentCandle(data);
         break;
-      }
+
+      case 'error':
+        console.error('[PriceChart] WebSocket error message:', data.message);
+        break;
 
       default:
-        // Pointer tool or unknown tool - do nothing
-        break;
+        console.debug('[PriceChart] Unknown message type:', type);
     }
-  }, [activeDrawingTool, priceData, onDrawingAdd, drawings, pendingDrawing, snapEnabled]);
+  }
 
-  // Handle drawing context menu (for future: chart right-click detection on drawings)
-  // eslint-disable-next-line no-unused-vars
-  const handleDrawingContextMenu = useCallback((event, drawing) => {
-    event.preventDefault();
-    setDrawingContextMenu({
-      isOpen: true,
-      position: { x: event.clientX, y: event.clientY },
-      drawing,
-    });
-  }, []);
+  /**
+   * Update chart with all candles (historical + current).
+   */
+  function updateChartData() {
+    if (!candlestickSeriesRef.current) return;
 
-  // Close drawing context menu
-  const closeDrawingContextMenu = useCallback(() => {
-    setDrawingContextMenu(prev => ({ ...prev, isOpen: false }));
-  }, []);
+    const formattedCandles = candleAggregator.getFormattedCandles();
+    if (formattedCandles.length > 0) {
+      candlestickSeriesRef.current.setData(formattedCandles);
+    }
+  }
 
-  // Handle drawing flip (fibonacci)
-  const handleDrawingFlip = useCallback(() => {
-    const drawing = drawingContextMenu.drawing;
-    if (!drawing || drawing.type !== DRAWING_TOOLS.FIBONACCI || !onDrawingUpdate) return;
+  /**
+   * Update only the last (current) candle for real-time updates.
+   */
+  function updateCurrentCandle(candle) {
+    if (!candlestickSeriesRef.current || !candle) return;
 
-    // Swap start and end points
-    const flipped = {
-      ...drawing,
-      startPoint: drawing.endPoint,
-      endPoint: drawing.startPoint,
+    const formattedCandle = {
+      time: parseTimeString(candle.time),
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
     };
-    onDrawingUpdate(flipped);
-  }, [drawingContextMenu.drawing, onDrawingUpdate]);
 
-  // Check if drawing is used in a condition
-  const isDrawingUsedInCondition = useCallback((drawingId) => {
-    return conditionDrawingIds.includes(drawingId);
-  }, [conditionDrawingIds]);
+    updateLastCandle(candlestickSeriesRef.current, formattedCandle);
+  }
 
-  // Drag and drop handlers
+  /**
+   * Initialize chart on mount.
+   */
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    console.log('[PriceChart] Initializing TradingView chart');
+    chartRef.current = createTradingViewChart(chartContainerRef.current);
+    candlestickSeriesRef.current = addCandlestickSeries(chartRef.current);
+
+    // Cleanup on unmount
+    return () => {
+      console.log('[PriceChart] Cleaning up chart');
+      if (chartRef.current) {
+        destroyChart(chartRef.current);
+        chartRef.current = null;
+        candlestickSeriesRef.current = null;
+      }
+    };
+  }, []);
+
+  /**
+   * Load historical data when priceData changes.
+   */
+  useEffect(() => {
+    if (!priceData || loading) return;
+
+    console.log('[PriceChart] Loading historical price data');
+    const candles = convertApiDataToCandles(priceData);
+
+    // Set historical candles in aggregator
+    candleAggregator.setHistoricalCandles(candles);
+
+    // Update chart
+    if (candlestickSeriesRef.current) {
+      candlestickSeriesRef.current.setData(candles);
+      fitChartContent(chartRef.current);
+    }
+  }, [priceData, loading]);
+
+  /**
+   * Reconnect WebSocket when pair or granularity changes.
+   */
+  useEffect(() => {
+    if (!selectedPair || !selectedGranularity) return;
+
+    console.log(`[PriceChart] Pair/granularity changed: ${selectedPair}/${selectedGranularity}`);
+
+    // Reset candle aggregator
+    candleAggregator.reset();
+
+    // WebSocket will auto-reconnect via useWebSocket hook
+  }, [selectedPair, selectedGranularity]);
+
+  /**
+   * Render active indicators on the chart.
+   */
+  useEffect(() => {
+    if (!chartRef.current || !candlestickSeriesRef.current) return;
+
+    // Remove old indicator series
+    Object.values(indicatorSeriesRef.current).forEach((series) => {
+      try {
+        chartRef.current.removeSeries(series);
+      } catch (err) {
+        console.warn('[PriceChart] Error removing series:', err);
+      }
+    });
+    indicatorSeriesRef.current = {};
+
+    // Add new indicator series
+    activeIndicators.forEach((indicator) => {
+      if (!indicator.data || indicator.data.length === 0) return;
+
+      try {
+        // Create line series for each indicator
+        const color = indicator.color || '#3b82f6';
+        const series = addLineSeries(chartRef.current, indicator.data, {
+          color,
+          lineWidth: 2,
+          title: getIndicatorDisplayName(indicator.name),
+        });
+
+        indicatorSeriesRef.current[indicator.instanceId] = series;
+      } catch (err) {
+        console.error('[PriceChart] Error adding indicator:', err);
+      }
+    });
+  }, [activeIndicators]);
+
+  /**
+   * Handle drag and drop for indicators.
+   */
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
+    e.stopPropagation();
     setIsDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e) => {
-    // Only set isDragOver to false if we're leaving the drop zone entirely
-    if (!e.currentTarget.contains(e.relatedTarget)) {
-      setIsDragOver(false);
-    }
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
   }, []);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
 
     try {
-      const itemData = JSON.parse(e.dataTransfer.getData('application/json'));
-      if (itemData) {
-        // Validate pattern data integrity before passing to handler
-        if (itemData.isPattern) {
-          if (!itemData.id || !itemData.name) {
-            console.error('Pattern drop error: Missing id or name in pattern data', itemData);
-            return;
-          }
-          // Create a defensive copy to prevent any mutation
-          const patternData = { ...itemData };
-          if (onPatternDrop) {
-            onPatternDrop(patternData);
-          }
-        } else if (onIndicatorDrop) {
-          onIndicatorDrop(itemData);
-        }
+      const indicatorData = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (indicatorData && onIndicatorDrop) {
+        onIndicatorDrop(indicatorData);
       }
     } catch (err) {
-      console.error('Failed to parse dropped item data:', err);
+      console.error('[PriceChart] Error handling drop:', err);
     }
-  }, [onIndicatorDrop, onPatternDrop]);
+  }, [onIndicatorDrop]);
+
+  /**
+   * Handle indicator context menu.
+   */
+  const handleIndicatorContextMenu = useCallback((e, indicatorInstanceId, indicatorName) => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY },
+      indicatorInstanceId,
+      indicatorName,
+    });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({
+      isOpen: false,
+      position: { x: 0, y: 0 },
+      indicatorInstanceId: null,
+      indicatorName: '',
+    });
+  }, []);
+
+  /**
+   * Get connection status badge.
+   */
+  function getConnectionStatusBadge() {
+    const statusConfig = {
+      [CONNECTION_STATUS.CONNECTED]: {
+        icon: Wifi,
+        label: 'Connected',
+        color: 'bg-green-500',
+      },
+      [CONNECTION_STATUS.CONNECTING]: {
+        icon: RefreshCw,
+        label: 'Connecting',
+        color: 'bg-yellow-500',
+        spin: true,
+      },
+      [CONNECTION_STATUS.RECONNECTING]: {
+        icon: RefreshCw,
+        label: 'Reconnecting',
+        color: 'bg-yellow-500',
+        spin: true,
+      },
+      [CONNECTION_STATUS.DISCONNECTED]: {
+        icon: WifiOff,
+        label: 'Disconnected',
+        color: 'bg-gray-500',
+      },
+      [CONNECTION_STATUS.ERROR]: {
+        icon: WifiOff,
+        label: 'Error',
+        color: 'bg-red-500',
+      },
+    };
+
+    const config = statusConfig[wsStatus] || statusConfig[CONNECTION_STATUS.DISCONNECTED];
+    const Icon = config.icon;
+
+    return (
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-md shadow-lg">
+        <Icon
+          size={16}
+          className={cn(
+            'text-white',
+            config.spin && 'animate-spin'
+          )}
+        />
+        <div className={cn('w-2 h-2 rounded-full', config.color)} />
+        <span className="text-sm text-slate-300 font-medium">{config.label}</span>
+      </div>
+    );
+  }
+
+  /**
+   * Render active indicators list.
+   */
+  function renderActiveIndicators() {
+    if (activeIndicators.length === 0) return null;
+
+    return (
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 max-w-xs">
+        {activeIndicators.map((indicator) => (
+          <div
+            key={indicator.instanceId}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/90 border border-slate-700 rounded-md shadow-md cursor-pointer hover:bg-slate-700/90 transition-colors"
+            onClick={(e) => onIndicatorClick?.(indicator.instanceId)}
+            onContextMenu={(e) => handleIndicatorContextMenu(e, indicator.instanceId, indicator.name)}
+          >
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: indicator.color || '#3b82f6' }}
+            />
+            <span className="text-sm text-slate-300 font-medium flex-1">
+              {getIndicatorDisplayName(indicator.name)}
+            </span>
+            <Settings size={14} className="text-slate-400 hover:text-slate-200" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="relative animate-fade-in">
-      {/* Chart Container - No Card Wrapper for Clean TradingView Look */}
-      <div className="relative">
-        {loading ? (
-          /* Loading Skeleton State */
-          <div className="w-full rounded-lg bg-muted/30 min-h-[500px] flex items-center justify-center" style={{ height: 'calc(100vh - 280px)' }}>
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
-                <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-              </div>
-              <p className="text-muted-foreground font-medium">Loading chart data...</p>
-            </div>
-          </div>
-        ) : (
-          /* Chart Display with Interaction Features */
-          <div
-            className={cn(
-              "relative rounded-lg transition-all duration-200",
-              isDragOver && "ring-2 ring-primary ring-dashed bg-primary/5"
-            )}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {/* Chart Legend Overlay - TradingView Style */}
-            <div className="absolute top-3 left-3 z-30 pointer-events-none">
-              <div className="flex flex-col gap-1">
-                {/* Symbol and Timeframe */}
-                <div className="flex items-center gap-2 pointer-events-auto">
-                  <span className="text-sm font-semibold text-foreground bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded">
-                    {selectedPair} <span className="text-muted-foreground">·</span> {selectedGranularity}
-                  </span>
-                </div>
+    <div className="relative w-full h-full">
+      {/* Connection Status Badge */}
+      {getConnectionStatusBadge()}
 
-                {/* Active Indicators */}
-                {activeIndicators.length > 0 && (
-                  <div className="flex items-center gap-1 flex-wrap pointer-events-auto">
-                    {activeIndicators.map((indicator) => {
-                      const displayName = getIndicatorDisplayName(indicator, indicator.params || indicator.defaultParams);
-                      const isPreview = indicator.isPreview;
-                      const isBeingPreviewed = previewIndicator && previewIndicator.instanceId === indicator.instanceId && !comparisonMode;
+      {/* Active Indicators */}
+      {renderActiveIndicators()}
 
-                      // Skip rendering the original if it's being replaced by preview
-                      if (isBeingPreviewed && !indicator.isPreview) {
-                        return null;
-                      }
-
-                      return (
-                        <span
-                          key={indicator.instanceId}
-                          className={cn(
-                            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-background/80 backdrop-blur-sm cursor-pointer hover:bg-background/90 transition-colors group",
-                            isPreview && "border border-dashed border-amber-500/50"
-                          )}
-                          style={{ borderLeft: `2px solid ${indicator.color}` }}
-                          onClick={(e) => {
-                            // Don't trigger edit when clicking the remove button
-                            if (e.target.closest('button')) return;
-                            if (onEditIndicator && !isPreview) {
-                              onEditIndicator(indicator.instanceId);
-                            }
-                          }}
-                          title={onEditIndicator && !isPreview ? `Click to edit ${displayName}` : displayName}
-                        >
-                          {displayName}
-                          {isPreview && <span className="text-amber-500">(P)</span>}
-                          {onEditIndicator && !isPreview && (
-                            <Settings className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          )}
-                          {onRemoveIndicator && !isPreview && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRemoveIndicator(indicator.instanceId);
-                              }}
-                              className="p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-                              title={`Remove ${displayName}`}
-                            >
-                              <X className="h-2.5 w-2.5" />
-                            </button>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Active Patterns */}
-                {activePatterns.length > 0 && (
-                  <div className="flex items-center gap-1 flex-wrap pointer-events-auto">
-                    {activePatterns.map((pattern) => {
-                      const displayName = getPatternDisplayName(pattern);
-                      const patternCount = pattern.detectedCount || 0;
-                      return (
-                        <span
-                          key={pattern.instanceId}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-background/80 backdrop-blur-sm"
-                          style={{ borderLeft: `2px solid ${pattern.color}` }}
-                          title={`${displayName} - ${patternCount} detected`}
-                        >
-                          <span
-                            className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: pattern.color }}
-                          />
-                          {patternCount} {displayName}
-                          {onRemovePattern && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRemovePattern(pattern.instanceId);
-                              }}
-                              className="p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-                              title={`Remove ${displayName}`}
-                            >
-                              <X className="h-2.5 w-2.5" />
-                            </button>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Drop zone overlay */}
-            {isDragOver && (
-              <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-                <div className="bg-primary/90 text-primary-foreground px-4 py-2 rounded-md shadow-lg font-medium">
-                  Drop to add indicator
-                </div>
-              </div>
-            )}
-            <div
-              id="chartDiv"
-              className={cn(
-                "w-full rounded-lg bg-muted/30 min-h-[500px]",
-                activeDrawingTool !== DRAWING_TOOLS.POINTER && activeDrawingTool !== DRAWING_TOOLS.CROSSHAIR && "cursor-crosshair",
-                activeDrawingTool === DRAWING_TOOLS.CROSSHAIR && "cursor-crosshair"
-              )}
-              style={{ height: 'calc(100vh - 280px)' }}
-              onClick={handleChartDrawingClick}
-            />
-
-            {/* Pending drawing indicator */}
-            {pendingDrawing && (
-              <div className="absolute top-3 right-3 z-40 bg-amber-500/90 text-white px-3 py-2 rounded-md shadow-lg text-sm font-medium flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                Click to set {pendingDrawing.type === DRAWING_TOOLS.TRENDLINE ? 'end point' : 'end point'} · Press Esc to cancel
-              </div>
-            )}
-
-            {/* Interaction Hints Tooltip */}
-            {showInteractionHint && (
-              <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
-                <div className="bg-black/90 text-white rounded-md px-4 py-3 shadow-lg max-w-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="text-sm">
-                      {isTouchDevice ? (
-                        <p>
-                          <span className="font-semibold">Pinch to zoom</span> · <span className="font-semibold">Drag to pan</span> · <span className="font-semibold">Double-tap to reset</span>
-                        </p>
-                      ) : (
-                        <p>
-                          <span className="font-semibold">Scroll to zoom</span> · <span className="font-semibold">Drag to pan</span> · <span className="font-semibold">Double-click to reset</span>
-                          <br />
-                          <span className="text-xs text-white/80 mt-1 inline-block">Keyboard: +/- to zoom, arrows to scroll</span>
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={dismissInteractionHint}
-                      className="text-white/70 hover:text-white transition-colors flex-shrink-0"
-                      title="Dismiss"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Zoom Level Indicator */}
-            {visibleCandleCount !== null && (
-              <div className="absolute bottom-3 left-3 z-30">
-                <span className="text-xs text-muted-foreground font-medium bg-background/80 backdrop-blur-sm px-2 py-1 rounded">
-                  {visibleCandleCount} candle{visibleCandleCount !== 1 ? 's' : ''}
-                </span>
-              </div>
-            )}
-          </div>
+      {/* Chart Container */}
+      <div
+        ref={chartContainerRef}
+        className={cn(
+          'w-full h-full',
+          isDragOver && 'ring-2 ring-blue-500 ring-opacity-50'
         )}
-      </div>
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      />
+
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm z-20">
+          <div className="flex flex-col items-center gap-3">
+            <RefreshCw size={32} className="text-blue-500 animate-spin" />
+            <p className="text-slate-300 font-medium">Loading chart data...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Drag Over Hint */}
+      {isDragOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-blue-500/10 backdrop-blur-sm border-2 border-dashed border-blue-500 rounded-lg z-15 pointer-events-none">
+          <div className="text-center">
+            <p className="text-blue-400 font-semibold text-lg">Drop indicator here</p>
+            <p className="text-blue-300 text-sm mt-1">Release to add to chart</p>
+          </div>
+        </div>
+      )}
+
+      {/* WebSocket Error */}
+      {wsError && (
+        <div className="absolute bottom-4 right-4 z-10 max-w-sm px-4 py-3 bg-red-900/90 border border-red-700 rounded-md shadow-lg">
+          <div className="flex items-start gap-3">
+            <X size={20} className="text-red-300 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-100">WebSocket Error</p>
+              <p className="text-xs text-red-200 mt-1">{wsError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Indicator Context Menu */}
-      <IndicatorContextMenu
-        isOpen={contextMenu.isOpen}
-        position={contextMenu.position}
-        indicatorName={contextMenu.indicatorName}
-        onConfigure={() => {
-          if (onIndicatorConfigure) {
-            onIndicatorConfigure(contextMenu.indicatorInstanceId);
-          }
-        }}
-        onRemove={() => {
-          if (onRemoveIndicator) {
-            onRemoveIndicator(contextMenu.indicatorInstanceId);
-          }
-        }}
-        onDuplicate={() => {
-          if (onIndicatorDuplicate) {
-            onIndicatorDuplicate(contextMenu.indicatorInstanceId);
-          }
-        }}
-        onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
-      />
-
-      {/* Drawing Context Menu */}
-      <DrawingContextMenu
-        isOpen={drawingContextMenu.isOpen}
-        position={drawingContextMenu.position}
-        drawing={drawingContextMenu.drawing}
-        onEdit={() => {
-          if (onDrawingEdit && drawingContextMenu.drawing) {
-            onDrawingEdit(drawingContextMenu.drawing);
-          }
-        }}
-        onDuplicate={() => {
-          if (onDrawingAdd && drawingContextMenu.drawing) {
-            const duplicate = {
-              ...drawingContextMenu.drawing,
-              id: generateDrawingId(),
-              label: '', // Clear label for duplicate
-            };
-            onDrawingAdd(duplicate);
-          }
-        }}
-        onDelete={() => {
-          if (onDrawingDelete && drawingContextMenu.drawing) {
-            onDrawingDelete(drawingContextMenu.drawing.id);
-          }
-        }}
-        onUseInCondition={() => {
-          if (onDrawingUseInCondition && drawingContextMenu.drawing) {
-            onDrawingUseInCondition(drawingContextMenu.drawing);
-          }
-        }}
-        onFlip={handleDrawingFlip}
-        onClose={closeDrawingContextMenu}
-        isUsedInCondition={drawingContextMenu.drawing ? isDrawingUsedInCondition(drawingContextMenu.drawing.id) : false}
-      />
+      {contextMenu.isOpen && (
+        <IndicatorContextMenu
+          position={contextMenu.position}
+          indicatorInstanceId={contextMenu.indicatorInstanceId}
+          indicatorName={contextMenu.indicatorName}
+          onClose={closeContextMenu}
+          onConfigure={() => {
+            onIndicatorConfigure?.(contextMenu.indicatorInstanceId);
+            closeContextMenu();
+          }}
+          onDuplicate={() => {
+            onIndicatorDuplicate?.(contextMenu.indicatorInstanceId);
+            closeContextMenu();
+          }}
+          onRemove={() => {
+            onRemoveIndicator?.(contextMenu.indicatorInstanceId);
+            closeContextMenu();
+          }}
+        />
+      )}
     </div>
   );
+}
+
+/**
+ * Parse time string to Unix timestamp (seconds).
+ */
+function parseTimeString(timeStr) {
+  if (typeof timeStr === 'number') {
+    return timeStr;
+  }
+
+  try {
+    // Parse format: "26-01-21 02:30"
+    const [datePart, timePart] = timeStr.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+
+    // Construct date (assuming 20XX century)
+    const date = new Date(2000 + year, month - 1, day, hour, minute, 0);
+
+    // Return Unix timestamp in seconds
+    return Math.floor(date.getTime() / 1000);
+  } catch (err) {
+    console.error('[PriceChart] Error parsing time:', timeStr, err);
+    return Math.floor(Date.now() / 1000);
+  }
 }
 
 export default PriceChart;

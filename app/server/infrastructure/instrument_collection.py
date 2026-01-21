@@ -20,7 +20,7 @@ class InstrumentCollection:
     """
 
     FILENAME = "instruments.json"
-    API_KEYS = ['Symbol', 'Precision', 'TradeAmountStep']
+    API_KEYS = ["Symbol", "Precision", "TradeAmountStep"]
 
     def __init__(self):
         """Initialize empty instrument collection."""
@@ -56,9 +56,7 @@ class InstrumentCollection:
                         "Precision": row.get("precision", 5),
                         "TradeAmountStep": row.get("trade_amount_step", 1000),
                     }
-                    self.instruments_dict[symbol] = Instrument.from_api_object(
-                        instrument_data
-                    )
+                    self.instruments_dict[symbol] = Instrument.from_api_object(instrument_data)
 
     def create_file(self, data: list, path: str) -> None:
         """
@@ -74,7 +72,7 @@ class InstrumentCollection:
 
         instruments_dict = {}
         for item in data:
-            key = item['Symbol']
+            key = item["Symbol"]
             instruments_dict[key] = {k: item[k] for k in self.API_KEYS}
 
         filename = f"{path}/{self.FILENAME}"

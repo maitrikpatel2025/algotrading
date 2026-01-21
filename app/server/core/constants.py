@@ -13,11 +13,7 @@ BUY = 1
 NONE = 0
 
 # Direction string mappings
-DIRECTION_MAP = {
-    BUY: "Buy",
-    SELL: "Sell",
-    NONE: "None"
-}
+DIRECTION_MAP = {BUY: "Buy", SELL: "Sell", NONE: "None"}
 
 # =============================================================================
 # Timeframe Constants (in seconds)
@@ -57,17 +53,30 @@ SAMPLE_COLLECTION = "forex_sample"
 # Supported Currency Pairs
 # =============================================================================
 
-MAJOR_PAIRS = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
-    "AUDUSD", "USDCAD", "NZDUSD"
-]
+MAJOR_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"]
 
 CROSS_PAIRS = [
-    "EURGBP", "EURJPY", "EURCHF", "EURAUD", "EURCAD", "EURNZD",
-    "GBPJPY", "GBPCHF", "GBPAUD", "GBPCAD", "GBPNZD",
-    "CHFJPY", "CADJPY", "AUDJPY", "NZDJPY",
-    "AUDCAD", "AUDCHF", "AUDNZD",
-    "CADCHF", "NZDCAD", "NZDCHF"
+    "EURGBP",
+    "EURJPY",
+    "EURCHF",
+    "EURAUD",
+    "EURCAD",
+    "EURNZD",
+    "GBPJPY",
+    "GBPCHF",
+    "GBPAUD",
+    "GBPCAD",
+    "GBPNZD",
+    "CHFJPY",
+    "CADJPY",
+    "AUDJPY",
+    "NZDJPY",
+    "AUDCAD",
+    "AUDCHF",
+    "AUDNZD",
+    "CADCHF",
+    "NZDCAD",
+    "NZDCHF",
 ]
 
 ALL_PAIRS = MAJOR_PAIRS + CROSS_PAIRS

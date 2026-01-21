@@ -501,6 +501,7 @@ dependencies = [
     { name = "requests" },
     { name = "supabase" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets" },
 ]
 
 [package.optional-dependencies]
@@ -539,6 +540,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.31.0" },
     { name = "supabase", specifier = ">=2.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
+    { name = "websockets", specifier = ">=15.0.1" },
 ]
 provides-extras = ["dev"]
 
