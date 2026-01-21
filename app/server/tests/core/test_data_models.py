@@ -13,6 +13,7 @@ from core.data_models import (
     OpenTradesResponse,
     OptionItem,
     PriceDataResponse,
+    StrategyConfig,
     TradeHistoryItem,
     TradeHistoryResponse,
     TradeInfo,
@@ -411,3 +412,44 @@ class TestTradeHistoryModels:
 
         assert response.error == "Failed to fetch trade history"
         assert len(response.trades) == 0
+
+
+class TestStrategyConfig:
+    """Test cases for StrategyConfig model."""
+
+    def test_strategy_config_candle_count_as_int(self):
+        """Test that candle_count accepts integer values."""
+        config = StrategyConfig(
+            name="Test Strategy",
+            candle_count=100
+        )
+
+        assert config.name == "Test Strategy"
+        assert config.candle_count == 100
+
+    def test_strategy_config_candle_count_as_str(self):
+        """Test that candle_count accepts string values."""
+        config = StrategyConfig(
+            name="Test Strategy",
+            candle_count="100"
+        )
+
+        assert config.name == "Test Strategy"
+        assert config.candle_count == "100"
+
+    def test_strategy_config_candle_count_as_none(self):
+        """Test that candle_count accepts None values."""
+        config = StrategyConfig(
+            name="Test Strategy",
+            candle_count=None
+        )
+
+        assert config.name == "Test Strategy"
+        assert config.candle_count is None
+
+    def test_strategy_config_minimal(self):
+        """Test that StrategyConfig works with only required fields."""
+        config = StrategyConfig(name="Minimal Strategy")
+
+        assert config.name == "Minimal Strategy"
+        assert config.candle_count is None

@@ -361,6 +361,19 @@ This prompt helps you determine what documentation you should read based on the 
     - When extending StrategyListItemExtended or StrategyExport data models
     - When implementing conflict resolution for strategy name conflicts
 
+- app_docs/feature-8047b9ec-strategy-import-pattern-display.md
+  - Conditions:
+    - When troubleshooting strategy import not refreshing UI automatically
+    - When working with strategy load error handling or error message improvements
+    - When fixing export double-serialization or data corruption issues
+    - When troubleshooting patterns not displaying on chart
+    - When implementing pattern detection user feedback
+    - When working with patternType property propagation or marker colors
+    - When debugging chart type restrictions for pattern rendering
+    - When enhancing error messages for database connection, missing indicators, or network failures
+    - When implementing auto-load functionality after strategy import
+    - When working with StrategyConfig.candle_count type validation (int vs str)
+
 - app_docs/feature-81b4393a-strategy-builder-layout.md
   - Conditions:
     - When working with the Strategy Builder three-column layout

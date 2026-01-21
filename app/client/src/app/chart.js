@@ -633,6 +633,8 @@ function createSubchartIndicators(chart, chartData, indicators) {
 function createPatternMarkers(mainSeries, chartData, patterns) {
   if (!patterns || patterns.length === 0) return;
 
+  console.log('createPatternMarkers called with', patterns.length, 'patterns');
+
   const markers = [];
 
   patterns.forEach(pattern => {
@@ -649,6 +651,12 @@ function createPatternMarkers(mainSeries, chartData, patterns) {
       if (idx >= 0 && idx < chartData.time.length) {
         const timestamp = parseTimeToUnix(chartData.time[idx]);
         if (isNaN(timestamp)) return;
+
+        // Validate patternType exists and use default if missing
+        if (!pattern.patternType) {
+          console.warn('Pattern missing patternType:', pattern.name, '- using default gray color');
+        }
+
         let markerColor;
         switch (pattern.patternType) {
           case PATTERN_TYPES.BULLISH:
@@ -658,7 +666,7 @@ function createPatternMarkers(mainSeries, chartData, patterns) {
             markerColor = CHART_COLORS.bearish;
             break;
           default:
-            markerColor = '#6B7280';
+            markerColor = '#6B7280'; // Default gray for neutral or missing
         }
 
         markers.push({
@@ -672,10 +680,13 @@ function createPatternMarkers(mainSeries, chartData, patterns) {
     });
   });
 
+  console.log('Generated', markers.length, 'markers for chart');
+
   if (markers.length > 0) {
     // Sort markers by time
     markers.sort((a, b) => a.time - b.time);
     mainSeries.setMarkers(markers);
+    console.log('Markers successfully set on chart');
   }
 }
 
@@ -877,7 +888,8 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
   }
 
   // Add pattern markers
-  if (activePatterns && activePatterns.length > 0 && chartType === 'candlestick') {
+  if (activePatterns && activePatterns.length > 0) {
+    console.log(`Rendering ${activePatterns.length} pattern(s) on chart`);
     createPatternMarkers(mainSeries, chartData, activePatterns);
   }
 
