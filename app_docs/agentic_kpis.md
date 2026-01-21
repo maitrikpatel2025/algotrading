@@ -6,15 +6,15 @@ Performance metrics for the AI Developer Workflow (ADW) system.
 
 Summary metrics across all ADW runs.
 
-| Metric            | Value          | Last Updated        |
-| ----------------- | -------------- | ------------------- |
-| Current Streak    | 28             | Wed Jan 21 20:35:54 UTC 2026 |
-| Longest Streak    | 28             | Wed Jan 21 20:35:54 UTC 2026 |
-| Total Plan Size   | 7427 lines     | Wed Jan 21 20:35:54 UTC 2026 |
-| Largest Plan Size | 411 lines      | Wed Jan 21 20:35:54 UTC 2026 |
-| Total Diff Size   | 40959 lines    | Wed Jan 21 20:35:54 UTC 2026 |
-| Largest Diff Size | 3326 lines     | Wed Jan 21 20:35:54 UTC 2026 |
-| Average Presence  | 1.00           | Wed Jan 21 20:35:54 UTC 2026 |
+| Metric            | Value          | Last Updated             |
+| ----------------- | -------------- | ------------------------ |
+| Current Streak    | 29             | Wed Jan 21 21:34:39 UTC 2026 |
+| Longest Streak    | 29             | Wed Jan 21 21:34:39 UTC 2026 |
+| Total Plan Size   | 7773 lines     | Wed Jan 21 21:34:39 UTC 2026 |
+| Largest Plan Size | 411 lines      | Wed Jan 21 21:34:39 UTC 2026 |
+| Total Diff Size   | 42532 lines    | Wed Jan 21 21:34:39 UTC 2026 |
+| Largest Diff Size | 3326 lines     | Wed Jan 21 21:34:39 UTC 2026 |
+| Average Presence  | 1.00           | Wed Jan 21 21:34:39 UTC 2026 |
 
 ## ADW KPIs
 
@@ -50,3 +50,4 @@ Detailed metrics for individual ADW workflow runs.
 | 2026-01-20 | f792fd5a | 80           | /feature    | 1        | 320               | 2324/29/33                      | Tue Jan 20 13:46:26 UTC 2026 | Tue Jan 20 13:46:26 UTC 2026 |
 | 2026-01-20 | 81b4393a | 84           | /feature    | 1        | 228               | 914/204/31                      | Tue Jan 20 22:04:55 UTC 2026 | Tue Jan 20 22:04:55 UTC 2026 |
 | 2026-01-21 | 5c1da8e9 | 93           | /bug        | 1        | 128               | 299/2/14                        | Wed Jan 21 20:35:54 UTC 2026 | Wed Jan 21 20:35:54 UTC 2026 |
+| 2026-01-21 | 904b1bf0 | 95           | /bug        | 1        | 346               | 1465/108/12                     | Wed Jan 21 21:34:39 UTC 2026 | Wed Jan 21 21:34:39 UTC 2026 |
