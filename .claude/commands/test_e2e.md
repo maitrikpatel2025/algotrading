@@ -30,8 +30,9 @@ The Forex Trading Dashboard is a full-stack application for forex trading with:
 
 E2E test specifications are located in `.claude/commands/e2e/`:
 - `test_api_health.md` - Backend API health and connectivity tests
-- `test_trading_dashboard.md` - Dashboard functionality tests
-- `test_market_headlines.md` - Home page and headlines tests
+- `test_account_page.md` - Account page with open trades and trade history
+- `test_strategy_builder.md` - Strategy Builder with chart, indicators, and conditions
+- `test_strategy_library.md` - Strategy Library listing, search, filter, and management
 
 ## Instructions
 
