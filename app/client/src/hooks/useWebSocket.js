@@ -56,6 +56,7 @@ export const useWebSocket = (url, options = {}) => {
   const reconnectTimeoutRef = useRef(null);
   const shouldReconnectRef = useRef(autoReconnect);
   const currentBackoffRef = useRef(INITIAL_BACKOFF);
+  const isConnectingRef = useRef(false);
 
   /**
    * Connect to WebSocket server.
@@ -71,7 +72,13 @@ export const useWebSocket = (url, options = {}) => {
       return;
     }
 
+    if (isConnectingRef.current) {
+      console.log('[useWebSocket] Connection already in progress');
+      return;
+    }
+
     console.log(`[useWebSocket] Connecting to ${url}`);
+    isConnectingRef.current = true;
     setStatus(CONNECTION_STATUS.CONNECTING);
     setError(null);
 
@@ -80,6 +87,7 @@ export const useWebSocket = (url, options = {}) => {
 
       ws.onopen = (event) => {
         console.log('[useWebSocket] Connection opened');
+        isConnectingRef.current = false;
         setStatus(CONNECTION_STATUS.CONNECTED);
         setRetryCount(0);
         currentBackoffRef.current = INITIAL_BACKOFF;
@@ -104,6 +112,9 @@ export const useWebSocket = (url, options = {}) => {
 
       ws.onerror = (event) => {
         console.error('[useWebSocket] WebSocket error:', event);
+        console.error('[useWebSocket] WebSocket readyState:', ws.readyState);
+        console.error('[useWebSocket] WebSocket URL:', url);
+        isConnectingRef.current = false;
         setStatus(CONNECTION_STATUS.ERROR);
         setError('WebSocket connection error');
 
@@ -114,6 +125,13 @@ export const useWebSocket = (url, options = {}) => {
 
       ws.onclose = (event) => {
         console.log('[useWebSocket] Connection closed:', event.code, event.reason);
+        console.log('[useWebSocket] Close event details:', {
+          wasClean: event.wasClean,
+          code: event.code,
+          reason: event.reason,
+          url: url
+        });
+        isConnectingRef.current = false;
         setStatus(CONNECTION_STATUS.DISCONNECTED);
         wsRef.current = null;
 
@@ -130,6 +148,7 @@ export const useWebSocket = (url, options = {}) => {
       wsRef.current = ws;
     } catch (err) {
       console.error('[useWebSocket] Error creating WebSocket:', err);
+      isConnectingRef.current = false;
       setStatus(CONNECTION_STATUS.ERROR);
       setError(err.message);
 
@@ -184,12 +203,12 @@ export const useWebSocket = (url, options = {}) => {
       setStatus(CONNECTION_STATUS.RECONNECTING);
 
       reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
+        connectRef.current();
       }, backoff);
 
       return newRetryCount;
     });
-  }, [connect]);
+  }, []);
 
   /**
    * Send message to WebSocket server.
@@ -216,10 +235,14 @@ export const useWebSocket = (url, options = {}) => {
     }
   }, []);
 
+  // Store connect function in ref for stable reference
+  const connectRef = useRef(connect);
+  connectRef.current = connect;
+
   // Auto-connect on mount
   useEffect(() => {
     if (autoConnect && url) {
-      connect();
+      connectRef.current();
     }
 
     // Cleanup on unmount
@@ -232,7 +255,7 @@ export const useWebSocket = (url, options = {}) => {
         wsRef.current.close();
       }
     };
-  }, [autoConnect, url, connect]);
+  }, [autoConnect, url]);
 
   return {
     status,

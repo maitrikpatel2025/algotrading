@@ -317,6 +317,8 @@ function Strategy() {
   const debounceTimerRef = useRef(null);
   // Previous timeframe for zoom context preservation
   const previousGranRef = useRef(null);
+  // Track last loaded pair/gran to prevent duplicate loads
+  const lastLoadedRef = useRef(null);
 
   useEffect(() => {
     loadOptions();
@@ -2354,6 +2356,20 @@ function Strategy() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo]);
+
+  // Auto-load chart data when pair and timeframe are selected
+  useEffect(() => {
+    if (!selectedPair || !selectedGran) return;
+
+    // Check if we've already loaded this combination
+    const currentKey = `${selectedPair}_${selectedGran}`;
+    if (lastLoadedRef.current === currentKey) return;
+
+    // Mark as loaded and trigger load
+    lastLoadedRef.current = currentKey;
+    loadTechnicals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPair, selectedGran]);
 
   // Loading state - Precision Swiss Design
   if (loading) {
