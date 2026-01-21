@@ -21,8 +21,8 @@ import { BarChart3, AlertTriangle, Info, Sparkles, Save, Download, Upload, Copy,
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../components/ui/DropdownMenu';
 import IndicatorSearchPopup from '../components/IndicatorSearchPopup';
 import StrategySettingsPopover from '../components/StrategySettingsPopover';
-import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
-import { getPatternDisplayName, PATTERNS } from '../app/patterns';
+import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS, getIndicatorById } from '../app/indicators';
+import { getPatternDisplayName, PATTERNS, getPatternById } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
 import {
   createConditionFromIndicator,
@@ -62,6 +62,10 @@ import {
   deserializeDrawings,
   getDrawingDisplayName,
 } from '../app/drawingUtils';
+import {
+  convertTimeFilterToBackend,
+  convertTimeFilterFromBackend,
+} from '../app/timeFilterUtils';
 import DrawingPropertiesDialog from '../components/DrawingPropertiesDialog';
 // DrawingToolbar removed - using dropdown menu for drawing tools
 
@@ -353,7 +357,7 @@ function Strategy() {
     const validIndicators = [];
 
     indicators.forEach(ind => {
-      const indicatorDef = INDICATORS[ind.id];
+      const indicatorDef = getIndicatorById(ind.id);
 
       if (!indicatorDef) {
         unknownIds.push(ind.id);
@@ -381,6 +385,50 @@ function Strategy() {
       valid: unknownIds.length === 0,
       unknownIds,
       validIndicators,
+    };
+  }, []);
+
+  /**
+   * Validate patterns against PATTERNS definition.
+   * Returns validation result with unknown patterns and valid patterns list.
+   * IMPORTANT: Always preserves instance_id from database and merges with pattern metadata.
+   */
+  const validatePatterns = useCallback((patterns) => {
+    if (!patterns || !Array.isArray(patterns)) {
+      return { valid: true, unknownIds: [], validPatterns: [] };
+    }
+
+    const unknownIds = [];
+    const validPatterns = [];
+
+    patterns.forEach(pat => {
+      const patternDef = getPatternById(pat.id);
+
+      if (!patternDef) {
+        unknownIds.push(pat.id);
+        console.warn(`Unknown pattern: ${pat.id}`);
+      } else {
+        // CRITICAL: Always use instance_id from database, never generate new one during load
+        if (!pat.instance_id) {
+          console.error(`Pattern ${pat.id} missing instance_id - this should not happen!`);
+        }
+
+        // Merge pattern definition with database data to preserve metadata
+        validPatterns.push({
+          ...patternDef, // Include patternType, candleCount, reliability, defaultConditionTemplate
+          instanceId: pat.instance_id, // NEVER generate new ID during load
+          name: pat.name || patternDef.name,
+          description: pat.description || patternDef.description,
+          type: pat.type || patternDef.type,
+          color: pat.color || patternDef.color,
+        });
+      }
+    });
+
+    return {
+      valid: unknownIds.length === 0,
+      unknownIds,
+      validPatterns,
     };
   }, []);
 
@@ -543,24 +591,28 @@ function Strategy() {
               setActiveIndicators(validation.validIndicators);
 
               if (!validation.valid) {
-                showWarning(`${validation.unknownIds.length} indicator(s) skipped due to missing definitions.`);
+                showWarning(`${validation.unknownIds.length} indicator(s) skipped due to missing definitions: ${validation.unknownIds.join(', ')}`);
               }
             }
 
-            // Restore patterns
-            // CRITICAL: Always preserve instance_id from database to maintain condition references
-            const restoredPatterns = [];
+            // Restore patterns with validation
+            let patternValidation = { valid: true, unknownIds: [], validPatterns: [] };
             if (strategy.patterns && Array.isArray(strategy.patterns)) {
-              strategy.patterns.forEach(pat => {
-                if (!pat.instance_id) {
-                  console.error(`Pattern ${pat.id} missing instance_id - this should not happen!`);
-                }
-                restoredPatterns.push({
-                  ...pat,
-                  instanceId: pat.instance_id, // NEVER generate new ID during load
-                });
-              });
-              setActivePatterns(restoredPatterns);
+              patternValidation = validatePatterns(strategy.patterns);
+
+              if (!patternValidation.valid && patternValidation.unknownIds.length > 0) {
+                console.error('Strategy contains unknown patterns:', patternValidation.unknownIds);
+                showError(
+                  `Strategy contains patterns not in your library: ${patternValidation.unknownIds.join(', ')}. ` +
+                  'These patterns will be skipped. Please update your pattern library or contact support.'
+                );
+              }
+
+              setActivePatterns(patternValidation.validPatterns);
+
+              if (!patternValidation.valid) {
+                showWarning(`${patternValidation.unknownIds.length} pattern(s) skipped due to missing definitions: ${patternValidation.unknownIds.join(', ')}`);
+              }
             }
 
             // Restore conditions with reference validation
@@ -569,7 +621,7 @@ function Strategy() {
               const conditionValidation = validateConditionReferences(
                 strategy.conditions,
                 validation.validIndicators,
-                restoredPatterns
+                patternValidation.validPatterns
               );
 
               if (!conditionValidation.valid && conditionValidation.brokenConditions.length > 0) {
@@ -604,7 +656,7 @@ function Strategy() {
 
             // Restore time filter
             if (strategy.time_filter) {
-              setTimeFilter(strategy.time_filter);
+              setTimeFilter(convertTimeFilterFromBackend(strategy.time_filter));
             }
 
             // Restore drawings
@@ -613,6 +665,14 @@ function Strategy() {
             }
 
             setHasLoadedFromUrl(true);
+
+            // Show success toast
+            showSuccess(`Strategy '${strategy.name}' loaded successfully`);
+
+            // Refresh chart with loadTechnicals if pair and timeframe are set
+            if (strategy.pair && strategy.timeframe) {
+              loadTechnicals();
+            }
           } else {
             console.error('Failed to load strategy:', response.error);
             // Navigate back to library if strategy not found
@@ -1103,7 +1163,7 @@ function Strategy() {
 
     // Provide user feedback about detection results
     if (detectedPatterns.length === 0) {
-      showToast(`No ${pattern.name} patterns detected in current price data. Try loading more candles or a different timeframe.`, 'info');
+      showInfo(`No ${pattern.name} patterns detected in current price data. Try different timeframe or candle count.`);
     } else {
       showSuccess(`Found ${detectedPatterns.length} ${pattern.name} pattern(s)`);
     }
@@ -1751,6 +1811,9 @@ function Strategy() {
           description: pat.description || null,
           type: pat.type || null,
           color: pat.color || null,
+          pattern_type: pat.patternType || null,
+          candle_count: pat.candleCount || null,
+          reliability: pat.reliability || null,
         })),
       conditions: conditions
         .filter(c => {
@@ -1803,15 +1866,7 @@ function Strategy() {
           indicator_id: ri.indicatorId,
           params: ri.params || {},
         })),
-      time_filter: timeFilter.enabled ? {
-        enabled: timeFilter.enabled,
-        start_hour: timeFilter.startHour,
-        start_minute: timeFilter.startMinute,
-        end_hour: timeFilter.endHour,
-        end_minute: timeFilter.endMinute,
-        days_of_week: timeFilter.days,
-        timezone: timeFilter.timezone,
-      } : null,
+      time_filter: convertTimeFilterToBackend(timeFilter),
       drawings: drawings || [],
     };
   }, [
@@ -1994,7 +2049,7 @@ function Strategy() {
             setActiveIndicators(validation.validIndicators);
 
             if (!validation.valid) {
-              showWarning(`${validation.unknownIds.length} indicator(s) skipped due to missing definitions.`);
+              showWarning(`${validation.unknownIds.length} indicator(s) skipped due to missing definitions: ${validation.unknownIds.join(', ')}`);
             }
           }
         } catch (error) {
@@ -2003,21 +2058,25 @@ function Strategy() {
           return;
         }
 
-        // Restore patterns
-        // CRITICAL: Always preserve instance_id from database to maintain condition references
-        let restoredPatterns = [];
+        // Restore patterns with validation
+        let patternValidation = { valid: true, unknownIds: [], validPatterns: [] };
         try {
           if (strategy.patterns && Array.isArray(strategy.patterns)) {
-            restoredPatterns = strategy.patterns.map(pat => {
-              if (!pat.instance_id) {
-                console.error(`Pattern ${pat.id} missing instance_id - this should not happen!`);
-              }
-              return {
-                ...pat,
-                instanceId: pat.instance_id, // NEVER generate new ID during load
-              };
-            });
-            setActivePatterns(restoredPatterns);
+            patternValidation = validatePatterns(strategy.patterns);
+
+            if (!patternValidation.valid && patternValidation.unknownIds.length > 0) {
+              console.error('Strategy contains unknown patterns:', patternValidation.unknownIds);
+              showError(
+                `Strategy contains patterns not in your library: ${patternValidation.unknownIds.join(', ')}. ` +
+                'These patterns will be skipped. Please update your pattern library or contact support.'
+              );
+            }
+
+            setActivePatterns(patternValidation.validPatterns);
+
+            if (!patternValidation.valid) {
+              showWarning(`${patternValidation.unknownIds.length} pattern(s) skipped due to missing definitions: ${patternValidation.unknownIds.join(', ')}`);
+            }
           }
         } catch (error) {
           console.error('Failed to restore patterns:', error);
@@ -2032,7 +2091,7 @@ function Strategy() {
             const conditionValidation = validateConditionReferences(
               strategy.conditions,
               validation.validIndicators,
-              restoredPatterns
+              patternValidation.validPatterns
             );
 
             if (!conditionValidation.valid && conditionValidation.brokenConditions.length > 0) {
@@ -2078,7 +2137,7 @@ function Strategy() {
 
         // Restore time filter
         if (strategy.time_filter) {
-          setTimeFilter(strategy.time_filter);
+          setTimeFilter(convertTimeFilterFromBackend(strategy.time_filter));
         }
 
         // Restore drawings
