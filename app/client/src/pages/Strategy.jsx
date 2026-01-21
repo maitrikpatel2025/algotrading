@@ -69,14 +69,31 @@ import DrawingPropertiesDialog from '../components/DrawingPropertiesDialog';
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
 const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
 
-// Timeframe button definitions
+// Timeframe button definitions (limited to M5, M15, H1, D)
 const TIMEFRAME_BUTTONS = [
-  { value: 'M1', label: '1m' },
   { value: 'M5', label: '5m' },
   { value: 'M15', label: '15m' },
   { value: 'H1', label: '1h' },
-  { value: 'H4', label: '4h' },
   { value: 'D', label: '1d' },
+];
+
+// Candle count options
+const CANDLE_COUNT_OPTIONS = [
+  { value: 50, label: '50' },
+  { value: 100, label: '100' },
+  { value: 200, label: '200' },
+];
+
+// Date range preset buttons
+const DATE_RANGE_PRESETS = [
+  { value: '1D', label: '1D', days: 1 },
+  { value: '5D', label: '5D', days: 5 },
+  { value: '1M', label: '1M', days: 30 },
+  { value: '3M', label: '3M', days: 90 },
+  { value: '6M', label: '6M', days: 180 },
+  { value: 'YTD', label: 'YTD', days: null }, // Calculate from Jan 1
+  { value: '1Y', label: '1Y', days: 365 },
+  { value: 'All', label: 'All', days: null }, // All available data
 ];
 
 // Indicator limits
@@ -93,7 +110,7 @@ function Strategy() {
   const [selectedGran, setSelectedGran] = useState(null);
   const [technicalsData, setTechnicalsData] = useState(null);
   const [priceData, setPriceData] = useState(null);
-  const [selectedCount, setSelectedCount] = useState(COUNTS[0].value);
+  const [selectedCount, setSelectedCount] = useState(50); // Default to 50 candles
   const [options, setOptions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
@@ -1506,48 +1523,93 @@ function Strategy() {
       confirm_on_candle_close: confirmOnCandleClose,
       pair: selectedPair,
       timeframe: selectedGran,
-      candle_count: selectedCount,
-      indicators: activeIndicators.map(ind => ({
-        id: ind.id,
-        instance_id: ind.instanceId,
-        params: ind.params || ind.defaultParams,
-        color: ind.color,
-        line_width: ind.lineWidth,
-        line_style: ind.lineStyle,
-        fill_opacity: ind.fillOpacity,
-      })),
-      patterns: activePatterns.map(pat => ({
-        id: pat.id,
-        instance_id: pat.instanceId,
-        name: pat.name,
-        description: pat.description,
-        type: pat.type,
-        color: pat.color,
-      })),
-      conditions: conditions.map(c => ({
-        id: c.id,
-        section: c.section,
-        left_operand: c.leftOperand,
-        operator: c.operator,
-        right_operand: c.rightOperand,
-        indicator_instance_id: c.indicatorInstanceId,
-        indicator_display_name: c.indicatorDisplayName,
-        pattern_instance_id: c.patternInstanceId,
-        is_pattern_condition: c.isPatternCondition,
-      })),
-      groups: groups.map(g => ({
-        id: g.id,
-        operator: g.operator,
-        section: g.section,
-        condition_ids: g.conditionIds,
-        parent_group_id: g.parentGroupId,
-      })),
-      reference_indicators: referenceIndicators.map(ri => ({
-        id: ri.id,
-        timeframe: ri.timeframe,
-        indicator_id: ri.indicatorId,
-        params: ri.params,
-      })),
+      candle_count: selectedCount ? String(selectedCount) : null,
+      indicators: activeIndicators
+        .filter(ind => {
+          // Filter out invalid indicators - must have id and instanceId
+          if (!ind.id || !ind.instanceId) {
+            console.warn('Skipping invalid indicator:', ind);
+            return false;
+          }
+          return true;
+        })
+        .map(ind => ({
+          id: ind.id,
+          instance_id: ind.instanceId,
+          params: ind.params || ind.defaultParams || {},
+          color: ind.color || null,
+          line_width: ind.lineWidth ? Math.round(ind.lineWidth) : null,
+          line_style: ind.lineStyle || null,
+          fill_opacity: ind.fillOpacity || null,
+        })),
+      patterns: activePatterns
+        .filter(pat => {
+          // Filter out invalid patterns - must have id and instanceId
+          if (!pat.id || !pat.instanceId) {
+            console.warn('Skipping invalid pattern:', pat);
+            return false;
+          }
+          return true;
+        })
+        .map(pat => ({
+          id: pat.id,
+          instance_id: pat.instanceId,
+          name: pat.name || null,
+          description: pat.description || null,
+          type: pat.type || null,
+          color: pat.color || null,
+        })),
+      conditions: conditions
+        .filter(c => {
+          // Filter out invalid conditions - must have id, section, leftOperand, and operator
+          if (!c.id || !c.section || !c.leftOperand || !c.operator) {
+            console.warn('Skipping invalid condition:', c);
+            return false;
+          }
+          return true;
+        })
+        .map(c => ({
+          id: c.id,
+          section: c.section,
+          left_operand: c.leftOperand,
+          operator: c.operator,
+          right_operand: c.rightOperand || null,
+          indicator_instance_id: c.indicatorInstanceId || null,
+          indicator_display_name: c.indicatorDisplayName || null,
+          pattern_instance_id: c.patternInstanceId || null,
+          is_pattern_condition: c.isPatternCondition || false,
+        })),
+      groups: groups
+        .filter(g => {
+          // Filter out invalid groups - must have id, operator, and section
+          if (!g.id || !g.operator || !g.section) {
+            console.warn('Skipping invalid group:', g);
+            return false;
+          }
+          return true;
+        })
+        .map(g => ({
+          id: g.id,
+          operator: g.operator,
+          section: g.section,
+          condition_ids: g.conditionIds || [],
+          parent_group_id: g.parentGroupId || null,
+        })),
+      reference_indicators: referenceIndicators
+        .filter(ri => {
+          // Filter out invalid reference indicators - must have id, timeframe, and indicatorId
+          if (!ri.id || !ri.timeframe || !ri.indicatorId) {
+            console.warn('Skipping invalid reference indicator:', ri);
+            return false;
+          }
+          return true;
+        })
+        .map(ri => ({
+          id: ri.id,
+          timeframe: ri.timeframe,
+          indicator_id: ri.indicatorId,
+          params: ri.params || {},
+        })),
       time_filter: timeFilter.enabled ? {
         enabled: timeFilter.enabled,
         start_hour: timeFilter.startHour,
@@ -1557,7 +1619,7 @@ function Strategy() {
         days_of_week: timeFilter.days,
         timezone: timeFilter.timezone,
       } : null,
-      drawings: serializeDrawings(drawings),
+      drawings: drawings || [],
     };
   }, [
     currentStrategyName, currentStrategyDescription, currentStrategyTags,
@@ -2496,6 +2558,70 @@ function Strategy() {
               </button>
             ))}
           </div>
+
+          {/* Candle Count Selector */}
+          <div className="flex items-center bg-neutral-100 rounded-md p-0.5">
+            {CANDLE_COUNT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setSelectedCount(opt.value);
+                  if (selectedPair && selectedGran) {
+                    setTimeout(() => loadTechnicals(), 100);
+                  }
+                }}
+                className={cn(
+                  "px-2 py-1 text-xs font-medium rounded transition-colors",
+                  selectedCount === opt.value
+                    ? "bg-primary text-white"
+                    : "text-neutral-500 hover:text-neutral-900"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date Range Presets */}
+          <div className="hidden lg:flex items-center gap-0.5">
+            {DATE_RANGE_PRESETS.map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => {
+                  setSelectedDateRange(preset.value);
+                  // Date range selection will trigger data reload
+                  if (selectedPair && selectedGran) {
+                    setTimeout(() => loadTechnicals(), 100);
+                  }
+                }}
+                className={cn(
+                  "px-1.5 py-1 text-[10px] font-medium rounded transition-colors",
+                  selectedDateRange === preset.value
+                    ? "bg-primary text-white"
+                    : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100"
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Volume Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowVolume(!showVolume)}
+            className={cn(
+              "px-2.5 py-1 text-xs font-medium rounded transition-colors",
+              showVolume
+                ? "bg-primary text-white"
+                : "bg-neutral-100 text-neutral-500 hover:text-neutral-900"
+            )}
+            title="Toggle Volume"
+          >
+            Vol
+          </button>
 
           <div className="h-5 w-px bg-neutral-200" />
 

@@ -151,23 +151,24 @@ export function createConditionFromIndicator(indicatorInstance, displayName, sec
 
   // Parse the template's leftOperand
   let leftOperand;
-  if (template.leftOperand === 'close' || template.leftOperand === 'open' ||
-      template.leftOperand === 'high' || template.leftOperand === 'low') {
-    const priceSource = PRICE_SOURCES.find(p => p.id === template.leftOperand);
+  const leftOp = template.leftOperand;
+  if (leftOp === 'close' || leftOp === 'open' ||
+      leftOp === 'high' || leftOp === 'low') {
+    const priceSource = PRICE_SOURCES.find(p => p.id === leftOp);
     leftOperand = {
       type: 'price',
-      value: template.leftOperand,
-      label: priceSource ? priceSource.label : template.leftOperand,
+      value: leftOp,
+      label: priceSource ? priceSource.label : leftOp,
     };
-  } else if (template.leftOperand === 'indicator') {
+  } else if (leftOp === 'indicator') {
     leftOperand = {
       type: 'indicator',
       instanceId: indicatorInstance.instanceId,
       component: null,
       label: displayName,
     };
-  } else if (template.leftOperand.startsWith('indicator:')) {
-    const component = template.leftOperand.replace('indicator:', '');
+  } else if (typeof leftOp === 'string' && leftOp.startsWith('indicator:')) {
+    const component = leftOp.replace('indicator:', '');
     leftOperand = {
       type: 'indicator',
       instanceId: indicatorInstance.instanceId,
@@ -185,23 +186,24 @@ export function createConditionFromIndicator(indicatorInstance, displayName, sec
 
   // Parse the template's rightOperand
   let rightOperand;
-  if (template.rightOperand === 'indicator') {
+  const rightOp = template.rightOperand;
+  if (rightOp === 'indicator') {
     rightOperand = {
       type: 'indicator',
       instanceId: indicatorInstance.instanceId,
       component: null,
       label: displayName,
     };
-  } else if (template.rightOperand.startsWith('indicator:')) {
-    const component = template.rightOperand.replace('indicator:', '');
+  } else if (typeof rightOp === 'string' && rightOp.startsWith('indicator:')) {
+    const component = rightOp.replace('indicator:', '');
     rightOperand = {
       type: 'indicator',
       instanceId: indicatorInstance.instanceId,
       component: component,
       label: `${displayName} ${component}`,
     };
-  } else if (template.rightOperand.startsWith('value:')) {
-    const value = parseFloat(template.rightOperand.replace('value:', ''));
+  } else if (typeof rightOp === 'string' && rightOp.startsWith('value:')) {
+    const value = parseFloat(rightOp.replace('value:', ''));
     rightOperand = {
       type: 'value',
       value: value,

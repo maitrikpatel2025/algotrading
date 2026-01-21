@@ -7,8 +7,17 @@ axios.interceptors.response.use(
     (response) => response,
     (error) => {
         // Log errors for debugging
-        const errorMessage = error.response?.data?.detail || error.message || 'An unknown error occurred';
+        const detail = error.response?.data?.detail;
         const statusCode = error.response?.status;
+
+        // Handle validation errors (422) - detail is an array of error objects
+        let errorMessage;
+        if (Array.isArray(detail)) {
+            errorMessage = detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join('; ');
+            console.error(`API Validation Errors [${statusCode}]:`, detail);
+        } else {
+            errorMessage = detail || error.message || 'An unknown error occurred';
+        }
 
         console.error(`API Error [${statusCode || 'Network'}]: ${errorMessage}`);
 

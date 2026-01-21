@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import Plotly from 'plotly.js-dist';
 import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
 import { getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
@@ -138,84 +137,19 @@ function PriceChart({
 
         chartElement.addEventListener('chartZoomUpdate', handleZoomUpdate);
 
-        // Handle left-click on indicator traces
-        const handlePlotlyClick = (eventData) => {
-          if (!eventData.points || eventData.points.length === 0) return;
-
-          const point = eventData.points[0];
-          // Check if the clicked trace has indicator metadata
-          if (point.data && point.data.meta && point.data.meta.instanceId) {
-            const instanceId = point.data.meta.instanceId;
-            if (onIndicatorClick) {
-              onIndicatorClick(instanceId);
-            }
-          }
-        };
-
-        // Handle right-click on indicator traces
+        // Handle context menu (right-click) - simplified for Lightweight Charts
         const handleContextMenu = (event) => {
-          console.log('Context menu event triggered');
-
-          // Use Plotly.Fx.hover() to trigger a synthetic hover event at the exact cursor position
-          // This ensures accurate hit-testing instead of relying on stale hover data
-          try {
-            // Calculate cursor position relative to the chart element
-            const rect = chartElement.getBoundingClientRect();
-            const xPos = event.clientX - rect.left;
-            const yPos = event.clientY - rect.top;
-
-            // Trigger Plotly hover at the right-click coordinates
-            if (window.Plotly && window.Plotly.Fx && window.Plotly.Fx.hover) {
-              window.Plotly.Fx.hover(chartElement, [{ curveNumber: 0, pointNumber: 0 }], [xPos, yPos]);
-            }
-
-            // Now check if hover data contains an indicator trace
-            let indicatorAtPosition = null;
-            if (chartElement._hoverdata && chartElement._hoverdata.length > 0) {
-              const hoverPoint = chartElement._hoverdata[0];
-              if (hoverPoint.data && hoverPoint.data.meta && hoverPoint.data.meta.instanceId) {
-                indicatorAtPosition = {
-                  instanceId: hoverPoint.data.meta.instanceId,
-                  name: hoverPoint.data.name,
-                };
-              }
-            }
-
-            if (indicatorAtPosition) {
-              console.log('Indicator found at position:', indicatorAtPosition);
-              event.preventDefault();
-              setContextMenu({
-                isOpen: true,
-                position: { x: event.clientX, y: event.clientY },
-                indicatorInstanceId: indicatorAtPosition.instanceId,
-                indicatorName: indicatorAtPosition.name,
-              });
-            } else {
-              console.log('No indicator found at cursor position. Hover data:', chartElement._hoverdata);
-            }
-          } catch (error) {
-            console.error('Error in context menu hit-testing:', error);
-          }
+          // Context menu for indicators is handled differently in Lightweight Charts
+          // For now, just prevent default to allow custom handling if needed
+          // Future: implement indicator hit-testing with Lightweight Charts API
         };
 
-        // Attach both Plotly click and contextmenu event listeners after a short delay
-        // to ensure Plotly has fully rendered and won't replace DOM elements
-        setTimeout(() => {
-          if (chartElement.on) {
-            chartElement.on('plotly_click', handlePlotlyClick);
-          }
-          console.log('Attaching contextmenu listener to chartElement');
-          chartElement.addEventListener('contextmenu', handleContextMenu);
-        }, 100);
+        chartElement.addEventListener('contextmenu', handleContextMenu);
 
         // Cleanup
         return () => {
           chartElement.removeEventListener('chartZoomUpdate', handleZoomUpdate);
           chartElement.removeEventListener('contextmenu', handleContextMenu);
-          // Remove Plotly event listener if it exists
-          if (chartElement.removeAllListeners) {
-            chartElement.removeAllListeners('plotly_click');
-          }
         };
       }
     }
@@ -239,16 +173,21 @@ function PriceChart({
       const chartElement = chartRef.current;
       if (!chartElement || !chartElement._chartData) return;
 
+      const chart = chartElement._chart;
+      if (!chart) return;
+
       const chartData = chartElement._chartData;
 
-      // Get current axis range
+      // Get current visible time range from Lightweight Charts
       const getCurrentRange = () => {
-        const layout = chartElement.layout;
-        if (layout && layout.xaxis && layout.xaxis.range) {
-          return layout.xaxis.range;
+        const visibleRange = chart.timeScale().getVisibleRange();
+        if (visibleRange) {
+          return visibleRange;
         }
         // Fallback to data range
-        return [chartData.time[0], chartData.time[chartData.time.length - 1]];
+        const firstTime = Math.floor(new Date(chartData.time[0]).getTime() / 1000);
+        const lastTime = Math.floor(new Date(chartData.time[chartData.time.length - 1]).getTime() / 1000);
+        return { from: firstTime, to: lastTime };
       };
 
       let newRange = null;
@@ -311,18 +250,9 @@ function PriceChart({
           return;
       }
 
-      if (newRange) {
-        // Use requestAnimationFrame for smooth updates
-        requestAnimationFrame(() => {
-          Plotly.relayout(chartElement, {
-            'xaxis.range': newRange
-          }, {
-            transition: {
-              duration: 150,
-              easing: 'cubic-in-out'
-            }
-          });
-        });
+      if (newRange && chart) {
+        // Use Lightweight Charts API to set visible range
+        chart.timeScale().setVisibleRange(newRange);
       }
     };
 
@@ -349,38 +279,30 @@ function PriceChart({
     const chartElement = document.getElementById('chartDiv');
     if (!chartElement) return;
 
-    // Get chart layout
-    const layout = chartElement.layout;
-    if (!layout || !layout.xaxis || !layout.yaxis) return;
+    const chart = chartElement._chart;
+    const mainSeries = chartElement._mainSeries;
+    if (!chart || !mainSeries) return;
 
     // Calculate click position relative to chart
     const rect = chartElement.getBoundingClientRect();
     const xPx = event.clientX - rect.left;
     const yPx = event.clientY - rect.top;
 
-    // Get the plot area dimensions (rough approximation)
-    const margin = layout.margin || { l: 60, r: 60, t: 50, b: 50 };
-    const plotWidth = rect.width - margin.l - margin.r;
-    const plotHeight = rect.height - margin.t - margin.b;
+    // Use Lightweight Charts coordinate conversion
+    const timeScale = chart.timeScale();
 
-    // Calculate relative position within plot area
-    const relX = (xPx - margin.l) / plotWidth;
-    const relY = (yPx - margin.t) / plotHeight;
+    // Convert pixel coordinates to logical coordinates
+    const time = timeScale.coordinateToTime(xPx);
 
-    // Check if click is within plot area
-    if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
+    // For price, we need to use the series coordinate conversion
+    const price = mainSeries.coordinateToPrice(yPx);
 
-    // Get axis ranges
-    const xRange = layout.xaxis.range || [priceData.time[0], priceData.time[priceData.time.length - 1]];
-    const yRange = layout.yaxis.range || [Math.min(...priceData.mid_l), Math.max(...priceData.mid_h)];
+    // Validate coordinates
+    if (time === null || price === null) return;
 
-    // Calculate price from pixel position (y-axis is inverted)
-    const clickedPrice = yRange[1] - relY * (yRange[1] - yRange[0]);
-
-    // Calculate time from pixel position
-    const startTime = new Date(xRange[0]).getTime();
-    const endTime = new Date(xRange[1]).getTime();
-    const clickedTime = new Date(startTime + relX * (endTime - startTime)).toISOString();
+    // Convert time to ISO string format
+    const clickedTime = new Date(time * 1000).toISOString();
+    const clickedPrice = price;
 
     // Apply snap-to-price if enabled
     let finalPrice = clickedPrice;
