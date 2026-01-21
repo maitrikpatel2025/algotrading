@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2026-01-21T00:00:00Z",
+  "strategy": {
+    "name": "Review Test Strategy Import",
+    "description": "Test strategy for validating import functionality",
+    "tags": ["review", "test"],
+    "trade_direction": "both",
+    "confirm_on_candle_close": "yes",
+    "pair": "EUR_USD",
+    "timeframe": "1h",
+    "candle_count": 100,
+    "indicators": [
+      {
+        "id": "sma",
+        "instance_id": "sma_review_1",
+        "params": {
+          "period": 20
+        },
+        "color": "#3B82F6",
+        "line_width": 2,
+        "line_style": "solid"
+      }
+    ],
+    "patterns": [],
+    "conditions": [],
+    "groups": [],
+    "reference_indicators": [],
+    "drawings": []
+  }
+}
