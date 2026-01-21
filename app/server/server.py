@@ -27,7 +27,6 @@ from config import settings
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
 from core.candle_aggregator import CandleAggregator
-from core.websocket_manager import WebSocketManager
 from core.data_models import (
     BotControlResponse,
     BotStartRequest,
@@ -85,6 +84,7 @@ from core.strategy_service import (
 from core.strategy_service import (
     validate_import as service_validate_import,
 )
+from core.websocket_manager import WebSocketManager
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
 
