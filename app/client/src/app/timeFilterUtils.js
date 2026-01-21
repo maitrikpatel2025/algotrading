@@ -492,3 +492,124 @@ export function validateTimeFilter(timeFilter) {
     errors,
   };
 }
+
+/**
+ * Convert frontend time filter structure to backend format
+ * Converts sessions/customWindows arrays to single start_hour/end_hour fields
+ * Converts day ID strings (monday, tuesday) to day indices (0-6)
+ * @param {Object} timeFilter - Frontend time filter structure
+ * @returns {Object|null} Backend time filter structure or null if disabled
+ */
+export function convertTimeFilterToBackend(timeFilter) {
+  if (!timeFilter || !timeFilter.enabled) {
+    return null;
+  }
+
+  // Convert days from string IDs to numeric indices (0=Sunday, 6=Saturday)
+  let daysOfWeek = [];
+  if (timeFilter.days && Array.isArray(timeFilter.days)) {
+    daysOfWeek = timeFilter.days
+      .map(dayId => {
+        const day = DAYS_OF_WEEK.find(d => d.id === dayId);
+        return day ? day.dayIndex : null;
+      })
+      .filter(idx => idx !== null);
+  }
+
+  // Calculate start_hour and end_hour from sessions and custom windows
+  let startHour = null;
+  let startMinute = null;
+  let endHour = null;
+  let endMinute = null;
+
+  // Priority: use first custom window if available, otherwise use first session
+  if (timeFilter.customWindows && timeFilter.customWindows.length > 0) {
+    const firstWindow = timeFilter.customWindows[0];
+    const start = parseTimeString(firstWindow.start);
+    const end = parseTimeString(firstWindow.end);
+    if (start && end) {
+      startHour = start.hours;
+      startMinute = start.minutes;
+      endHour = end.hours;
+      endMinute = end.minutes;
+    }
+  } else if (timeFilter.sessions && timeFilter.sessions.length > 0) {
+    const firstSession = getSessionTimes(timeFilter.sessions[0], timeFilter.timezone || 'UTC');
+    if (firstSession) {
+      startHour = firstSession.startHour % 24;
+      startMinute = 0;
+      endHour = firstSession.endHour % 24;
+      endMinute = 0;
+    }
+  }
+
+  return {
+    enabled: true,
+    mode: timeFilter.mode || TIME_FILTER_MODES.INCLUDE,
+    start_hour: startHour,
+    start_minute: startMinute,
+    end_hour: endHour,
+    end_minute: endMinute,
+    days_of_week: daysOfWeek,
+    timezone: timeFilter.timezone || 'UTC',
+  };
+}
+
+/**
+ * Convert backend time filter structure to frontend format
+ * Converts start_hour/end_hour to customWindows array
+ * Converts day indices (0-6) to day ID strings (monday, tuesday)
+ * @param {Object} backendTimeFilter - Backend time filter structure
+ * @returns {Object} Frontend time filter structure
+ */
+export function convertTimeFilterFromBackend(backendTimeFilter) {
+  if (!backendTimeFilter || !backendTimeFilter.enabled) {
+    return {
+      enabled: false,
+      mode: TIME_FILTER_MODES.INCLUDE,
+      sessions: [],
+      customWindows: [],
+      days: [],
+      timezone: 'UTC',
+    };
+  }
+
+  // Convert days_of_week from numeric indices to string IDs
+  let days = [];
+  if (backendTimeFilter.days_of_week && Array.isArray(backendTimeFilter.days_of_week)) {
+    days = backendTimeFilter.days_of_week
+      .map(dayIndex => {
+        const day = DAYS_OF_WEEK.find(d => d.dayIndex === dayIndex);
+        return day ? day.id : null;
+      })
+      .filter(id => id !== null);
+  }
+
+  // Convert start_hour/end_hour to customWindows array
+  let customWindows = [];
+  if (
+    backendTimeFilter.start_hour !== null &&
+    backendTimeFilter.start_hour !== undefined &&
+    backendTimeFilter.end_hour !== null &&
+    backendTimeFilter.end_hour !== undefined
+  ) {
+    const startTime = formatTimeString(
+      backendTimeFilter.start_hour,
+      backendTimeFilter.start_minute || 0
+    );
+    const endTime = formatTimeString(
+      backendTimeFilter.end_hour,
+      backendTimeFilter.end_minute || 0
+    );
+    customWindows = [{ start: startTime, end: endTime }];
+  }
+
+  return {
+    enabled: true,
+    mode: backendTimeFilter.mode || TIME_FILTER_MODES.INCLUDE,
+    sessions: [], // Backend doesn't store session IDs, only times
+    customWindows,
+    days,
+    timezone: backendTimeFilter.timezone || 'UTC',
+  };
+}
