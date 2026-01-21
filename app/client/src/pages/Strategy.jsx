@@ -329,7 +329,7 @@ function Strategy() {
 
   // Toast hook for notifications
   // eslint-disable-next-line no-unused-vars
-  const { toast, showToast, hideToast, success: showSuccess, error: showError, warning: showWarning } = useToast();
+  const { toast, showToast, hideToast, success: showSuccess, error: showError, warning: showWarning, info: showInfo } = useToast();
 
   // Auto-save draft interval ref
   const autoSaveIntervalRef = useRef(null);
