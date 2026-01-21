@@ -325,7 +325,7 @@ function Strategy() {
 
   // Toast hook for notifications
   // eslint-disable-next-line no-unused-vars
-  const { toast, showToast, hideToast, success: showSuccess, error: showError } = useToast();
+  const { toast, showToast, hideToast, success: showSuccess, error: showError, warning: showWarning } = useToast();
 
   // Auto-save draft interval ref
   const autoSaveIntervalRef = useRef(null);
@@ -334,6 +334,166 @@ function Strategy() {
   const debounceTimerRef = useRef(null);
   // Previous timeframe for zoom context preservation
   const previousGranRef = useRef(null);
+
+  // =============================================================================
+  // Validation Functions for Strategy Loading
+  // =============================================================================
+
+  /**
+   * Validate indicators against INDICATORS definition.
+   * Returns validation result with unknown indicators and valid indicators list.
+   * IMPORTANT: Always preserves instance_id from database to maintain condition references.
+   */
+  const validateIndicators = useCallback((indicators) => {
+    if (!indicators || !Array.isArray(indicators)) {
+      return { valid: true, unknownIds: [], validIndicators: [] };
+    }
+
+    const unknownIds = [];
+    const validIndicators = [];
+
+    indicators.forEach(ind => {
+      const indicatorDef = INDICATORS[ind.id];
+
+      if (!indicatorDef) {
+        unknownIds.push(ind.id);
+        console.warn(`Unknown indicator: ${ind.id}`);
+      } else {
+        // CRITICAL: Always use instance_id from database, never generate new one during load
+        if (!ind.instance_id) {
+          console.error(`Indicator ${ind.id} missing instance_id - this should not happen!`);
+        }
+
+        // Construct valid indicator with proper defaults
+        validIndicators.push({
+          ...indicatorDef,
+          instanceId: ind.instance_id, // NEVER generate new ID during load
+          params: ind.params || indicatorDef.defaultParams || {},
+          color: ind.color || indicatorDef.defaultColor || '#3b82f6',
+          lineWidth: ind.line_width || 2,
+          lineStyle: ind.line_style || 'solid',
+          fillOpacity: ind.fill_opacity !== undefined ? ind.fill_opacity : 0.2,
+        });
+      }
+    });
+
+    return {
+      valid: unknownIds.length === 0,
+      unknownIds,
+      validIndicators,
+    };
+  }, []);
+
+  /**
+   * Validate condition references to ensure all referenced indicators and patterns exist.
+   * Returns validation result with broken conditions and valid conditions list.
+   */
+  const validateConditionReferences = useCallback((conditions, activeIndicators, activePatterns) => {
+    if (!conditions || !Array.isArray(conditions)) {
+      return { valid: true, brokenConditions: [], validConditions: [] };
+    }
+
+    // Build sets for fast lookup
+    const indicatorInstanceIds = new Set(activeIndicators.map(ind => ind.instanceId));
+    const patternInstanceIds = new Set(activePatterns.map(pat => pat.instanceId));
+
+    const brokenConditions = [];
+    const validConditions = [];
+
+    conditions.forEach(c => {
+      let isBroken = false;
+
+      // Check indicator reference
+      if (c.indicator_instance_id && !indicatorInstanceIds.has(c.indicator_instance_id)) {
+        console.warn(`Condition ${c.id} references missing indicator instance: ${c.indicator_instance_id}`);
+        isBroken = true;
+      }
+
+      // Check pattern reference
+      if (c.pattern_instance_id && !patternInstanceIds.has(c.pattern_instance_id)) {
+        console.warn(`Condition ${c.id} references missing pattern instance: ${c.pattern_instance_id}`);
+        isBroken = true;
+      }
+
+      if (isBroken) {
+        brokenConditions.push(c);
+      } else {
+        validConditions.push({
+          id: c.id,
+          section: c.section,
+          leftOperand: c.left_operand,
+          operator: c.operator,
+          rightOperand: c.right_operand,
+          indicatorInstanceId: c.indicator_instance_id,
+          indicatorDisplayName: c.indicator_display_name,
+          patternInstanceId: c.pattern_instance_id,
+          isPatternCondition: c.is_pattern_condition,
+        });
+      }
+    });
+
+    return {
+      valid: brokenConditions.length === 0,
+      brokenConditions,
+      validConditions,
+    };
+  }, []);
+
+  /**
+   * Validate group references to ensure all referenced conditions exist.
+   * Returns validation result with broken groups and valid groups list.
+   */
+  const validateGroupReferences = useCallback((groups, conditions) => {
+    if (!groups || !Array.isArray(groups)) {
+      return { valid: true, brokenGroups: [], validGroups: [] };
+    }
+
+    // Build set of condition IDs for fast lookup
+    const conditionIds = new Set(conditions.map(c => c.id));
+
+    // Build set of group IDs for parent validation
+    const groupIds = new Set(groups.map(g => g.id));
+
+    const brokenGroups = [];
+    const validGroups = [];
+
+    groups.forEach(g => {
+      let isBroken = false;
+
+      // Check if all condition_ids exist
+      if (g.condition_ids && Array.isArray(g.condition_ids)) {
+        const missingConditions = g.condition_ids.filter(cid => !conditionIds.has(cid));
+        if (missingConditions.length > 0) {
+          console.warn(`Group ${g.id} references missing conditions: ${missingConditions.join(', ')}`);
+          isBroken = true;
+        }
+      }
+
+      // Check if parent_id exists (if set)
+      if (g.parent_id && !groupIds.has(g.parent_id)) {
+        console.warn(`Group ${g.id} references missing parent group: ${g.parent_id}`);
+        isBroken = true;
+      }
+
+      if (isBroken) {
+        brokenGroups.push(g);
+      } else {
+        validGroups.push({
+          id: g.id,
+          operator: g.operator,
+          conditionIds: g.condition_ids || [],
+          parentId: g.parent_id,
+          section: g.section,
+        });
+      }
+    });
+
+    return {
+      valid: brokenGroups.length === 0,
+      brokenGroups,
+      validGroups,
+    };
+  }, []);
 
   useEffect(() => {
     loadOptions();
@@ -367,55 +527,74 @@ function Strategy() {
             if (strategy.timeframe) setSelectedGran(strategy.timeframe);
             if (strategy.candle_count) setSelectedCount(strategy.candle_count);
 
-            // Restore indicators
+            // Restore indicators with validation
+            let validation = { valid: true, unknownIds: [], validIndicators: [] };
             if (strategy.indicators && Array.isArray(strategy.indicators)) {
-              const restoredIndicators = strategy.indicators.map(ind => {
-                const indicatorDef = INDICATORS[ind.id];
-                return {
-                  ...indicatorDef,
-                  instanceId: ind.instance_id || `${ind.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                  params: ind.params || indicatorDef?.defaultParams,
-                  color: ind.color || indicatorDef?.defaultColor,
-                  lineWidth: ind.line_width || 2,
-                  lineStyle: ind.line_style || 'solid',
-                  fillOpacity: ind.fill_opacity || 0.2,
-                };
-              }).filter(Boolean);
-              setActiveIndicators(restoredIndicators);
+              validation = validateIndicators(strategy.indicators);
+
+              if (!validation.valid && validation.unknownIds.length > 0) {
+                console.error('Strategy contains unknown indicators:', validation.unknownIds);
+                showError(
+                  `Strategy contains indicators not in your library: ${validation.unknownIds.join(', ')}. ` +
+                  'These indicators will be skipped. Please update your indicator library or contact support.'
+                );
+              }
+
+              setActiveIndicators(validation.validIndicators);
+
+              if (!validation.valid) {
+                showWarning(`${validation.unknownIds.length} indicator(s) skipped due to missing definitions.`);
+              }
             }
 
             // Restore patterns
+            // CRITICAL: Always preserve instance_id from database to maintain condition references
+            const restoredPatterns = [];
             if (strategy.patterns && Array.isArray(strategy.patterns)) {
-              setActivePatterns(strategy.patterns.map(pat => ({
-                ...pat,
-                instanceId: pat.instance_id || `${pat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              })));
+              strategy.patterns.forEach(pat => {
+                if (!pat.instance_id) {
+                  console.error(`Pattern ${pat.id} missing instance_id - this should not happen!`);
+                }
+                restoredPatterns.push({
+                  ...pat,
+                  instanceId: pat.instance_id, // NEVER generate new ID during load
+                });
+              });
+              setActivePatterns(restoredPatterns);
             }
 
-            // Restore conditions
+            // Restore conditions with reference validation
+            const restoredConditions = [];
             if (strategy.conditions && Array.isArray(strategy.conditions)) {
-              setConditions(strategy.conditions.map(c => ({
-                id: c.id,
-                section: c.section,
-                leftOperand: c.left_operand,
-                operator: c.operator,
-                rightOperand: c.right_operand,
-                indicatorInstanceId: c.indicator_instance_id,
-                indicatorDisplayName: c.indicator_display_name,
-                patternInstanceId: c.pattern_instance_id,
-                isPatternCondition: c.is_pattern_condition,
-              })));
+              const conditionValidation = validateConditionReferences(
+                strategy.conditions,
+                validation.validIndicators,
+                restoredPatterns
+              );
+
+              if (!conditionValidation.valid && conditionValidation.brokenConditions.length > 0) {
+                console.warn('Removing conditions with broken references:', conditionValidation.brokenConditions);
+                showWarning(
+                  `${conditionValidation.brokenConditions.length} condition(s) removed due to missing indicator/pattern references.`
+                );
+              }
+
+              restoredConditions.push(...conditionValidation.validConditions);
+              setConditions(conditionValidation.validConditions);
             }
 
-            // Restore groups
+            // Restore groups with reference validation
             if (strategy.groups && Array.isArray(strategy.groups)) {
-              setGroups(strategy.groups.map(g => ({
-                id: g.id,
-                operator: g.operator,
-                conditionIds: g.condition_ids || [],
-                parentId: g.parent_id,
-                section: g.section,
-              })));
+              const groupValidation = validateGroupReferences(strategy.groups, restoredConditions);
+
+              if (!groupValidation.valid && groupValidation.brokenGroups.length > 0) {
+                console.warn('Removing groups with broken references:', groupValidation.brokenGroups);
+                showWarning(
+                  `${groupValidation.brokenGroups.length} group(s) removed due to missing condition references.`
+                );
+              }
+
+              setGroups(groupValidation.validGroups);
             }
 
             // Restore reference indicators
@@ -1799,32 +1978,24 @@ function Strategy() {
         if (strategy.candle_count) setSelectedCount(strategy.candle_count);
 
         // Restore indicators with validation
+        let validation = { valid: true, unknownIds: [], validIndicators: [] };
         try {
           if (strategy.indicators && Array.isArray(strategy.indicators)) {
-            // Validate indicator IDs exist in INDICATORS definition
-            const unknownIndicators = strategy.indicators
-              .filter(ind => !INDICATORS[ind.id])
-              .map(ind => ind.id);
+            validation = validateIndicators(strategy.indicators);
 
-            if (unknownIndicators.length > 0) {
-              console.error('Strategy contains unknown indicators:', unknownIndicators);
-              showError(`Strategy contains unknown indicators: ${unknownIndicators.join(', ')}. Please update your indicator library.`);
-              return;
+            if (!validation.valid && validation.unknownIds.length > 0) {
+              console.error('Strategy contains unknown indicators:', validation.unknownIds);
+              showError(
+                `Strategy contains indicators not in your library: ${validation.unknownIds.join(', ')}. ` +
+                'These indicators will be skipped. Please update your indicator library or contact support.'
+              );
             }
 
-            const restoredIndicators = strategy.indicators.map(ind => {
-              const indicatorDef = INDICATORS[ind.id];
-              return {
-                ...indicatorDef,
-                instanceId: ind.instance_id || `${ind.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                params: ind.params || indicatorDef?.defaultParams,
-                color: ind.color || indicatorDef?.defaultColor,
-                lineWidth: ind.line_width || 2,
-                lineStyle: ind.line_style || 'solid',
-                fillOpacity: ind.fill_opacity || 0.2,
-              };
-            }).filter(Boolean);
-            setActiveIndicators(restoredIndicators);
+            setActiveIndicators(validation.validIndicators);
+
+            if (!validation.valid) {
+              showWarning(`${validation.unknownIds.length} indicator(s) skipped due to missing definitions.`);
+            }
           }
         } catch (error) {
           console.error('Failed to restore indicators:', error);
@@ -1833,12 +2004,20 @@ function Strategy() {
         }
 
         // Restore patterns
+        // CRITICAL: Always preserve instance_id from database to maintain condition references
+        let restoredPatterns = [];
         try {
           if (strategy.patterns && Array.isArray(strategy.patterns)) {
-            setActivePatterns(strategy.patterns.map(pat => ({
-              ...pat,
-              instanceId: pat.instance_id || `${pat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            })));
+            restoredPatterns = strategy.patterns.map(pat => {
+              if (!pat.instance_id) {
+                console.error(`Pattern ${pat.id} missing instance_id - this should not happen!`);
+              }
+              return {
+                ...pat,
+                instanceId: pat.instance_id, // NEVER generate new ID during load
+              };
+            });
+            setActivePatterns(restoredPatterns);
           }
         } catch (error) {
           console.error('Failed to restore patterns:', error);
@@ -1846,20 +2025,25 @@ function Strategy() {
           return;
         }
 
-        // Restore conditions
+        // Restore conditions with reference validation
+        let restoredConditions = [];
         try {
           if (strategy.conditions && Array.isArray(strategy.conditions)) {
-            setConditions(strategy.conditions.map(c => ({
-              id: c.id,
-              section: c.section,
-              leftOperand: c.left_operand,
-              operator: c.operator,
-              rightOperand: c.right_operand,
-              indicatorInstanceId: c.indicator_instance_id,
-              indicatorDisplayName: c.indicator_display_name,
-              patternInstanceId: c.pattern_instance_id,
-              isPatternCondition: c.is_pattern_condition,
-            })));
+            const conditionValidation = validateConditionReferences(
+              strategy.conditions,
+              validation.validIndicators,
+              restoredPatterns
+            );
+
+            if (!conditionValidation.valid && conditionValidation.brokenConditions.length > 0) {
+              console.warn('Removing conditions with broken references:', conditionValidation.brokenConditions);
+              showWarning(
+                `${conditionValidation.brokenConditions.length} condition(s) removed due to missing indicator/pattern references.`
+              );
+            }
+
+            restoredConditions = conditionValidation.validConditions;
+            setConditions(conditionValidation.validConditions);
           }
         } catch (error) {
           console.error('Failed to restore conditions:', error);
@@ -1867,16 +2051,19 @@ function Strategy() {
           return;
         }
 
-        // Restore groups
+        // Restore groups with reference validation
         try {
           if (strategy.groups && Array.isArray(strategy.groups)) {
-            setGroups(strategy.groups.map(g => ({
-              id: g.id,
-              operator: g.operator,
-              conditionIds: g.condition_ids || [],
-              parentId: g.parent_id,
-              section: g.section,
-            })));
+            const groupValidation = validateGroupReferences(strategy.groups, restoredConditions);
+
+            if (!groupValidation.valid && groupValidation.brokenGroups.length > 0) {
+              console.warn('Removing groups with broken references:', groupValidation.brokenGroups);
+              showWarning(
+                `${groupValidation.brokenGroups.length} group(s) removed due to missing condition references.`
+              );
+            }
+
+            setGroups(groupValidation.validGroups);
           }
         } catch (error) {
           console.error('Failed to restore groups:', error);
