@@ -12,11 +12,17 @@ from typing import List, Optional, Tuple
 
 from core.data_models import (
     CheckNameResponse,
+    ConditionGroup,
     ImportValidationResult,
+    ReferenceIndicator,
+    StrategyCondition,
     StrategyConfig,
     StrategyExport,
+    StrategyIndicator,
     StrategyListItem,
     StrategyListItemExtended,
+    StrategyPattern,
+    TimeFilter,
 )
 from db.supabase_client import get_supabase_client, is_configured
 
@@ -47,27 +53,90 @@ def _strategy_to_db_row(strategy: StrategyConfig) -> dict:
 
 
 def _db_row_to_strategy(row: dict) -> StrategyConfig:
-    """Convert a database row to a StrategyConfig."""
-    return StrategyConfig(
-        id=row.get("id"),
-        name=row.get("name"),
-        description=row.get("description"),
-        tags=row.get("tags", []),
-        trade_direction=row.get("trade_direction", "both"),
-        confirm_on_candle_close=row.get("confirm_on_candle_close", "yes"),
-        pair=row.get("pair"),
-        timeframe=row.get("timeframe"),
-        candle_count=row.get("candle_count"),
-        indicators=row.get("indicators", []),
-        patterns=row.get("patterns", []),
-        conditions=row.get("conditions", []),
-        groups=row.get("groups", []),
-        reference_indicators=row.get("reference_indicators", []),
-        time_filter=row.get("time_filter"),
-        drawings=row.get("drawings", []),
-        created_at=row.get("created_at"),
-        updated_at=row.get("updated_at"),
-    )
+    """
+    Convert a database row to a StrategyConfig with proper deserialization.
+
+    This function deserializes nested JSON arrays from the database into
+    properly typed Pydantic models to ensure validation and type safety.
+    """
+    try:
+        # Deserialize indicators array
+        indicators_data = row.get("indicators", []) or []
+        indicators = []
+        for ind_data in indicators_data:
+            try:
+                indicators.append(StrategyIndicator(**ind_data))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize indicator {ind_data.get('id', 'unknown')}: {e}")
+
+        # Deserialize patterns array
+        patterns_data = row.get("patterns", []) or []
+        patterns = []
+        for pat_data in patterns_data:
+            try:
+                patterns.append(StrategyPattern(**pat_data))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize pattern {pat_data.get('id', 'unknown')}: {e}")
+
+        # Deserialize conditions array
+        conditions_data = row.get("conditions", []) or []
+        conditions = []
+        for cond_data in conditions_data:
+            try:
+                conditions.append(StrategyCondition(**cond_data))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize condition {cond_data.get('id', 'unknown')}: {e}")
+
+        # Deserialize groups array
+        groups_data = row.get("groups", []) or []
+        groups = []
+        for grp_data in groups_data:
+            try:
+                groups.append(ConditionGroup(**grp_data))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize group {grp_data.get('id', 'unknown')}: {e}")
+
+        # Deserialize reference indicators array
+        ref_indicators_data = row.get("reference_indicators", []) or []
+        reference_indicators = []
+        for ref_data in ref_indicators_data:
+            try:
+                reference_indicators.append(ReferenceIndicator(**ref_data))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize reference indicator {ref_data.get('id', 'unknown')}: {e}")
+
+        # Deserialize time filter
+        time_filter_data = row.get("time_filter")
+        time_filter = None
+        if time_filter_data:
+            try:
+                time_filter = TimeFilter(**time_filter_data)
+            except Exception as e:
+                logger.warning(f"Failed to deserialize time filter: {e}")
+
+        return StrategyConfig(
+            id=row.get("id"),
+            name=row.get("name"),
+            description=row.get("description"),
+            tags=row.get("tags", []) or [],
+            trade_direction=row.get("trade_direction", "both"),
+            confirm_on_candle_close=row.get("confirm_on_candle_close", "yes"),
+            pair=row.get("pair"),
+            timeframe=row.get("timeframe"),
+            candle_count=row.get("candle_count"),
+            indicators=indicators,
+            patterns=patterns,
+            conditions=conditions,
+            groups=groups,
+            reference_indicators=reference_indicators,
+            time_filter=time_filter,
+            drawings=row.get("drawings", []) or [],
+            created_at=row.get("created_at"),
+            updated_at=row.get("updated_at"),
+        )
+    except Exception as e:
+        logger.error(f"Failed to deserialize strategy from database row: {e}")
+        raise ValueError(f"Malformed strategy data in database: {e}")
 
 
 def _db_row_to_list_item(row: dict) -> StrategyListItem:
