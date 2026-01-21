@@ -384,3 +384,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When modifying responsive behavior for the Strategy page (mobile/tablet views)
     - When troubleshooting sidebar collapse/expand or layout issues on Strategy page
     - When working with layout toggle buttons or panel visibility state
+
+- app_docs/feature-5c1da8e9-account-page-terminology.md
+  - Conditions:
+    - When working with Account page terminology or trading terminology consistency
+    - When implementing or modifying text on the Account page (Open Trades, Trade History)
+    - When troubleshooting "Order History" vs "Trade History" naming issues
+    - When verifying trading industry standard terminology usage
+    - When creating E2E tests for Account page components
+    - When auditing user-facing text for consistency with FXOpen API documentation
+    - When working with empty state messages or section headers on the Account page
