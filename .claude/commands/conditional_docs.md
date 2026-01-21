@@ -394,3 +394,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When creating E2E tests for Account page components
     - When auditing user-facing text for consistency with FXOpen API documentation
     - When working with empty state messages or section headers on the Account page
+
+- app_docs/feature-904b1bf0-strategy-load-failure-fix.md
+  - Conditions:
+    - When working with strategy load functionality or loadStrategyFromUrl/handleLoadStrategy functions
+    - When troubleshooting strategy loading errors or validation failures
+    - When implementing or modifying indicator/pattern/condition reference validation
+    - When working with strategy deserialization in strategy_service.py (_db_row_to_strategy)
+    - When fixing broken condition references or missing indicator errors
+    - When implementing validation functions for strategy components
+    - When troubleshooting instance ID preservation or reference integrity issues
+    - When working with StrategyConfig nested object deserialization (StrategyIndicator, StrategyCondition, StrategyPattern, ConditionGroup)
+    - When adding error handling or warning messages for strategy loading
+    - When implementing recovery options for strategies with missing components
