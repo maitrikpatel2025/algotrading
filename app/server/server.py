@@ -862,7 +862,7 @@ async def websocket_prices(websocket: WebSocket, pair: str, granularity: str):
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         try:
             await websocket.send_json({"type": "error", "data": {"message": str(e)}})
-        except:
+        except Exception:
             pass
     finally:
         # Cleanup
