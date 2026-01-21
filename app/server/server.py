@@ -10,6 +10,7 @@ This server provides endpoints for:
 - Market headlines
 """
 
+import asyncio
 import logging
 import sys
 import traceback
@@ -18,13 +19,14 @@ from typing import Optional
 
 import requests.exceptions
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import get_options
 from config import settings
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
+from core.candle_aggregator import CandleAggregator
 from core.data_models import (
     BotControlResponse,
     BotStartRequest,
@@ -91,10 +93,8 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 # Create logger for this module
@@ -110,7 +110,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
 # CORS Configuration
@@ -133,6 +133,7 @@ api = OpenFxApi()
 # Startup Events
 # =============================================================================
 
+
 @app.on_event("startup")
 async def startup_event():
     """Validate database connection on startup."""
@@ -154,6 +155,7 @@ async def startup_event():
 # =============================================================================
 # API Routes
 # =============================================================================
+
 
 @app.get("/api/test", tags=["Health"])
 async def test():
@@ -183,10 +185,7 @@ async def health():
         return response
     except Exception as e:
         logger.error(f"[ERROR] Health check failed: {str(e)}")
-        return HealthCheckResponse(
-            status="error",
-            uptime_seconds=0
-        )
+        return HealthCheckResponse(status="error", uptime_seconds=0)
 
 
 @app.get("/api/account", tags=["Account"])
@@ -227,11 +226,7 @@ async def open_trades():
 
         if trades is None:
             logger.warning("[WARNING] Open trades returned None - API call may have failed")
-            return OpenTradesResponse(
-                trades=[],
-                count=0,
-                error="Failed to fetch open trades"
-            )
+            return OpenTradesResponse(trades=[], count=0, error="Failed to fetch open trades")
 
         trade_info_list = [
             TradeInfo(
@@ -247,27 +242,17 @@ async def open_trades():
             for trade in trades
         ]
 
-        response = OpenTradesResponse(
-            trades=trade_info_list,
-            count=len(trade_info_list)
-        )
+        response = OpenTradesResponse(trades=trade_info_list, count=len(trade_info_list))
         logger.info(f"[SUCCESS] Open trades fetched: {len(trade_info_list)} trades")
         return response
     except Exception as e:
         logger.error(f"[ERROR] Open trades fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return OpenTradesResponse(
-            trades=[],
-            count=0,
-            error=str(e)
-        )
+        return OpenTradesResponse(trades=[], count=0, error=str(e))
 
 
 @app.get("/api/trades/history", response_model=TradeHistoryResponse, tags=["Trades"])
-async def trade_history(
-    timestamp_from: Optional[int] = None,
-    timestamp_to: Optional[int] = None
-):
+async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Optional[int] = None):
     """
     Get trade history (closed/completed trades) from FXOpen API.
 
@@ -291,9 +276,7 @@ async def trade_history(
         if history_data is None:
             logger.warning("[WARNING] Trade history returned None from API")
             return TradeHistoryResponse(
-                trades=[],
-                count=0,
-                message="Unable to fetch trade history from the API."
+                trades=[], count=0, message="Unable to fetch trade history from the API."
             )
 
         # Parse the response and transform to TradeHistoryItem format
@@ -310,7 +293,9 @@ async def trade_history(
                 entry_price=record.get("TradePrice", 0.0),
                 exit_price=record.get("PositionClosePrice"),
                 realized_pl=record.get("BalanceMovement"),
-                closed_at=datetime.fromtimestamp(record.get("TransactionTimestamp", 0) / 1000) if record.get("TransactionTimestamp") else None,
+                closed_at=datetime.fromtimestamp(record.get("TransactionTimestamp", 0) / 1000)
+                if record.get("TransactionTimestamp")
+                else None,
                 transaction_type=record.get("TransactionType"),
                 transaction_reason=record.get("TransactionReason"),
                 transaction_timestamp=record.get("TransactionTimestamp"),
@@ -321,14 +306,14 @@ async def trade_history(
                 position_close_price=record.get("PositionClosePrice"),
                 balance_movement=record.get("BalanceMovement"),
                 commission=record.get("Commission"),
-                swap=record.get("Swap")
+                swap=record.get("Swap"),
             )
             trades.append(trade_item)
 
         response = TradeHistoryResponse(
             trades=trades,
             count=len(trades),
-            message=f"Retrieved {len(trades)} trade history records."
+            message=f"Retrieved {len(trades)} trade history records.",
         )
         logger.info(f"[SUCCESS] Trade history endpoint returned {len(trades)} records")
         return response
@@ -336,25 +321,19 @@ async def trade_history(
     except requests.exceptions.Timeout as e:
         logger.warning(f"[TIMEOUT] Trade history request timed out: {str(e)}")
         return TradeHistoryResponse(
-            trades=[],
-            count=0,
-            message="Trade history request timed out. Please try again later."
+            trades=[], count=0, message="Trade history request timed out. Please try again later."
         )
     except requests.exceptions.RequestException as e:
         logger.warning(f"[NETWORK_ERROR] Trade history network error: {str(e)}")
         return TradeHistoryResponse(
             trades=[],
             count=0,
-            message="Unable to connect to trade history service. Please try again later."
+            message="Unable to connect to trade history service. Please try again later.",
         )
     except Exception as e:
         logger.error(f"[ERROR] Trade history fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return TradeHistoryResponse(
-            trades=[],
-            count=0,
-            error=str(e)
-        )
+        return TradeHistoryResponse(trades=[], count=0, error=str(e))
 
 
 @app.get("/api/bot/status", response_model=BotStatusResponse, tags=["Bot"])
@@ -375,10 +354,7 @@ async def bot_status():
     except Exception as e:
         logger.error(f"[ERROR] Bot status fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return BotStatusResponse(
-            status="error",
-            error_message=str(e)
-        )
+        return BotStatusResponse(status="error", error_message=str(e))
 
 
 @app.post("/api/bot/start", response_model=BotControlResponse, tags=["Bot"])
@@ -403,32 +379,26 @@ async def bot_start(request: BotStartRequest = None):
         pairs = request.pairs if request else None
         timeframe = request.timeframe if request else None
 
-        logger.info(f"[BOT_CONTROL] Start request received - strategy: {strategy}, pairs: {pairs}, timeframe: {timeframe}")
-
-        result = bot_controller.start_bot(
-            strategy=strategy,
-            pairs=pairs,
-            timeframe=timeframe
+        logger.info(
+            f"[BOT_CONTROL] Start request received - strategy: {strategy}, pairs: {pairs}, timeframe: {timeframe}"
         )
+
+        result = bot_controller.start_bot(strategy=strategy, pairs=pairs, timeframe=timeframe)
 
         if result["success"]:
             # Update bot status tracker
             bot_status_tracker.set_running(
                 strategy_name=strategy or "Bollinger Bands Strategy",
-                strategy_description="Automated trading strategy"
+                strategy_description="Automated trading strategy",
             )
             logger.info(f"[SUCCESS] Bot started: {result['message']}")
             return BotControlResponse(**result)
         else:
             error = result.get("error", "")
             if error == "conflict":
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=result["message"]
-                )
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result["message"])
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result["message"]
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["message"]
             )
 
     except HTTPException:
@@ -436,10 +406,7 @@ async def bot_start(request: BotStartRequest = None):
     except Exception as e:
         logger.error(f"[ERROR] Bot start failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.post("/api/bot/stop", response_model=BotControlResponse, tags=["Bot"])
@@ -469,12 +436,10 @@ async def bot_stop():
             error = result.get("error", "")
             if error == "not_running":
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=result["message"]
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
                 )
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result["message"]
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["message"]
             )
 
     except HTTPException:
@@ -482,10 +447,7 @@ async def bot_stop():
     except Exception as e:
         logger.error(f"[ERROR] Bot stop failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.post("/api/bot/restart", response_model=BotControlResponse, tags=["Bot"])
@@ -509,26 +471,23 @@ async def bot_restart(request: BotStartRequest = None):
         pairs = request.pairs if request else None
         timeframe = request.timeframe if request else None
 
-        logger.info(f"[BOT_CONTROL] Restart request received - strategy: {strategy}, pairs: {pairs}, timeframe: {timeframe}")
-
-        result = bot_controller.restart_bot(
-            strategy=strategy,
-            pairs=pairs,
-            timeframe=timeframe
+        logger.info(
+            f"[BOT_CONTROL] Restart request received - strategy: {strategy}, pairs: {pairs}, timeframe: {timeframe}"
         )
+
+        result = bot_controller.restart_bot(strategy=strategy, pairs=pairs, timeframe=timeframe)
 
         if result["success"]:
             # Update bot status tracker
             bot_status_tracker.set_running(
                 strategy_name=strategy or "Bollinger Bands Strategy",
-                strategy_description="Automated trading strategy"
+                strategy_description="Automated trading strategy",
             )
             logger.info(f"[SUCCESS] Bot restarted: {result['message']}")
             return BotControlResponse(**result)
         else:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result["message"]
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["message"]
             )
 
     except HTTPException:
@@ -536,10 +495,7 @@ async def bot_restart(request: BotStartRequest = None):
     except Exception as e:
         logger.error(f"[ERROR] Bot restart failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.get("/api/headlines", response_model=HeadlinesResponse, tags=["Market Data"])
@@ -554,31 +510,20 @@ async def headlines():
         data = get_bloomberg_headlines()
 
         if data is None:
-            return HeadlinesResponse(
-                headlines=[],
-                count=0,
-                error="Failed to fetch headlines"
-            )
+            return HeadlinesResponse(headlines=[], count=0, error="Failed to fetch headlines")
 
         headline_items = [
-            HeadlineItem(headline=item['headline'], link=item['link'])
-            for item in data
+            HeadlineItem(headline=item["headline"], link=item["link"]) for item in data
         ]
 
-        response = HeadlinesResponse(
-            headlines=headline_items,
-            count=len(headline_items)
-        )
+        response = HeadlinesResponse(headlines=headline_items, count=len(headline_items))
         logger.info(f"[SUCCESS] Headlines fetched: {len(headline_items)} items")
         return response
     except Exception as e:
         logger.error(f"[ERROR] Headlines fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return HeadlinesResponse(
-            headlines=[],
-            count=0,
-            error=str(e)
-        )
+        return HeadlinesResponse(headlines=[], count=0, error=str(e))
+
 
 @app.get("/api/options", response_model=TradingOptionsResponse, tags=["Trading"])
 async def options():
@@ -595,10 +540,11 @@ async def options():
             return TradingOptionsResponse(error="Failed to get options")
 
         response = TradingOptionsResponse(
-            pairs=data.get('pairs', []),
-            granularities=data.get('granularities', [])
+            pairs=data.get("pairs", []), granularities=data.get("granularities", [])
         )
-        logger.info(f"[SUCCESS] Options fetched: {len(response.pairs)} pairs, {len(response.granularities)} granularities")
+        logger.info(
+            f"[SUCCESS] Options fetched: {len(response.pairs)} pairs, {len(response.granularities)} granularities"
+        )
         return response
     except Exception as e:
         logger.error(f"[ERROR] Options fetch failed: {str(e)}")
@@ -622,36 +568,29 @@ async def spread(pair: str):
         if pair not in available_pairs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Currency pair '{pair}' not found in available instruments"
+                detail=f"Currency pair '{pair}' not found in available instruments",
             )
 
         # Get price data (API expects pair without underscore)
-        symbol = pair.replace('_', '')
+        symbol = pair.replace("_", "")
         prices = api.get_prices([symbol])
 
         if prices is None or len(prices) == 0:
             logger.warning(f"[WARNING] Could not fetch price for {pair}")
-            return SpreadResponse(
-                pair=pair,
-                error="Unable to fetch current price data"
-            )
+            return SpreadResponse(pair=pair, error="Unable to fetch current price data")
 
         price = prices[0]
 
         # Calculate spread in pips
         # JPY pairs have pip at 0.01, others at 0.0001
-        is_jpy_pair = 'JPY' in pair
+        is_jpy_pair = "JPY" in pair
         pip_multiplier = 100 if is_jpy_pair else 10000
 
         raw_spread = abs(price.ask - price.bid)
         spread_pips = round(raw_spread * pip_multiplier, 2)
 
         response = SpreadResponse(
-            pair=pair,
-            spread=spread_pips,
-            bid=price.bid,
-            ask=price.ask,
-            timestamp=price.time
+            pair=pair, spread=spread_pips, bid=price.bid, ask=price.ask, timestamp=price.time
         )
         logger.info(f"[SUCCESS] Spread fetched for {pair}: {spread_pips} pips")
         return response
@@ -661,10 +600,7 @@ async def spread(pair: str):
     except Exception as e:
         logger.error(f"[ERROR] Spread fetch failed for {pair}: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return SpreadResponse(
-            pair=pair,
-            error=str(e)
-        )
+        return SpreadResponse(pair=pair, error=str(e))
 
 
 @app.get("/api/technicals/{pair}/{timeframe}", tags=["Technical Analysis"])
@@ -683,32 +619,29 @@ async def technicals(pair: str, timeframe: str):
         data = get_pair_technicals(pair, timeframe)
 
         # Check if the response contains an error
-        if data is not None and 'error' in data:
-            error_type = data.get('error')
-            error_message = data.get('message', 'Unknown error')
-            logger.warning(f"[WARNING] Technicals error for {pair}/{timeframe}: {error_type} - {error_message}")
+        if data is not None and "error" in data:
+            error_type = data.get("error")
+            error_message = data.get("message", "Unknown error")
+            logger.warning(
+                f"[WARNING] Technicals error for {pair}/{timeframe}: {error_type} - {error_message}"
+            )
 
             # Return 503 for external service errors, 400 for invalid input
-            if error_type in ['external_service_error', 'timeout', 'connection_error']:
+            if error_type in ["external_service_error", "timeout", "connection_error"]:
                 raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=error_message
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=error_message
                 )
-            elif error_type == 'invalid_pair':
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=error_message
-                )
+            elif error_type == "invalid_pair":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_message)
             else:
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=error_message
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
                 )
 
         if data is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Technical data not found for {pair}/{timeframe}"
+                detail=f"Technical data not found for {pair}/{timeframe}",
             )
 
         logger.info(f"[SUCCESS] Technicals fetched for {pair}/{timeframe}")
@@ -717,10 +650,7 @@ async def technicals(pair: str, timeframe: str):
         raise
     except Exception as e:
         logger.error(f"[ERROR] Technicals fetch failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.get("/api/prices/{pair}/{granularity}/{count}", tags=["Price Data"])
@@ -740,27 +670,27 @@ async def prices(pair: str, granularity: str, count: str):
         data = api.web_api_candles(pair, granularity, count)
 
         # Check if the response contains an error
-        if data is not None and 'error' in data:
-            error_type = data.get('error')
-            error_message = data.get('message', 'Unknown error')
-            logger.warning(f"[WARNING] Prices error for {pair}/{granularity}: {error_type} - {error_message}")
+        if data is not None and "error" in data:
+            error_type = data.get("error")
+            error_message = data.get("message", "Unknown error")
+            logger.warning(
+                f"[WARNING] Prices error for {pair}/{granularity}: {error_type} - {error_message}"
+            )
 
             # Return 503 for API/service errors
-            if error_type in ['api_error', 'no_data']:
+            if error_type in ["api_error", "no_data"]:
                 raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=error_message
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=error_message
                 )
             else:
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=error_message
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
                 )
 
         if data is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Price data not found for {pair}/{granularity}"
+                detail=f"Price data not found for {pair}/{granularity}",
             )
 
         logger.info(f"[SUCCESS] Prices fetched for {pair}/{granularity}, count: {count}")
@@ -769,15 +699,197 @@ async def prices(pair: str, granularity: str, count: str):
         raise
     except Exception as e:
         logger.error(f"[ERROR] Prices fetch failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.websocket("/ws/prices/{pair}/{granularity}")
+async def websocket_prices(websocket: WebSocket, pair: str, granularity: str):
+    """
+    WebSocket endpoint for real-time price streaming.
+
+    Connects to FX Open API via WebSocket, aggregates ticks into candles,
+    and streams updates to the frontend client.
+
+    Args:
+        websocket: WebSocket connection
+        pair: Currency pair (e.g., 'EUR_USD')
+        granularity: Timeframe (e.g., 'M5', 'H1')
+
+    Message Format (sent to client):
+        {
+            "type": "candle_update",  # or "candle_completed", "connection_status", "error"
+            "data": {...}              # Candle data or status info
+        }
+    """
+    # Accept WebSocket connection
+    await websocket.accept()
+    logger.info(f"[WEBSOCKET] Client connected for {pair}/{granularity}")
+
+    # Initialize candle aggregator
+    aggregator = None
+    ws_manager = None
+
+    try:
+        # Send connection acknowledgment
+        await websocket.send_json(
+            {
+                "type": "connection_status",
+                "data": {"status": "connected", "pair": pair, "granularity": granularity},
+            }
         )
+
+        # Initialize candle aggregator
+        aggregator = CandleAggregator(timeframe=granularity)
+        logger.info(f"[WEBSOCKET] Candle aggregator initialized for {granularity}")
+
+        # Define tick callback
+        async def on_tick(tick):
+            """Process incoming tick and send updates to client."""
+            try:
+                # Extract tick data
+                timestamp = (
+                    datetime.fromisoformat(tick["timestamp"].replace("Z", "+00:00"))
+                    if isinstance(tick["timestamp"], str)
+                    else tick["timestamp"]
+                )
+                price = tick.get("mid") or ((tick.get("bid", 0) + tick.get("ask", 0)) / 2)
+                volume = tick.get("volume", 0)
+
+                # Aggregate tick into candle
+                result = aggregator.add_tick(timestamp, price, volume)
+
+                # Send completed candle if any
+                if result["candle_completed"] and result["completed_candle"]:
+                    formatted_candle = aggregator.format_candle_for_api(result["completed_candle"])
+                    await websocket.send_json(
+                        {"type": "candle_completed", "data": formatted_candle}
+                    )
+                    logger.debug(f"[WEBSOCKET] Completed candle sent: {formatted_candle['time']}")
+
+                # Send current candle update
+                if result["current_candle"]:
+                    formatted_current = aggregator.format_candle_for_api(result["current_candle"])
+                    await websocket.send_json({"type": "candle_update", "data": formatted_current})
+
+            except Exception as e:
+                logger.error(f"[WEBSOCKET] Error processing tick: {e}")
+                await websocket.send_json(
+                    {"type": "error", "data": {"message": "Error processing tick data"}}
+                )
+
+        # Define error callback
+        async def on_error(error):
+            """Handle WebSocket manager errors."""
+            logger.error(f"[WEBSOCKET] WebSocket manager error: {error}")
+            await websocket.send_json({"type": "error", "data": {"message": str(error)}})
+
+        # Initialize WebSocket manager
+        # NOTE: This is a placeholder for FX Open WebSocket connection
+        # In production, uncomment and configure with actual FX Open WebSocket URL
+        # ws_manager = WebSocketManager(
+        #     on_tick=lambda tick: asyncio.create_task(on_tick(tick)),
+        #     on_error=lambda error: asyncio.create_task(on_error(error))
+        # )
+
+        # Connect and authenticate
+        # if await ws_manager.connect():
+        #     if await ws_manager.authenticate():
+        #         await ws_manager.subscribe(pair.replace("_", ""))
+        #         logger.info(f"[WEBSOCKET] Subscribed to {pair}")
+        #     else:
+        #         await websocket.send_json({
+        #             "type": "error",
+        #             "data": {"message": "Failed to authenticate with FX Open API"}
+        #         })
+        # else:
+        #     await websocket.send_json({
+        #         "type": "error",
+        #         "data": {"message": "Failed to connect to FX Open API"}
+        #     })
+
+        # For now, simulate tick data for testing (remove in production)
+        logger.info("[WEBSOCKET] Using simulated tick data (FX Open WebSocket not yet configured)")
+        await websocket.send_json(
+            {
+                "type": "connection_status",
+                "data": {
+                    "status": "simulated",
+                    "message": "Using simulated data - FX Open WebSocket not configured",
+                },
+            }
+        )
+
+        # Simulate ticks every 2 seconds
+        base_price = 1.0850  # EUR_USD base price
+        while True:
+            try:
+                # Check if client is still connected
+                await asyncio.sleep(2)
+
+                # Generate simulated tick
+                import random
+
+                price = base_price + random.uniform(-0.001, 0.001)
+                timestamp = datetime.now(tz=None)
+
+                # Process tick
+                result = aggregator.add_tick(timestamp, price, 0)
+
+                # Send completed candle if any
+                if result["candle_completed"] and result["completed_candle"]:
+                    formatted_candle = aggregator.format_candle_for_api(result["completed_candle"])
+                    await websocket.send_json(
+                        {"type": "candle_completed", "data": formatted_candle}
+                    )
+                    logger.debug(f"[WEBSOCKET] Completed candle sent: {formatted_candle['time']}")
+
+                # Send current candle update
+                if result["current_candle"]:
+                    formatted_current = aggregator.format_candle_for_api(result["current_candle"])
+                    await websocket.send_json({"type": "candle_update", "data": formatted_current})
+
+            except WebSocketDisconnect:
+                logger.info(f"[WEBSOCKET] Client disconnected for {pair}/{granularity}")
+                break
+            except Exception as e:
+                logger.error(f"[WEBSOCKET] Error in simulation loop: {e}")
+                break
+
+    except WebSocketDisconnect:
+        logger.info(f"[WEBSOCKET] Client disconnected for {pair}/{granularity}")
+    except Exception as e:
+        logger.error(f"[WEBSOCKET] WebSocket error: {e}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        try:
+            await websocket.send_json({"type": "error", "data": {"message": str(e)}})
+        except Exception:
+            pass
+    finally:
+        # Cleanup
+        if ws_manager:
+            await ws_manager.disconnect()
+        logger.info(f"[WEBSOCKET] Connection closed for {pair}/{granularity}")
+
+
+@app.get("/api/websocket/status", tags=["WebSocket"])
+async def websocket_status():
+    """
+    Get WebSocket connection status.
+
+    Returns:
+        JSON object with WebSocket availability status
+    """
+    return {
+        "available": True,
+        "mode": "simulated",
+        "message": "WebSocket endpoint available with simulated data. FX Open WebSocket integration pending.",
+    }
 
 
 # =============================================================================
 # Strategy Routes
 # =============================================================================
+
 
 @app.post("/api/strategies", response_model=SaveStrategyResponse, tags=["Strategies"])
 async def save_strategy(request: SaveStrategyRequest):
@@ -801,24 +913,18 @@ async def save_strategy(request: SaveStrategyRequest):
             return SaveStrategyResponse(
                 success=True,
                 strategy_id=strategy_id,
-                message=f"Strategy '{strategy.name}' saved successfully"
+                message=f"Strategy '{strategy.name}' saved successfully",
             )
         else:
             logger.warning(f"[WARNING] Strategy save failed: {error}")
             return SaveStrategyResponse(
-                success=False,
-                message="Failed to save strategy",
-                error=error
+                success=False, message="Failed to save strategy", error=error
             )
 
     except Exception as e:
         logger.error(f"[ERROR] Strategy save failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return SaveStrategyResponse(
-            success=False,
-            message="Failed to save strategy",
-            error=str(e)
-        )
+        return SaveStrategyResponse(success=False, message="Failed to save strategy", error=str(e))
 
 
 @app.get("/api/strategies", response_model=ListStrategiesResponse, tags=["Strategies"])
@@ -837,28 +943,16 @@ async def list_strategies():
         if success:
             logger.info(f"[SUCCESS] Listed {len(strategies)} strategies")
             return ListStrategiesResponse(
-                success=True,
-                strategies=strategies,
-                count=len(strategies)
+                success=True, strategies=strategies, count=len(strategies)
             )
         else:
             logger.warning(f"[WARNING] Strategy list failed: {error}")
-            return ListStrategiesResponse(
-                success=False,
-                strategies=[],
-                count=0,
-                error=error
-            )
+            return ListStrategiesResponse(success=False, strategies=[], count=0, error=error)
 
     except Exception as e:
         logger.error(f"[ERROR] Strategy list failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return ListStrategiesResponse(
-            success=False,
-            strategies=[],
-            count=0,
-            error=str(e)
-        )
+        return ListStrategiesResponse(success=False, strategies=[], count=0, error=str(e))
 
 
 @app.get("/api/strategies/check-name/{name}", response_model=CheckNameResponse, tags=["Strategies"])
@@ -890,7 +984,9 @@ async def check_strategy_name(name: str):
         return CheckNameResponse(exists=False)
 
 
-@app.get("/api/strategies/extended", response_model=ListStrategiesExtendedResponse, tags=["Strategies"])
+@app.get(
+    "/api/strategies/extended", response_model=ListStrategiesExtendedResponse, tags=["Strategies"]
+)
 async def list_strategies_extended():
     """
     List all saved strategies with extended metadata (indicator counts, etc).
@@ -906,28 +1002,18 @@ async def list_strategies_extended():
         if success:
             logger.info(f"[SUCCESS] Listed {len(strategies)} strategies (extended)")
             return ListStrategiesExtendedResponse(
-                success=True,
-                strategies=strategies,
-                count=len(strategies)
+                success=True, strategies=strategies, count=len(strategies)
             )
         else:
             logger.warning(f"[WARNING] Strategy list (extended) failed: {error}")
             return ListStrategiesExtendedResponse(
-                success=False,
-                strategies=[],
-                count=0,
-                error=error
+                success=False, strategies=[], count=0, error=error
             )
 
     except Exception as e:
         logger.error(f"[ERROR] Strategy list (extended) failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return ListStrategiesExtendedResponse(
-            success=False,
-            strategies=[],
-            count=0,
-            error=str(e)
-        )
+        return ListStrategiesExtendedResponse(success=False, strategies=[], count=0, error=str(e))
 
 
 @app.get("/api/strategies/{strategy_id}", response_model=LoadStrategyResponse, tags=["Strategies"])
@@ -948,15 +1034,12 @@ async def get_strategy(strategy_id: str):
 
         if success:
             logger.info(f"[SUCCESS] Strategy retrieved: {strategy.name}")
-            return LoadStrategyResponse(
-                success=True,
-                strategy=strategy
-            )
+            return LoadStrategyResponse(success=True, strategy=strategy)
         else:
             logger.warning(f"[WARNING] Strategy get failed: {error}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=error or f"Strategy not found: {strategy_id}"
+                detail=error or f"Strategy not found: {strategy_id}",
             )
 
     except HTTPException:
@@ -964,13 +1047,12 @@ async def get_strategy(strategy_id: str):
     except Exception as e:
         logger.error(f"[ERROR] Strategy get failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@app.delete("/api/strategies/{strategy_id}", response_model=DeleteStrategyResponse, tags=["Strategies"])
+@app.delete(
+    "/api/strategies/{strategy_id}", response_model=DeleteStrategyResponse, tags=["Strategies"]
+)
 async def delete_strategy(strategy_id: str):
     """
     Delete a strategy by ID.
@@ -988,15 +1070,12 @@ async def delete_strategy(strategy_id: str):
 
         if success:
             logger.info(f"[SUCCESS] Strategy deleted: {strategy_id}")
-            return DeleteStrategyResponse(
-                success=True,
-                message="Strategy deleted successfully"
-            )
+            return DeleteStrategyResponse(success=True, message="Strategy deleted successfully")
         else:
             logger.warning(f"[WARNING] Strategy delete failed: {error}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=error or f"Strategy not found: {strategy_id}"
+                detail=error or f"Strategy not found: {strategy_id}",
             )
 
     except HTTPException:
@@ -1004,13 +1083,14 @@ async def delete_strategy(strategy_id: str):
     except Exception as e:
         logger.error(f"[ERROR] Strategy delete failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@app.post("/api/strategies/{strategy_id}/duplicate", response_model=DuplicateStrategyResponse, tags=["Strategies"])
+@app.post(
+    "/api/strategies/{strategy_id}/duplicate",
+    response_model=DuplicateStrategyResponse,
+    tags=["Strategies"],
+)
 async def duplicate_strategy(strategy_id: str):
     """
     Duplicate a strategy by ID.
@@ -1032,13 +1112,13 @@ async def duplicate_strategy(strategy_id: str):
                 success=True,
                 strategy_id=new_id,
                 strategy_name=new_name,
-                message=f"Strategy duplicated as '{new_name}'"
+                message=f"Strategy duplicated as '{new_name}'",
             )
         else:
             logger.warning(f"[WARNING] Strategy duplicate failed: {error}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=error or f"Strategy not found: {strategy_id}"
+                detail=error or f"Strategy not found: {strategy_id}",
             )
 
     except HTTPException:
@@ -1046,10 +1126,7 @@ async def duplicate_strategy(strategy_id: str):
     except Exception as e:
         logger.error(f"[ERROR] Strategy duplicate failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.get("/api/strategies/{strategy_id}/export", tags=["Strategies"])
@@ -1083,14 +1160,14 @@ async def export_strategy(strategy_id: str):
                 content=export_data.model_dump(mode="json"),
                 headers={
                     "Content-Disposition": f'attachment; filename="{filename}"',
-                    "Content-Type": "application/json"
-                }
+                    "Content-Type": "application/json",
+                },
             )
         else:
             logger.warning(f"[WARNING] Strategy export failed: {error}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=error or f"Strategy not found: {strategy_id}"
+                detail=error or f"Strategy not found: {strategy_id}",
             )
 
     except HTTPException:
@@ -1098,13 +1175,12 @@ async def export_strategy(strategy_id: str):
     except Exception as e:
         logger.error(f"[ERROR] Strategy export failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@app.post("/api/strategies/import/validate", response_model=ImportValidationResult, tags=["Strategies"])
+@app.post(
+    "/api/strategies/import/validate", response_model=ImportValidationResult, tags=["Strategies"]
+)
 async def validate_import_strategy(request: ImportStrategyRequest):
     """
     Validate import data without saving.
@@ -1136,7 +1212,7 @@ async def validate_import_strategy(request: ImportStrategyRequest):
             warnings=[],
             strategy_preview=None,
             name_conflict=False,
-            conflicting_strategy_id=None
+            conflicting_strategy_id=None,
         )
 
 
@@ -1157,7 +1233,7 @@ async def save_imported_strategy(request: ImportStrategySaveRequest):
         success, strategy_id, strategy_name, error = service_import_strategy(
             request.strategy_data,
             name_override=request.name_override,
-            conflict_resolution=request.conflict_resolution
+            conflict_resolution=request.conflict_resolution,
         )
 
         if success:
@@ -1166,23 +1242,19 @@ async def save_imported_strategy(request: ImportStrategySaveRequest):
                 success=True,
                 strategy_id=strategy_id,
                 strategy_name=strategy_name,
-                message=f"Strategy '{strategy_name}' imported successfully"
+                message=f"Strategy '{strategy_name}' imported successfully",
             )
         else:
             logger.warning(f"[WARNING] Import save failed: {error}")
             return ImportStrategyResponse(
-                success=False,
-                message="Failed to import strategy",
-                error=error
+                success=False, message="Failed to import strategy", error=error
             )
 
     except Exception as e:
         logger.error(f"[ERROR] Import save failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return ImportStrategyResponse(
-            success=False,
-            message="Failed to import strategy",
-            error=str(e)
+            success=False, message="Failed to import strategy", error=str(e)
         )
 
 
@@ -1215,5 +1287,5 @@ if __name__ == "__main__":
         host=settings.API_HOST,
         port=settings.API_PORT,
         reload=settings.API_DEBUG,
-        log_level="info" if settings.API_DEBUG else "warning"
+        log_level="info" if settings.API_DEBUG else "warning",
     )

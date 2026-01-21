@@ -25,6 +25,7 @@ def _get_bot_controller():
     global _bot_controller
     if _bot_controller is None:
         from .bot_controller import bot_controller
+
         _bot_controller = bot_controller
     return _bot_controller
 
@@ -47,7 +48,9 @@ class BotStatusTracker:
         if self._initialized:
             return
 
-        self._status: Literal["running", "stopped", "paused", "error", "starting", "stopping"] = "stopped"
+        self._status: Literal["running", "stopped", "paused", "error", "starting", "stopping"] = (
+            "stopped"
+        )
         self._started_at: Optional[datetime] = None
         self._last_heartbeat: Optional[datetime] = None
         self._last_signal_time: Optional[datetime] = None

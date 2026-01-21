@@ -18,7 +18,7 @@ class LogWrapper:
     Creates log files in a dedicated logs directory.
     """
 
-    PATH = './logs'
+    PATH = "./logs"
 
     def __init__(self, name: str, mode: str = "w"):
         """
@@ -33,7 +33,7 @@ class LogWrapper:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(DEFAULT_LEVEL)
 
-        formatter = logging.Formatter(LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = logging.Formatter(LOG_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 
         # File handler for log files
         file_handler = logging.FileHandler(self.filename, mode=mode)
