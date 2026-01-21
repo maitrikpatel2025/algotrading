@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import endPoints from '../app/api';
-import { COUNTS, calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
+import { calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
 import PriceChart from '../components/PriceChart';
 import PairSelector from '../components/PairSelector';
 import Technicals from '../components/Technicals';
@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../compon
 import IndicatorSearchPopup from '../components/IndicatorSearchPopup';
 import StrategySettingsPopover from '../components/StrategySettingsPopover';
 import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
-import { getPatternDisplayName } from '../app/patterns';
+import { getPatternDisplayName, PATTERNS } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
 import {
   createConditionFromIndicator,
@@ -922,14 +922,28 @@ function Strategy() {
       priceData.mid_c
     );
 
+    // Provide user feedback about detection results
+    if (detectedPatterns.length === 0) {
+      showToast(`No ${pattern.name} patterns detected in current price data. Try loading more candles or a different timeframe.`, 'info');
+    } else {
+      showSuccess(`Found ${detectedPatterns.length} ${pattern.name} pattern(s)`);
+    }
+
+    // Find pattern definition to ensure patternType is set
+    const patternDef = PATTERNS.find(p => p.id === pattern.id);
+
     // Create pattern instance with detected patterns
-    // IMPORTANT: Spread pattern first, then override with our values
+    // IMPORTANT: Explicitly set patternType from pattern definition
     const newPattern = {
       ...pattern,
       instanceId: `${patternId}-${Date.now()}`,
+      patternType: patternDef?.patternType || pattern.patternType || 'neutral',
       detectedPatterns: detectedPatterns,
       detectedCount: detectedPatterns.length,
     };
+
+    // Log pattern creation for debugging
+    console.log('Pattern created with type:', newPattern.patternType, 'for pattern:', newPattern.name);
 
     // Verify pattern integrity after creation
     if (process.env.NODE_ENV === 'development') {
@@ -947,7 +961,7 @@ function Strategy() {
     setConditions(prev => [...prev, newCondition]);
     setConditionHistory(prev => [...prev, { type: 'condition', item: newCondition }]);
     setIndicatorError(null);
-  }, [priceData, tradeDirection]);
+  }, [priceData, tradeDirection, showToast, showSuccess]);
 
   // Handle pattern removal
   const handleRemovePattern = useCallback((instanceId) => {
@@ -1784,55 +1798,90 @@ function Strategy() {
         if (strategy.timeframe) setSelectedGran(strategy.timeframe);
         if (strategy.candle_count) setSelectedCount(strategy.candle_count);
 
-        // Restore indicators
-        if (strategy.indicators && Array.isArray(strategy.indicators)) {
-          const restoredIndicators = strategy.indicators.map(ind => {
-            const indicatorDef = INDICATORS[ind.id];
-            return {
-              ...indicatorDef,
-              instanceId: ind.instance_id || `${ind.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              params: ind.params || indicatorDef?.defaultParams,
-              color: ind.color || indicatorDef?.defaultColor,
-              lineWidth: ind.line_width || 2,
-              lineStyle: ind.line_style || 'solid',
-              fillOpacity: ind.fill_opacity || 0.2,
-            };
-          }).filter(Boolean);
-          setActiveIndicators(restoredIndicators);
+        // Restore indicators with validation
+        try {
+          if (strategy.indicators && Array.isArray(strategy.indicators)) {
+            // Validate indicator IDs exist in INDICATORS definition
+            const unknownIndicators = strategy.indicators
+              .filter(ind => !INDICATORS[ind.id])
+              .map(ind => ind.id);
+
+            if (unknownIndicators.length > 0) {
+              console.error('Strategy contains unknown indicators:', unknownIndicators);
+              showError(`Strategy contains unknown indicators: ${unknownIndicators.join(', ')}. Please update your indicator library.`);
+              return;
+            }
+
+            const restoredIndicators = strategy.indicators.map(ind => {
+              const indicatorDef = INDICATORS[ind.id];
+              return {
+                ...indicatorDef,
+                instanceId: ind.instance_id || `${ind.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                params: ind.params || indicatorDef?.defaultParams,
+                color: ind.color || indicatorDef?.defaultColor,
+                lineWidth: ind.line_width || 2,
+                lineStyle: ind.line_style || 'solid',
+                fillOpacity: ind.fill_opacity || 0.2,
+              };
+            }).filter(Boolean);
+            setActiveIndicators(restoredIndicators);
+          }
+        } catch (error) {
+          console.error('Failed to restore indicators:', error);
+          showError(`Failed to restore indicators: ${error.message}`);
+          return;
         }
 
         // Restore patterns
-        if (strategy.patterns && Array.isArray(strategy.patterns)) {
-          setActivePatterns(strategy.patterns.map(pat => ({
-            ...pat,
-            instanceId: pat.instance_id || `${pat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          })));
+        try {
+          if (strategy.patterns && Array.isArray(strategy.patterns)) {
+            setActivePatterns(strategy.patterns.map(pat => ({
+              ...pat,
+              instanceId: pat.instance_id || `${pat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            })));
+          }
+        } catch (error) {
+          console.error('Failed to restore patterns:', error);
+          showError(`Failed to restore patterns: ${error.message}`);
+          return;
         }
 
         // Restore conditions
-        if (strategy.conditions && Array.isArray(strategy.conditions)) {
-          setConditions(strategy.conditions.map(c => ({
-            id: c.id,
-            section: c.section,
-            leftOperand: c.left_operand,
-            operator: c.operator,
-            rightOperand: c.right_operand,
-            indicatorInstanceId: c.indicator_instance_id,
-            indicatorDisplayName: c.indicator_display_name,
-            patternInstanceId: c.pattern_instance_id,
-            isPatternCondition: c.is_pattern_condition,
-          })));
+        try {
+          if (strategy.conditions && Array.isArray(strategy.conditions)) {
+            setConditions(strategy.conditions.map(c => ({
+              id: c.id,
+              section: c.section,
+              leftOperand: c.left_operand,
+              operator: c.operator,
+              rightOperand: c.right_operand,
+              indicatorInstanceId: c.indicator_instance_id,
+              indicatorDisplayName: c.indicator_display_name,
+              patternInstanceId: c.pattern_instance_id,
+              isPatternCondition: c.is_pattern_condition,
+            })));
+          }
+        } catch (error) {
+          console.error('Failed to restore conditions:', error);
+          showError(`Failed to restore conditions: ${error.message}`);
+          return;
         }
 
         // Restore groups
-        if (strategy.groups && Array.isArray(strategy.groups)) {
-          setGroups(strategy.groups.map(g => ({
-            id: g.id,
-            operator: g.operator,
-            conditionIds: g.condition_ids || [],
-            parentId: g.parent_id,
-            section: g.section,
-          })));
+        try {
+          if (strategy.groups && Array.isArray(strategy.groups)) {
+            setGroups(strategy.groups.map(g => ({
+              id: g.id,
+              operator: g.operator,
+              conditionIds: g.condition_ids || [],
+              parentId: g.parent_id,
+              section: g.section,
+            })));
+          }
+        } catch (error) {
+          console.error('Failed to restore groups:', error);
+          showError(`Failed to restore groups: ${error.message}`);
+          return;
         }
 
         // Restore reference indicators
@@ -1858,11 +1907,38 @@ function Strategy() {
           loadTechnicals();
         }
       } else {
-        showError(response.error || 'Failed to load strategy');
+        // Provide more specific error message
+        const errorMsg = response.error || 'Failed to load strategy';
+        console.error('Strategy load failed:', errorMsg);
+
+        // Check for specific error types
+        if (errorMsg.includes('Supabase') || errorMsg.includes('database') || errorMsg.includes('connection')) {
+          showError('Database connection failed. Please check your Supabase configuration.');
+        } else if (errorMsg.includes('not found')) {
+          showError('Strategy not found. It may have been deleted.');
+        } else {
+          showError(errorMsg);
+        }
       }
     } catch (error) {
       console.error('Failed to load strategy:', error);
-      showError('Failed to load strategy');
+
+      // Provide more specific error messages based on error type
+      let errorMessage = 'Failed to load strategy';
+
+      if (error.response?.status === 503) {
+        errorMessage = 'Database service unavailable. Please check your Supabase configuration.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Strategy not found. It may have been deleted.';
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'Server error occurred. Please try again later.';
+      } else if (error.request && !error.response) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = `Failed to load strategy: ${error.message}`;
+      }
+
+      showError(errorMessage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSuccess, showError]);
@@ -2059,6 +2135,16 @@ function Strategy() {
         setImportDialogOpen(false);
         // Refresh strategies list if load dialog opens next
         fetchStrategiesList();
+
+        // Immediately load the imported strategy into the UI
+        if (response.strategy_id) {
+          try {
+            await handleLoadStrategy({ id: response.strategy_id, name: response.strategy_name });
+          } catch (loadError) {
+            console.error('Failed to load imported strategy:', loadError);
+            showError('Strategy imported but failed to load. Please manually select it from the load dialog.');
+          }
+        }
       } else {
         showError(response.error || 'Failed to import strategy');
       }
@@ -2068,7 +2154,7 @@ function Strategy() {
     } finally {
       setIsImporting(false);
     }
-  }, [fetchStrategiesList, showSuccess, showError]);
+  }, [fetchStrategiesList, showSuccess, showError, handleLoadStrategy]);
 
   // Check if current strategy has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
