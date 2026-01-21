@@ -1,4 +1,4 @@
-import { createChart, ColorType, CrosshairMode, LineStyle, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode, LineStyle, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries, createSeriesMarkers } from 'lightweight-charts';
 import {
   calculateSMA,
   calculateEMA,
@@ -685,7 +685,8 @@ function createPatternMarkers(mainSeries, chartData, patterns) {
   if (markers.length > 0) {
     // Sort markers by time
     markers.sort((a, b) => a.time - b.time);
-    mainSeries.setMarkers(markers);
+    // In lightweight-charts v5, use createSeriesMarkers instead of setMarkers
+    createSeriesMarkers(mainSeries, markers);
     console.log('Markers successfully set on chart');
   }
 }
