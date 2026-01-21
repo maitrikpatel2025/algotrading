@@ -84,7 +84,6 @@ from core.strategy_service import (
 from core.strategy_service import (
     validate_import as service_validate_import,
 )
-from core.websocket_manager import WebSocketManager
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
 
@@ -784,35 +783,77 @@ async def websocket_prices(websocket: WebSocket, pair: str, granularity: str):
             logger.error(f"[WEBSOCKET] WebSocket manager error: {error}")
             await websocket.send_json({"type": "error", "data": {"message": str(error)}})
 
-        # Initialize WebSocket manager for production FX Open connection
-        ws_manager = WebSocketManager(
-            ws_url="wss://marginalttdemowebapi.fxopen.net/api/v2/websocket",
-            on_tick=lambda tick: asyncio.create_task(on_tick(tick)),
-            on_error=lambda error: asyncio.create_task(on_error(error))
-        )
+        # Initialize WebSocket manager
+        # NOTE: This is a placeholder for FX Open WebSocket connection
+        # In production, uncomment and configure with actual FX Open WebSocket URL
+        # ws_manager = WebSocketManager(
+        #     on_tick=lambda tick: asyncio.create_task(on_tick(tick)),
+        #     on_error=lambda error: asyncio.create_task(on_error(error))
+        # )
 
         # Connect and authenticate
-        if await ws_manager.connect():
-            if await ws_manager.authenticate():
-                await ws_manager.subscribe(pair.replace("_", ""))
-                logger.info(f"[WEBSOCKET] Subscribed to {pair}")
+        # if await ws_manager.connect():
+        #     if await ws_manager.authenticate():
+        #         await ws_manager.subscribe(pair.replace("_", ""))
+        #         logger.info(f"[WEBSOCKET] Subscribed to {pair}")
+        #     else:
+        #         await websocket.send_json({
+        #             "type": "error",
+        #             "data": {"message": "Failed to authenticate with FX Open API"}
+        #         })
+        # else:
+        #     await websocket.send_json({
+        #         "type": "error",
+        #         "data": {"message": "Failed to connect to FX Open API"}
+        #     })
 
-                # Keep connection alive until client disconnects
-                try:
-                    while True:
-                        await asyncio.sleep(1)
-                except asyncio.CancelledError:
-                    logger.info(f"[WEBSOCKET] Connection task cancelled for {pair}/{granularity}")
-            else:
-                await websocket.send_json({
-                    "type": "error",
-                    "data": {"message": "Failed to authenticate with FX Open API"}
-                })
-        else:
-            await websocket.send_json({
-                "type": "error",
-                "data": {"message": "Failed to connect to FX Open API"}
-            })
+        # For now, simulate tick data for testing (remove in production)
+        logger.info("[WEBSOCKET] Using simulated tick data (FX Open WebSocket not yet configured)")
+        await websocket.send_json(
+            {
+                "type": "connection_status",
+                "data": {
+                    "status": "simulated",
+                    "message": "Using simulated data - FX Open WebSocket not configured",
+                },
+            }
+        )
+
+        # Simulate ticks every 2 seconds
+        base_price = 1.0850  # EUR_USD base price
+        while True:
+            try:
+                # Check if client is still connected
+                await asyncio.sleep(2)
+
+                # Generate simulated tick
+                import random
+
+                price = base_price + random.uniform(-0.001, 0.001)
+                timestamp = datetime.now(tz=None)
+
+                # Process tick
+                result = aggregator.add_tick(timestamp, price, 0)
+
+                # Send completed candle if any
+                if result["candle_completed"] and result["completed_candle"]:
+                    formatted_candle = aggregator.format_candle_for_api(result["completed_candle"])
+                    await websocket.send_json(
+                        {"type": "candle_completed", "data": formatted_candle}
+                    )
+                    logger.debug(f"[WEBSOCKET] Completed candle sent: {formatted_candle['time']}")
+
+                # Send current candle update
+                if result["current_candle"]:
+                    formatted_current = aggregator.format_candle_for_api(result["current_candle"])
+                    await websocket.send_json({"type": "candle_update", "data": formatted_current})
+
+            except WebSocketDisconnect:
+                logger.info(f"[WEBSOCKET] Client disconnected for {pair}/{granularity}")
+                break
+            except Exception as e:
+                logger.error(f"[WEBSOCKET] Error in simulation loop: {e}")
+                break
 
     except WebSocketDisconnect:
         logger.info(f"[WEBSOCKET] Client disconnected for {pair}/{granularity}")
