@@ -8,6 +8,7 @@
 // Drawing tool types
 export const DRAWING_TOOLS = {
   POINTER: 'pointer',
+  CROSSHAIR: 'crosshair',
   HORIZONTAL_LINE: 'horizontal_line',
   TRENDLINE: 'trendline',
   FIBONACCI: 'fibonacci',
@@ -15,6 +16,7 @@ export const DRAWING_TOOLS = {
 
 // Keyboard shortcuts for drawing tools
 export const DRAWING_TOOL_SHORTCUTS = {
+  C: DRAWING_TOOLS.CROSSHAIR,
   H: DRAWING_TOOLS.HORIZONTAL_LINE,
   T: DRAWING_TOOLS.TRENDLINE,
   F: DRAWING_TOOLS.FIBONACCI,
@@ -24,6 +26,7 @@ export const DRAWING_TOOL_SHORTCUTS = {
 // Drawing tool labels for display
 export const DRAWING_TOOL_LABELS = {
   [DRAWING_TOOLS.POINTER]: 'Pointer',
+  [DRAWING_TOOLS.CROSSHAIR]: 'Crosshair',
   [DRAWING_TOOLS.HORIZONTAL_LINE]: 'Horizontal Line',
   [DRAWING_TOOLS.TRENDLINE]: 'Trendline',
   [DRAWING_TOOLS.FIBONACCI]: 'Fibonacci Retracement',
@@ -32,6 +35,7 @@ export const DRAWING_TOOL_LABELS = {
 // Drawing tool shortcut hints
 export const DRAWING_TOOL_HINTS = {
   [DRAWING_TOOLS.POINTER]: 'Esc',
+  [DRAWING_TOOLS.CROSSHAIR]: 'C',
   [DRAWING_TOOLS.HORIZONTAL_LINE]: 'H',
   [DRAWING_TOOLS.TRENDLINE]: 'T',
   [DRAWING_TOOLS.FIBONACCI]: 'F',

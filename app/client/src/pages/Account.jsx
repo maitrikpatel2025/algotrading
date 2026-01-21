@@ -3,7 +3,15 @@ import endPoints from '../app/api';
 import AccountSummary from '../components/AccountSummary';
 import OpenTrades from '../components/OpenTrades';
 import TradeHistory from '../components/TradeHistory';
-import { Briefcase, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+
+/**
+ * Account Page - Precision Swiss Design System
+ *
+ * Clean layout with no gradient hero section.
+ * Card-based sections with proper spacing.
+ * Clean KPI display with tabular-nums.
+ */
 
 function Account() {
   const [openTrades, setOpenTrades] = useState([]);
@@ -79,66 +87,61 @@ function Account() {
     loadData(true);
   };
 
-  // Loading state
+  // Loading state - Precision Swiss Design
   if (loading) {
     return (
-      <div className="py-8 animate-fade-in">
-        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
-            <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      <div className="min-h-[calc(100vh-8rem)] bg-neutral-50 py-8 animate-fade-in">
+        <div className="container-swiss">
+          <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <div className="relative">
+              <div className="h-12 w-12 rounded-full border-4 border-neutral-200 animate-pulse" />
+              <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            </div>
+            <p className="text-neutral-500 font-medium">Loading account data...</p>
           </div>
-          <p className="text-muted-foreground font-medium">Loading account data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="py-8 space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20">
-              <Briefcase className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-h2 text-foreground">Account</h1>
-              <p className="text-muted-foreground">
-                View your account summary, open trades, and trade history
-              </p>
-            </div>
+    <div className="min-h-[calc(100vh-8rem)] bg-neutral-50 py-8 animate-fade-in">
+      <div className="container-swiss space-y-6">
+        {/* Page Header - Precision Swiss Design */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="heading-1">Account</h1>
+            <p className="body-sm mt-1">View your account summary, open trades, and trade history</p>
           </div>
+
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn btn-secondary flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
 
-        {/* Refresh Button */}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="btn-outline flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </div>
+        {/* Main Content */}
+        <div className="space-y-6">
+          {/* Account Summary Section */}
+          <AccountSummary />
 
-      {/* Main Content */}
-      <div className="space-y-6">
-        {/* Account Summary Section */}
-        <AccountSummary />
+          {/* Open Trades Section */}
+          <OpenTrades trades={openTrades} loading={refreshing} />
 
-        {/* Open Trades Section */}
-        <OpenTrades trades={openTrades} loading={refreshing} />
-
-        {/* Trade History Section */}
-        <TradeHistory
-          history={tradeHistory}
-          loading={refreshing}
-          message={historyMessage}
-          error={historyError}
-          onRetry={handleRefresh}
-        />
+          {/* Trade History Section */}
+          <TradeHistory
+            history={tradeHistory}
+            loading={refreshing}
+            message={historyMessage}
+            error={historyError}
+            onRetry={handleRefresh}
+          />
+        </div>
       </div>
     </div>
   );

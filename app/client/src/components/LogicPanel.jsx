@@ -7,12 +7,12 @@ import {
   LogOut,
   Sparkles,
   Plus,
-  ListTree,
-  List,
-  FlaskConical,
   FolderPlus,
   Check,
   Clock,
+  FlaskConical,
+  ListTree,
+  List,
 } from 'lucide-react';
 import ConditionBlock from './ConditionBlock';
 import ConditionGroup from './ConditionGroup';
@@ -439,25 +439,20 @@ function LogicPanel({
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, sectionKey)}
       >
-        {/* Section Header */}
+        {/* Section Header - Compact */}
         <div className={cn(
-          "flex items-center gap-2 px-4 py-2.5",
-          sectionColor === 'success' ? "bg-success/10" : "bg-destructive/10"
+          "flex items-center gap-1.5 px-2 py-1.5",
+          sectionColor === 'success' ? "bg-success/5" : "bg-destructive/5"
         )}>
           <Icon className={cn(
-            "h-4 w-4",
+            "h-3.5 w-3.5",
             sectionColor === 'success' ? "text-success" : "text-destructive"
           )} />
-          <span className="text-sm font-medium text-foreground">{sectionLabel}</span>
-          {sectionConditions.length > 0 && (
-            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full ml-auto">
-              {sectionConditions.length}
-            </span>
-          )}
+          <span className="text-xs font-medium text-foreground">{sectionLabel}</span>
         </div>
 
         {/* Section Content */}
-        <div className="p-3 space-y-3 min-h-[80px] overflow-visible">
+        <div className="px-2 py-1.5 space-y-1.5 overflow-visible">
           {/* Tree View */}
           {viewMode === LOGIC_VIEW_MODES.TREE ? (
             <LogicTreeView
@@ -470,11 +465,9 @@ function LogicPanel({
             <>
               {/* Inline View - Groups first, then ungrouped conditions */}
               {sectionConditions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Drag indicators to chart or click Add Condition
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground py-1">
+                  Drag indicators to chart or click Add Condition
+                </p>
               ) : (
                 <>
                   {/* Render groups */}
@@ -506,15 +499,15 @@ function LogicPanel({
                   {ungroupedConditions.map((condition) => (
                     <div
                       key={condition.id}
-                      className="relative"
+                      className="relative flex items-start gap-2"
                     >
                       {/* Selection checkbox */}
                       <button
                         type="button"
                         onClick={() => handleConditionSelect(condition.id)}
                         className={cn(
-                          "absolute -left-1 top-1/2 -translate-y-1/2 z-10",
-                          "w-5 h-5 rounded border flex items-center justify-center",
+                          "mt-3 flex-shrink-0",
+                          "w-4 h-4 rounded border flex items-center justify-center",
                           "transition-colors",
                           selectedConditions.has(condition.id)
                             ? "bg-primary border-primary text-primary-foreground"
@@ -522,11 +515,11 @@ function LogicPanel({
                         )}
                       >
                         {selectedConditions.has(condition.id) && (
-                          <Check className="h-3 w-3" />
+                          <Check className="h-2.5 w-2.5" />
                         )}
                       </button>
 
-                      <div className="ml-5">
+                      <div className="flex-1 min-w-0">
                         <ConditionBlock
                           condition={condition}
                           activeIndicators={activeIndicators}
@@ -547,81 +540,48 @@ function LogicPanel({
             </>
           )}
 
-          {/* Action buttons */}
-          <div className="space-y-2 pt-2">
-            {/* Primary action buttons row */}
-            <div className="flex flex-wrap gap-2">
-              {/* Add Condition Button */}
+          {/* Action buttons - Compact */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => handleAddConditionClick(sectionKey)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              <span>Add Condition</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleAddMultiTimeframeClick(sectionKey)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="Add multi-timeframe condition"
+            >
+              <Clock className="h-3 w-3" />
+              <span>Multi-TF</span>
+            </button>
+
+            {selectedCount >= 2 && viewMode === LOGIC_VIEW_MODES.INLINE && (
               <button
                 type="button"
-                onClick={() => handleAddConditionClick(sectionKey)}
-                className={cn(
-                  "flex items-center gap-2 py-2 px-3",
-                  "text-sm text-muted-foreground",
-                  "border border-dashed border-border rounded-md",
-                  "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
-                  "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-                )}
+                onClick={() => handleGroupSelected(sectionKey)}
+                className="flex items-center gap-1 text-xs bg-primary text-white px-2 py-0.5 rounded"
               >
-                <Plus className="h-4 w-4" />
-                <span>Add Condition</span>
+                <FolderPlus className="h-3 w-3" />
+                <span>Group ({selectedCount})</span>
               </button>
+            )}
 
-              {/* Add Multi-Timeframe Condition Button */}
-              <button
-                type="button"
-                onClick={() => handleAddMultiTimeframeClick(sectionKey)}
-                className={cn(
-                  "flex items-center gap-2 py-2 px-3",
-                  "text-sm text-muted-foreground",
-                  "border border-dashed border-border rounded-md",
-                  "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
-                  "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-                )}
-                title="Add condition referencing indicator from another timeframe"
-              >
-                <Clock className="h-4 w-4" />
-                <span>Multi-TF</span>
-              </button>
-
-              {/* Group Selected Button */}
-              {selectedCount >= 2 && viewMode === LOGIC_VIEW_MODES.INLINE && (
-                <button
-                  type="button"
-                  onClick={() => handleGroupSelected(sectionKey)}
-                  className={cn(
-                    "flex items-center gap-2 py-2 px-3",
-                    "text-sm text-primary-foreground bg-primary",
-                    "rounded-md",
-                    "hover:bg-primary/90",
-                    "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  )}
-                >
-                  <FolderPlus className="h-4 w-4" />
-                  <span>Group Selected ({selectedCount})</span>
-                </button>
-              )}
-            </div>
-
-            {/* Test Logic Button - separate row for visibility */}
             {sectionConditions.length > 0 && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  data-testid="test-logic-button"
-                  onClick={() => handleTestLogicClick(sectionKey)}
-                  className={cn(
-                    "flex items-center gap-2 py-2 px-3",
-                    "text-sm text-muted-foreground",
-                    "border border-border rounded-md",
-                    "hover:bg-muted/50 hover:text-foreground",
-                    "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  )}
-                >
-                  <FlaskConical className="h-4 w-4" />
-                  <span>Test Logic</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleTestLogicClick(sectionKey)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors ml-auto"
+                title="Test logic conditions"
+              >
+                <FlaskConical className="h-3 w-3" />
+                <span>Test</span>
+              </button>
             )}
           </div>
         </div>
@@ -674,6 +634,9 @@ function LogicPanel({
   }
 
   // Expanded state - full panel
+  // When isCollapsedProp is explicitly false (drawer mode), use full width
+  const isDrawerMode = isCollapsedProp === false;
+
   return (
     <>
       <div
@@ -681,50 +644,51 @@ function LogicPanel({
         className={cn(
           "flex flex-col bg-card border-l border-border relative",
           "min-h-full",
-          "transition-all duration-200 ease-out"
+          "transition-all duration-200 ease-out",
+          isDrawerMode && "w-full"
         )}
-        style={{ width: `${panelWidth}px` }}
+        style={isDrawerMode ? undefined : { width: `${panelWidth}px` }}
       >
-        {/* Resize Handle */}
-        <div
-          className={cn(
-            "absolute left-0 top-0 bottom-0 w-1.5",
-            "cursor-ew-resize hover:bg-primary/30 transition-colors",
-            "group",
-            isResizing && "bg-primary/50"
-          )}
-          onMouseDown={handleResizeStart}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize logic panel"
-        >
-          <div className={cn(
-            "absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8",
-            "bg-muted-foreground/30 rounded-full",
-            "group-hover:bg-primary/50 transition-colors",
-            isResizing && "bg-primary"
-          )} />
-        </div>
+        {/* Resize Handle - hidden in drawer mode */}
+        {!isDrawerMode && (
+          <div
+            className={cn(
+              "absolute left-0 top-0 bottom-0 w-1.5",
+              "cursor-ew-resize hover:bg-primary/30 transition-colors",
+              "group",
+              isResizing && "bg-primary/50"
+            )}
+            onMouseDown={handleResizeStart}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize logic panel"
+          >
+            <div className={cn(
+              "absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8",
+              "bg-muted-foreground/30 rounded-full",
+              "group-hover:bg-primary/50 transition-colors",
+              isResizing && "bg-primary"
+            )} />
+          </div>
+        )}
 
-        {/* Panel Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        {/* Panel Header - Minimal */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Logic Panel</h2>
+            <span className="text-sm font-medium text-foreground">Logic</span>
+            {conditions.length > 0 && (
+              <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                {conditions.length}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
-            {/* View mode toggle */}
             <button
               type="button"
               onClick={handleViewModeToggle}
-              data-testid="view-mode-toggle"
-              className={cn(
-                "p-1.5 rounded-md text-muted-foreground",
-                "hover:bg-muted hover:text-foreground",
-                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-              )}
-              aria-label={viewMode === LOGIC_VIEW_MODES.INLINE ? "Switch to tree view" : "Switch to inline view"}
-              title={viewMode === LOGIC_VIEW_MODES.INLINE ? "Tree view" : "Inline view"}
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title={viewMode === LOGIC_VIEW_MODES.INLINE ? "Switch to tree view" : "Switch to list view"}
             >
               {viewMode === LOGIC_VIEW_MODES.INLINE ? (
                 <ListTree className="h-4 w-4" />
@@ -732,25 +696,19 @@ function LogicPanel({
                 <List className="h-4 w-4" />
               )}
             </button>
-
-            {/* Collapse button */}
             <button
               type="button"
               onClick={handleToggle}
-              className={cn(
-                "p-1.5 rounded-md text-muted-foreground",
-                "hover:bg-muted hover:text-foreground",
-                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-              )}
-              aria-label="Collapse logic panel"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Close logic panel"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Time Filter Section */}
-        <div className="px-4 py-2 border-b border-border bg-muted/20">
+        {/* Time Filter Section - Compact */}
+        <div className="px-3 py-1.5 border-b border-border">
           {timeFilter && timeFilter.enabled ? (
             <TimeFilterBadge
               timeFilter={timeFilter}
@@ -761,15 +719,9 @@ function LogicPanel({
             <button
               type="button"
               onClick={onTimeFilterEdit}
-              className={cn(
-                "flex items-center gap-2 py-1.5 px-3",
-                "text-sm text-muted-foreground",
-                "border border-dashed border-border rounded-full",
-                "hover:bg-muted/50 hover:text-foreground hover:border-muted-foreground",
-                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-              )}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Clock className="h-4 w-4" />
+              <Clock className="h-3.5 w-3.5" />
               <span>Add Time Filter</span>
             </button>
           )}
@@ -791,15 +743,14 @@ function LogicPanel({
           />
         </div>
 
-        {/* Panel Footer */}
-        <div className="px-4 py-3 border-t border-border bg-muted/30">
-          <p className="text-xs text-muted-foreground text-center">
-            {conditions.length === 0
-              ? 'Add indicators to create conditions'
-              : `${conditions.length} condition${conditions.length !== 1 ? 's' : ''} defined${groups.length > 0 ? `, ${groups.length} group${groups.length !== 1 ? 's' : ''}` : ''}`
-            }
-          </p>
-        </div>
+        {/* Panel Footer - Minimal */}
+        {conditions.length === 0 && (
+          <div className="px-3 py-2 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              Add indicators to create conditions
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Test Logic Dialog */}

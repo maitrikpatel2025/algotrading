@@ -3,17 +3,11 @@ import { cn } from '../lib/utils';
 import { AlertTriangle, X } from 'lucide-react';
 
 /**
- * ConfirmDialog Component
+ * ConfirmDialog Component - Precision Swiss Design System
  *
- * A modal dialog for confirming destructive actions like deletion.
+ * Clean modal dialog with white background.
+ * No gradients, simple border styling.
  * Supports multiple action buttons for different confirmation options.
- *
- * @param {boolean} isOpen - Whether the dialog is visible
- * @param {Function} onClose - Callback when dialog is closed
- * @param {string} title - Dialog title
- * @param {string} message - Dialog message/description
- * @param {Array} actions - Array of action objects: { label, onClick, variant }
- * @param {string} variant - Dialog variant: 'warning' | 'danger' | 'info'
  */
 function ConfirmDialog({
   isOpen,
@@ -29,10 +23,8 @@ function ConfirmDialog({
   // Focus management and escape key handler
   useEffect(() => {
     if (isOpen) {
-      // Focus first button when dialog opens
       firstButtonRef.current?.focus();
 
-      // Handle escape key
       const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
           onClose();
@@ -56,19 +48,19 @@ function ConfirmDialog({
 
   if (!isOpen) return null;
 
-  // Variant-based styling
+  // Variant-based styling - Precision Swiss Design
   const variantStyles = {
     warning: {
-      icon: 'text-amber-500',
-      iconBg: 'bg-amber-500/10',
+      icon: 'text-warning',
+      iconBg: 'bg-warning-light',
     },
     danger: {
-      icon: 'text-destructive',
-      iconBg: 'bg-destructive/10',
+      icon: 'text-danger',
+      iconBg: 'bg-danger-light',
     },
     info: {
-      icon: 'text-info',
-      iconBg: 'bg-info/10',
+      icon: 'text-primary',
+      iconBg: 'bg-primary-light',
     },
   };
 
@@ -83,7 +75,7 @@ function ConfirmDialog({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-neutral-900/50"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -91,22 +83,13 @@ function ConfirmDialog({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={cn(
-          "relative bg-card rounded-lg shadow-xl max-w-md w-full",
-          "border border-border",
-          "animate-fade-in"
-        )}
+        className="relative bg-white rounded-md shadow-elevated max-w-md w-full border border-neutral-200 animate-fade-in"
       >
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className={cn(
-            "absolute top-3 right-3 p-1.5 rounded-md",
-            "text-muted-foreground hover:text-foreground",
-            "hover:bg-muted transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-primary/50"
-          )}
+          className="absolute top-3 right-3 p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
           aria-label="Close dialog"
         >
           <X className="h-4 w-4" />
@@ -122,11 +105,11 @@ function ConfirmDialog({
             <div className="flex-1">
               <h2
                 id="confirm-dialog-title"
-                className="text-lg font-semibold text-foreground"
+                className="text-lg font-semibold text-neutral-900"
               >
                 {title}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-neutral-500">
                 {message}
               </p>
             </div>
@@ -138,12 +121,7 @@ function ConfirmDialog({
             <button
               type="button"
               onClick={onClose}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md",
-                "bg-muted text-foreground",
-                "hover:bg-muted/80 transition-colors",
-                "focus:outline-none focus:ring-2 focus:ring-primary/50"
-              )}
+              className="btn btn-secondary"
             >
               Cancel
             </button>
@@ -156,28 +134,11 @@ function ConfirmDialog({
                 type="button"
                 onClick={action.onClick}
                 className={cn(
-                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                  "focus:outline-none focus:ring-2 focus:ring-offset-2",
-                  action.variant === 'danger' && [
-                    "bg-destructive text-destructive-foreground",
-                    "hover:bg-destructive/90",
-                    "focus:ring-destructive/50"
-                  ],
-                  action.variant === 'primary' && [
-                    "bg-primary text-primary-foreground",
-                    "hover:bg-primary/90",
-                    "focus:ring-primary/50"
-                  ],
-                  action.variant === 'secondary' && [
-                    "bg-secondary text-secondary-foreground",
-                    "hover:bg-secondary/80",
-                    "focus:ring-secondary/50"
-                  ],
-                  !action.variant && [
-                    "bg-primary text-primary-foreground",
-                    "hover:bg-primary/90",
-                    "focus:ring-primary/50"
-                  ]
+                  "btn",
+                  action.variant === 'danger' && "btn-danger",
+                  action.variant === 'primary' && "btn-primary",
+                  action.variant === 'secondary' && "btn-secondary",
+                  !action.variant && "btn-primary"
                 )}
               >
                 {action.label}

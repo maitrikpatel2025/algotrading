@@ -1,14 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Plotly from 'plotly.js-dist';
-import Select from './Select';
-import { COUNTS, CHART_TYPES, DATE_RANGES } from '../app/data';
 import { drawChart, computeZoomedInRange, computeZoomedOutRange, computeScrolledRange } from '../app/chart';
 import { getIndicatorDisplayName } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
-import { LineChart, BarChart2, X, Settings } from 'lucide-react';
+import { X, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 import IndicatorContextMenu from './IndicatorContextMenu';
-import DrawingToolbar from './DrawingToolbar';
 import DrawingContextMenu from './DrawingContextMenu';
 import {
   DRAWING_TOOLS,
@@ -345,7 +342,7 @@ function PriceChart({
   // Handle chart click for drawing tools
   const handleChartDrawingClick = useCallback((event) => {
     // Only handle if a drawing tool is active
-    if (activeDrawingTool === DRAWING_TOOLS.POINTER || !priceData || !onDrawingAdd) {
+    if (activeDrawingTool === DRAWING_TOOLS.POINTER || activeDrawingTool === DRAWING_TOOLS.CROSSHAIR || !priceData || !onDrawingAdd) {
       return;
     }
 
@@ -544,204 +541,12 @@ function PriceChart({
   }, [onIndicatorDrop, onPatternDrop]);
 
   return (
-    <div className="card animate-fade-in">
-      {/* Header */}
-      <div className="card-header border-b border-border">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/70 shadow-lg shadow-accent/20">
-              <LineChart className="h-5 w-5 text-white" />
-            </div>
-            <div className="flex items-center gap-2">
-              <div>
-                <h3 className="card-title">Price Chart</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {selectedPair}
-                </p>
-              </div>
-              {/* Timeframe Badge Pill */}
-              <span className="ml-2 px-2 py-1 rounded-md bg-primary text-primary-foreground text-xs font-bold">
-                {selectedGranularity}
-              </span>
-            </div>
-          </div>
-
-          {/* Chart Controls */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Chart Type Selector */}
-            <Select
-              name="chartType"
-              title="Chart Type"
-              options={CHART_TYPES}
-              defaultValue={chartType}
-              onSelected={onChartTypeChange}
-              hideLabel
-              className="w-32"
-            />
-
-            {/* Candle Count Selector */}
-            <Select
-              name="numrows"
-              title="Candles"
-              options={COUNTS}
-              defaultValue={selectedCount}
-              onSelected={handleCountChange}
-              hideLabel
-              className="w-24"
-            />
-
-            {/* Volume Toggle */}
-            <button
-              onClick={onVolumeToggle}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                showVolume
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-              title={showVolume ? 'Hide Volume' : 'Show Volume'}
-            >
-              <BarChart2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Vol</span>
-            </button>
-
-            {/* Drawing Toolbar */}
-            {onDrawingToolChange && (
-              <DrawingToolbar
-                activeTool={activeDrawingTool}
-                onToolSelect={onDrawingToolChange}
-                drawings={drawings}
-                disabled={!priceData || loading}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Date Range Buttons */}
-        <div className="mt-4 pt-4 border-t border-border">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground mr-2">Range:</span>
-            {DATE_RANGES.map((range) => (
-              <button
-                key={range.key}
-                onClick={() => onDateRangeChange(range.value)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  selectedDateRange === range.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
-                }`}
-              >
-                {range.text}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Active Indicators */}
-        {activeIndicators.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground mr-2">Active:</span>
-              {activeIndicators.map((indicator) => {
-                const displayName = getIndicatorDisplayName(indicator, indicator.params || indicator.defaultParams);
-                const isPreview = indicator.isPreview;
-                const isBeingPreviewed = previewIndicator && previewIndicator.instanceId === indicator.instanceId && !comparisonMode;
-
-                // Skip rendering the original if it's being replaced by preview
-                if (isBeingPreviewed && !indicator.isPreview) {
-                  return null;
-                }
-
-                return (
-                  <span
-                    key={indicator.instanceId}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-                      isPreview
-                        ? "bg-amber-500/20 text-foreground border border-amber-500/30 border-dashed"
-                        : "bg-muted text-foreground",
-                      onEditIndicator && "cursor-pointer hover:bg-muted/80 transition-colors group"
-                    )}
-                    style={{ borderLeft: `3px solid ${indicator.color}` }}
-                    onClick={(e) => {
-                      // Don't trigger edit when clicking the remove button
-                      if (e.target.closest('button')) return;
-                      if (onEditIndicator && !isPreview) {
-                        onEditIndicator(indicator.instanceId);
-                      }
-                    }}
-                    title={onEditIndicator && !isPreview ? `Click to edit ${displayName}` : displayName}
-                  >
-                    {displayName}
-                    {isPreview && <span className="text-amber-600 dark:text-amber-400">(Preview)</span>}
-                    {onEditIndicator && !isPreview && (
-                      <Settings className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
-                    {onRemoveIndicator && !isPreview && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveIndicator(indicator.instanceId);
-                        }}
-                        className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-                        title={`Remove ${displayName}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Active Patterns */}
-        {activePatterns.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground mr-2">Patterns:</span>
-              {activePatterns.map((pattern) => {
-                const displayName = getPatternDisplayName(pattern);
-                const patternCount = pattern.detectedCount || 0;
-                return (
-                  <span
-                    key={pattern.instanceId}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground"
-                    style={{ borderLeft: `3px solid ${pattern.color}` }}
-                    title={`${displayName} - ${patternCount} detected`}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: pattern.color }}
-                    />
-                    Found {patternCount} {displayName}
-                    {onRemovePattern && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemovePattern(pattern.instanceId);
-                        }}
-                        className="ml-1 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-                        title={`Remove ${displayName}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Chart Container */}
-      <div className="p-4">
+    <div className="relative animate-fade-in">
+      {/* Chart Container - No Card Wrapper for Clean TradingView Look */}
+      <div className="relative">
         {loading ? (
           /* Loading Skeleton State */
-          <div className="w-full rounded-lg bg-muted/30 min-h-[500px] flex items-center justify-center" style={{ height: 'calc(100vh - 450px)' }}>
+          <div className="w-full rounded-lg bg-muted/30 min-h-[500px] flex items-center justify-center" style={{ height: 'calc(100vh - 280px)' }}>
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
@@ -761,6 +566,109 @@ function PriceChart({
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
+            {/* Chart Legend Overlay - TradingView Style */}
+            <div className="absolute top-3 left-3 z-30 pointer-events-none">
+              <div className="flex flex-col gap-1">
+                {/* Symbol and Timeframe */}
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  <span className="text-sm font-semibold text-foreground bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded">
+                    {selectedPair} <span className="text-muted-foreground">·</span> {selectedGranularity}
+                  </span>
+                </div>
+
+                {/* Active Indicators */}
+                {activeIndicators.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap pointer-events-auto">
+                    {activeIndicators.map((indicator) => {
+                      const displayName = getIndicatorDisplayName(indicator, indicator.params || indicator.defaultParams);
+                      const isPreview = indicator.isPreview;
+                      const isBeingPreviewed = previewIndicator && previewIndicator.instanceId === indicator.instanceId && !comparisonMode;
+
+                      // Skip rendering the original if it's being replaced by preview
+                      if (isBeingPreviewed && !indicator.isPreview) {
+                        return null;
+                      }
+
+                      return (
+                        <span
+                          key={indicator.instanceId}
+                          className={cn(
+                            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-background/80 backdrop-blur-sm cursor-pointer hover:bg-background/90 transition-colors group",
+                            isPreview && "border border-dashed border-amber-500/50"
+                          )}
+                          style={{ borderLeft: `2px solid ${indicator.color}` }}
+                          onClick={(e) => {
+                            // Don't trigger edit when clicking the remove button
+                            if (e.target.closest('button')) return;
+                            if (onEditIndicator && !isPreview) {
+                              onEditIndicator(indicator.instanceId);
+                            }
+                          }}
+                          title={onEditIndicator && !isPreview ? `Click to edit ${displayName}` : displayName}
+                        >
+                          {displayName}
+                          {isPreview && <span className="text-amber-500">(P)</span>}
+                          {onEditIndicator && !isPreview && (
+                            <Settings className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          )}
+                          {onRemoveIndicator && !isPreview && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveIndicator(indicator.instanceId);
+                              }}
+                              className="p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
+                              title={`Remove ${displayName}`}
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Active Patterns */}
+                {activePatterns.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap pointer-events-auto">
+                    {activePatterns.map((pattern) => {
+                      const displayName = getPatternDisplayName(pattern);
+                      const patternCount = pattern.detectedCount || 0;
+                      return (
+                        <span
+                          key={pattern.instanceId}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-background/80 backdrop-blur-sm"
+                          style={{ borderLeft: `2px solid ${pattern.color}` }}
+                          title={`${displayName} - ${patternCount} detected`}
+                        >
+                          <span
+                            className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: pattern.color }}
+                          />
+                          {patternCount} {displayName}
+                          {onRemovePattern && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemovePattern(pattern.instanceId);
+                              }}
+                              className="p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
+                              title={`Remove ${displayName}`}
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Drop zone overlay */}
             {isDragOver && (
               <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -773,35 +681,36 @@ function PriceChart({
               id="chartDiv"
               className={cn(
                 "w-full rounded-lg bg-muted/30 min-h-[500px]",
-                activeDrawingTool !== DRAWING_TOOLS.POINTER && "cursor-crosshair"
+                activeDrawingTool !== DRAWING_TOOLS.POINTER && activeDrawingTool !== DRAWING_TOOLS.CROSSHAIR && "cursor-crosshair",
+                activeDrawingTool === DRAWING_TOOLS.CROSSHAIR && "cursor-crosshair"
               )}
-              style={{ height: 'calc(100vh - 450px)' }}
+              style={{ height: 'calc(100vh - 280px)' }}
               onClick={handleChartDrawingClick}
             />
 
             {/* Pending drawing indicator */}
             {pendingDrawing && (
-              <div className="absolute top-4 right-4 z-40 bg-amber-500/90 text-white px-3 py-2 rounded-md shadow-lg text-sm font-medium flex items-center gap-2">
+              <div className="absolute top-3 right-3 z-40 bg-amber-500/90 text-white px-3 py-2 rounded-md shadow-lg text-sm font-medium flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                Click to set {pendingDrawing.type === DRAWING_TOOLS.TRENDLINE ? 'end point' : 'end point'} • Press Esc to cancel
+                Click to set {pendingDrawing.type === DRAWING_TOOLS.TRENDLINE ? 'end point' : 'end point'} · Press Esc to cancel
               </div>
             )}
 
             {/* Interaction Hints Tooltip */}
             {showInteractionHint && (
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+              <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
                 <div className="bg-black/90 text-white rounded-md px-4 py-3 shadow-lg max-w-md">
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-sm">
                       {isTouchDevice ? (
                         <p>
-                          <span className="font-semibold">Pinch to zoom</span> • <span className="font-semibold">Drag to pan</span> • <span className="font-semibold">Double-tap to reset</span>
+                          <span className="font-semibold">Pinch to zoom</span> · <span className="font-semibold">Drag to pan</span> · <span className="font-semibold">Double-tap to reset</span>
                         </p>
                       ) : (
                         <p>
-                          <span className="font-semibold">Scroll to zoom</span> • <span className="font-semibold">Drag to pan</span> • <span className="font-semibold">Double-click to reset</span>
+                          <span className="font-semibold">Scroll to zoom</span> · <span className="font-semibold">Drag to pan</span> · <span className="font-semibold">Double-click to reset</span>
                           <br />
-                          <span className="text-xs text-white/80 mt-1 inline-block">Keyboard: +/- to zoom, ←/→ to scroll</span>
+                          <span className="text-xs text-white/80 mt-1 inline-block">Keyboard: +/- to zoom, arrows to scroll</span>
                         </p>
                       )}
                     </div>
@@ -819,9 +728,9 @@ function PriceChart({
 
             {/* Zoom Level Indicator */}
             {visibleCandleCount !== null && (
-              <div className="mt-2 text-center">
-                <span className="text-sm text-muted-foreground font-medium">
-                  Showing {visibleCandleCount} candle{visibleCandleCount !== 1 ? 's' : ''}
+              <div className="absolute bottom-3 left-3 z-30">
+                <span className="text-xs text-muted-foreground font-medium bg-background/80 backdrop-blur-sm px-2 py-1 rounded">
+                  {visibleCandleCount} candle{visibleCandleCount !== 1 ? 's' : ''}
                 </span>
               </div>
             )}

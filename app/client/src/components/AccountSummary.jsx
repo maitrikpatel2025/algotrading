@@ -3,6 +3,14 @@ import endPoints from '../app/api';
 import { cn } from '../lib/utils';
 import { Wallet, TrendingUp, Scale, Percent, Layers } from 'lucide-react';
 
+/**
+ * AccountSummary Component - Precision Swiss Design System
+ *
+ * Clean card with proper KPI styling.
+ * Tabular numbers for financial data.
+ * No gradients, clean borders.
+ */
+
 const DATA_KEYS = [
   { name: "Account Number", key: "Id", fixed: -1, icon: Wallet },
   { name: "Balance", key: "Balance", fixed: 2, prefix: "$", icon: Wallet },
@@ -41,21 +49,21 @@ function AccountSummary() {
     return `${prefix}${formatted}${suffix}`;
   };
 
-  // Loading skeleton
+  // Loading skeleton - Precision Swiss Design
   if (loading) {
     return (
       <div className="card animate-fade-in">
-        <div className="card-header border-b border-border">
+        <div className="p-4 border-b border-neutral-200">
           <div className="flex items-center gap-3">
-            <div className="skeleton h-10 w-10 rounded-lg" />
-            <div className="skeleton h-6 w-40" />
+            <div className="h-10 w-10 rounded-md bg-neutral-200 animate-pulse" />
+            <div className="h-5 w-40 bg-neutral-200 rounded animate-pulse" />
           </div>
         </div>
-        <div className="card-content pt-6 space-y-4">
+        <div className="p-4 space-y-4">
           {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="flex justify-between items-center">
-              <div className="skeleton h-4 w-28" />
-              <div className="skeleton h-5 w-24" />
+              <div className="h-4 w-28 bg-neutral-200 rounded animate-pulse" />
+              <div className="h-5 w-24 bg-neutral-200 rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -67,16 +75,16 @@ function AccountSummary() {
   if (!account) {
     return (
       <div className="card">
-        <div className="card-header border-b border-border">
+        <div className="p-4 border-b border-neutral-200">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <Wallet className="h-5 w-5 text-muted-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-neutral-100">
+              <Wallet className="h-5 w-5 text-neutral-400" />
             </div>
-            <h3 className="card-title">Account Summary</h3>
+            <h3 className="text-base font-semibold text-neutral-900">Account Summary</h3>
           </div>
         </div>
-        <div className="card-content pt-6">
-          <p className="text-muted-foreground text-center py-8">
+        <div className="p-4">
+          <p className="text-neutral-500 text-center py-8">
             Unable to load account data. Please try again later.
           </p>
         </div>
@@ -86,60 +94,60 @@ function AccountSummary() {
 
   return (
     <div className="card animate-fade-in">
-      {/* Header */}
-      <div className="card-header border-b border-border">
+      {/* Header - Precision Swiss Design */}
+      <div className="p-4 border-b border-neutral-200">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20">
-            <Wallet className="h-5 w-5 text-white" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-light">
+            <Wallet className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="card-title">Account Summary</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Real-time account metrics</p>
+            <h3 className="text-base font-semibold text-neutral-900">Account Summary</h3>
+            <p className="text-xs text-neutral-500">Real-time account metrics</p>
           </div>
         </div>
       </div>
-      
+
       {/* Content */}
-      <div className="card-content pt-6">
-        <div className="space-y-4">
+      <div className="p-4">
+        <div className="space-y-3">
           {DATA_KEYS.map((item, index) => {
             const value = account[item.key];
             const isProfit = item.colored && typeof value === 'number';
             const isPositive = isProfit && value >= 0;
             const isNegative = isProfit && value < 0;
             const Icon = item.icon;
-            
+
             return (
-              <div 
-                key={item.key} 
+              <div
+                key={item.key}
                 className={cn(
                   "flex items-center justify-between py-2 transition-colors",
-                  index !== DATA_KEYS.length - 1 && "border-b border-border/50"
+                  index !== DATA_KEYS.length - 1 && "border-b border-neutral-100"
                 )}
               >
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     "flex h-8 w-8 items-center justify-center rounded-md",
-                    isPositive && "bg-success/10",
-                    isNegative && "bg-destructive/10",
-                    !isProfit && "bg-muted"
+                    isPositive && "bg-success-light",
+                    isNegative && "bg-danger-light",
+                    !isProfit && "bg-neutral-100"
                   )}>
                     <Icon className={cn(
                       "h-4 w-4",
                       isPositive && "text-success",
-                      isNegative && "text-destructive",
-                      !isProfit && "text-muted-foreground"
+                      isNegative && "text-danger",
+                      !isProfit && "text-neutral-400"
                     )} />
                   </div>
-                  <span className="text-sm font-medium text-muted-foreground">
+                  <span className="text-sm font-medium text-neutral-500">
                     {item.name}
                   </span>
                 </div>
                 <span className={cn(
-                  "text-sm font-bold tabular-nums",
-                  isPositive && "text-success",
-                  isNegative && "text-destructive",
-                  !isProfit && "text-foreground"
+                  "text-sm font-semibold tabular-nums",
+                  isPositive && "pnl-positive",
+                  isNegative && "pnl-negative",
+                  !isProfit && "text-neutral-900"
                 )}>
                   {isProfit && value >= 0 && "+"}
                   {formatValue(value, item.fixed, item.prefix, item.suffix)}

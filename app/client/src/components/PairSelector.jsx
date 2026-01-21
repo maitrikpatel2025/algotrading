@@ -349,15 +349,10 @@ function PairSelector({
   return (
     <div
       ref={containerRef}
-      className={cn("relative flex flex-col gap-1.5", className)}
+      className={cn("relative", className)}
       onKeyDown={handleKeyDown}
     >
-      {/* Label */}
-      <label className="text-sm font-medium text-muted-foreground">
-        Currency Pair
-      </label>
-
-      {/* Trigger Button */}
+      {/* Trigger Button - No label for cleaner toolbar */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -387,7 +382,8 @@ function PairSelector({
       {/* Dropdown */}
       {isOpen && (
         <div className={cn(
-          "absolute z-50 top-full left-0 right-0 mt-1",
+          "absolute z-50 top-full left-0 mt-1",
+          "min-w-[280px] w-max",
           "bg-card border border-border rounded-lg shadow-xl",
           "animate-in fade-in-0 zoom-in-95 duration-150"
         )}>

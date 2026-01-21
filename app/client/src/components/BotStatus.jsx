@@ -5,7 +5,10 @@ import { Bot, Activity, Clock, Signal, TrendingUp, AlertCircle, Play, Square, Ch
 
 const POLL_INTERVAL = 30000; // 30 seconds
 
-// Toast notification component
+/**
+ * Toast notification component - Precision Swiss Design
+ * Clean white background with colored left border
+ */
 function Toast({ message, type, onClose }) {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -14,18 +17,18 @@ function Toast({ message, type, onClose }) {
     return () => clearTimeout(timer);
   }, [onClose]);
 
-  const bgColor = type === 'success' ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30';
-  const textColor = type === 'success' ? 'text-success' : 'text-destructive';
+  const borderColor = type === 'success' ? 'border-l-success' : 'border-l-danger';
+  const textColor = type === 'success' ? 'text-success' : 'text-danger';
 
   return (
     <div className={cn(
-      "fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg animate-fade-in",
-      bgColor
+      "fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-white border border-neutral-200 rounded-md shadow-elevated animate-fade-in border-l-4",
+      borderColor
     )}>
       <span className={cn("text-sm font-medium", textColor)}>{message}</span>
       <button
         onClick={onClose}
-        className={cn("p-1 rounded-full hover:bg-black/10", textColor)}
+        className="p-1 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
       >
         <X className="h-4 w-4" />
       </button>
@@ -33,28 +36,31 @@ function Toast({ message, type, onClose }) {
   );
 }
 
-// Confirmation dialog component
+/**
+ * Confirmation dialog component - Precision Swiss Design
+ * Clean modal with no gradients
+ */
 function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel, isLoading }) {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative bg-card border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4 animate-fade-in">
-        <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-        <p className="text-sm text-muted-foreground mb-6">{message}</p>
+      <div className="absolute inset-0 bg-neutral-900/50" onClick={onCancel} />
+      <div className="relative bg-white border border-neutral-200 rounded-md shadow-elevated p-6 max-w-md w-full mx-4 animate-fade-in">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-2">{title}</h3>
+        <p className="text-sm text-neutral-500 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
+            className="btn btn-secondary disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="btn btn-danger disabled:opacity-50 flex items-center gap-2"
           >
             {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
             Confirm
@@ -181,98 +187,104 @@ function BotStatus() {
       case 'running':
         return {
           label: 'Running',
-          bgColor: 'bg-success/10',
+          bgColor: 'bg-success-light',
           textColor: 'text-success',
-          borderColor: 'border-success/30',
+          borderColor: 'border-success',
+          leftBorder: 'border-l-success',
           pulse: true,
         };
       case 'starting':
         return {
           label: 'Starting',
-          bgColor: 'bg-warning/10',
+          bgColor: 'bg-warning-light',
           textColor: 'text-warning',
-          borderColor: 'border-warning/30',
+          borderColor: 'border-warning',
+          leftBorder: 'border-l-warning',
           pulse: true,
         };
       case 'stopping':
         return {
           label: 'Stopping',
-          bgColor: 'bg-warning/10',
+          bgColor: 'bg-warning-light',
           textColor: 'text-warning',
-          borderColor: 'border-warning/30',
+          borderColor: 'border-warning',
+          leftBorder: 'border-l-warning',
           pulse: true,
         };
       case 'paused':
         return {
           label: 'Paused',
-          bgColor: 'bg-warning/10',
+          bgColor: 'bg-warning-light',
           textColor: 'text-warning',
-          borderColor: 'border-warning/30',
+          borderColor: 'border-warning',
+          leftBorder: 'border-l-warning',
           pulse: false,
         };
       case 'error':
         return {
           label: 'Error',
-          bgColor: 'bg-destructive/10',
-          textColor: 'text-destructive',
-          borderColor: 'border-destructive/30',
+          bgColor: 'bg-danger-light',
+          textColor: 'text-danger',
+          borderColor: 'border-danger',
+          leftBorder: 'border-l-danger',
           pulse: false,
         };
       case 'stopped':
       default:
         return {
           label: 'Stopped',
-          bgColor: 'bg-muted',
-          textColor: 'text-muted-foreground',
-          borderColor: 'border-border',
+          bgColor: 'bg-neutral-100',
+          textColor: 'text-neutral-500',
+          borderColor: 'border-neutral-300',
+          leftBorder: 'border-l-neutral-300',
           pulse: false,
         };
     }
   };
 
-  // Loading skeleton
+  // Loading skeleton - Precision Swiss Design
   if (loading) {
     return (
       <div className="card animate-fade-in">
-        <div className="card-header border-b border-border">
+        <div className="p-4 border-b border-neutral-200">
           <div className="flex items-center gap-3">
-            <div className="skeleton h-10 w-10 rounded-lg" />
-            <div className="skeleton h-6 w-40" />
+            <div className="h-10 w-10 rounded-md bg-neutral-200 animate-pulse" />
+            <div className="h-5 w-40 bg-neutral-200 rounded animate-pulse" />
           </div>
         </div>
-        <div className="card-content pt-6 space-y-4">
+        <div className="p-4 space-y-4">
           <div className="flex justify-between items-center">
-            <div className="skeleton h-4 w-20" />
-            <div className="skeleton h-6 w-24 rounded-full" />
+            <div className="h-4 w-20 bg-neutral-200 rounded animate-pulse" />
+            <div className="h-6 w-24 bg-neutral-200 rounded-full animate-pulse" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="skeleton h-16 rounded-lg" />
+              <div key={i} className="h-16 bg-neutral-100 rounded-md animate-pulse" />
             ))}
           </div>
-          <div className="skeleton h-20 rounded-lg" />
-          <div className="skeleton h-12 rounded-lg" />
+          <div className="h-20 bg-neutral-100 rounded-md animate-pulse" />
+          <div className="h-12 bg-neutral-200 rounded-md animate-pulse" />
         </div>
       </div>
     );
   }
 
-  // Error state
+  // Error state - Precision Swiss Design
   if (error && !botStatus) {
     return (
       <div className="card">
-        <div className="card-header border-b border-border">
+        <div className="p-4 border-b border-neutral-200">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <Bot className="h-5 w-5 text-muted-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-neutral-100">
+              <Bot className="h-5 w-5 text-neutral-400" />
             </div>
-            <h3 className="card-title">Trading Bot Status</h3>
+            <h3 className="text-base font-semibold text-neutral-900">Trading Bot Status</h3>
           </div>
         </div>
-        <div className="card-content pt-6">
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            <p className="text-sm text-destructive">{error}</p>
+        <div className="p-4">
+          <div className="flex items-center gap-3 p-4 rounded-md bg-danger-light border-l-4 border-l-danger">
+            <AlertCircle className="h-5 w-5 text-danger" />
+            <p className="text-sm text-danger">{error}</p>
           </div>
         </div>
       </div>
@@ -284,7 +296,10 @@ function BotStatus() {
   const canStop = botStatus?.can_stop && !isStarting && !isStopping;
 
   return (
-    <div className="card animate-fade-in">
+    <div className={cn(
+      "card animate-fade-in border-l-4",
+      statusConfig.leftBorder
+    )}>
       {/* Toast notification */}
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={hideToast} />
@@ -300,24 +315,23 @@ function BotStatus() {
         isLoading={isStopping}
       />
 
-      {/* Header */}
-      <div className="card-header border-b border-border">
+      {/* Header - Precision Swiss Design */}
+      <div className="p-4 border-b border-neutral-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/70 shadow-lg shadow-accent/20">
-              <Bot className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-light">
+              <Bot className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="card-title">Trading Bot Status</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Automated trading system</p>
+              <h3 className="text-base font-semibold text-neutral-900">Trading Bot</h3>
+              <p className="text-xs text-neutral-500">Automated trading system</p>
             </div>
           </div>
 
           {/* Status Badge */}
           <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-full border",
-            statusConfig.bgColor,
-            statusConfig.borderColor
+            "flex items-center gap-2 px-3 py-1.5 rounded-full",
+            statusConfig.bgColor
           )}>
             {statusConfig.pulse && (
               <span className="relative flex h-2 w-2">
@@ -331,25 +345,25 @@ function BotStatus() {
                 )} />
               </span>
             )}
-            <span className={cn("text-sm font-medium", statusConfig.textColor)}>
+            <span className={cn("text-xs font-medium uppercase tracking-wider", statusConfig.textColor)}>
               {statusConfig.label}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="card-content pt-6 space-y-6">
+      {/* Content - Precision Swiss Design */}
+      <div className="p-4 space-y-4">
         {/* Control Buttons */}
         <div className="flex gap-3">
           <button
             onClick={handleStart}
             disabled={!canStart}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all",
+              "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
               canStart
-                ? "bg-success text-success-foreground hover:bg-success/90 shadow-lg shadow-success/20"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
+                ? "bg-success text-white hover:bg-success-hover"
+                : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
             )}
           >
             {isStarting ? (
@@ -364,10 +378,10 @@ function BotStatus() {
             onClick={handleStop}
             disabled={!canStop}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all",
+              "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
               canStop
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/20"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
+                ? "bg-danger text-white hover:bg-danger-hover"
+                : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
             )}
           >
             {isStopping ? (
@@ -381,30 +395,30 @@ function BotStatus() {
 
         {/* Configuration Panel (shown when bot is stopped) */}
         {botStatus?.status === 'stopped' && (
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className="border border-neutral-200 rounded-md overflow-hidden">
             <button
               onClick={() => setShowConfig(!showConfig)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 bg-neutral-50 hover:bg-neutral-100 transition-colors"
             >
-              <span className="text-sm font-medium text-foreground">Configuration</span>
+              <span className="text-sm font-medium text-neutral-900">Configuration</span>
               {showConfig ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                <ChevronUp className="h-4 w-4 text-neutral-400" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-neutral-400" />
               )}
             </button>
 
             {showConfig && (
-              <div className="p-4 space-y-4 bg-card">
+              <div className="p-4 space-y-4 bg-white">
                 {/* Strategy Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
                     Strategy
                   </label>
                   <select
                     value={selectedStrategy}
                     onChange={(e) => setSelectedStrategy(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="input-field"
                   >
                     <option value="Bollinger Bands Strategy">Bollinger Bands Strategy</option>
                   </select>
@@ -412,13 +426,13 @@ function BotStatus() {
 
                 {/* Timeframe Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
                     Timeframe
                   </label>
                   <select
                     value={selectedTimeframe}
                     onChange={(e) => setSelectedTimeframe(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="input-field"
                   >
                     <option value="M1">M1 (1 Minute)</option>
                     <option value="M5">M5 (5 Minutes)</option>
@@ -432,14 +446,14 @@ function BotStatus() {
                 {/* Trading Pairs Info */}
                 {botStatus?.monitored_pairs && botStatus.monitored_pairs.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
+                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
                       Trading Pairs (from config)
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {botStatus.monitored_pairs.map((pair, index) => (
                         <span
                           key={`config-${pair.symbol}-${index}`}
-                          className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary border border-primary/30"
+                          className="badge badge-primary"
                         >
                           {pair.symbol}
                         </span>
@@ -454,59 +468,59 @@ function BotStatus() {
 
         {/* Error Banner */}
         {botStatus?.status === 'error' && botStatus?.error_message && (
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
-            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-            <p className="text-sm text-destructive">{botStatus.error_message}</p>
+          <div className="flex items-center gap-3 p-4 rounded-md bg-danger-light border-l-4 border-l-danger">
+            <AlertCircle className="h-5 w-5 text-danger flex-shrink-0" />
+            <p className="text-sm text-danger">{botStatus.error_message}</p>
           </div>
         )}
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 gap-3">
           {/* Uptime */}
-          <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+          <div className="p-3 rounded-md bg-neutral-50 border border-neutral-200">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Uptime</span>
+              <Clock className="h-4 w-4 text-neutral-400" />
+              <span className="text-xs text-neutral-500 uppercase tracking-wider">Uptime</span>
             </div>
-            <p className="text-lg font-bold text-foreground">
+            <p className="text-lg font-semibold text-neutral-900 tabular-nums">
               {formatUptime(botStatus?.uptime_seconds)}
             </p>
           </div>
 
           {/* Last Signal */}
-          <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+          <div className="p-3 rounded-md bg-neutral-50 border border-neutral-200">
             <div className="flex items-center gap-2 mb-1">
-              <Signal className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Last Signal</span>
+              <Signal className="h-4 w-4 text-neutral-400" />
+              <span className="text-xs text-neutral-500 uppercase tracking-wider">Last Signal</span>
             </div>
-            <p className="text-lg font-bold text-foreground">
+            <p className="text-lg font-semibold text-neutral-900 tabular-nums">
               {formatRelativeTime(botStatus?.last_signal_time)}
             </p>
             {botStatus?.last_signal_pair && botStatus?.last_signal_type && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-neutral-500">
                 {botStatus.last_signal_type} {botStatus.last_signal_pair}
               </p>
             )}
           </div>
 
           {/* Signals Today */}
-          <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+          <div className="p-3 rounded-md bg-neutral-50 border border-neutral-200">
             <div className="flex items-center gap-2 mb-1">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Signals Today</span>
+              <Activity className="h-4 w-4 text-neutral-400" />
+              <span className="text-xs text-neutral-500 uppercase tracking-wider">Signals Today</span>
             </div>
-            <p className="text-lg font-bold text-foreground">
+            <p className="text-lg font-semibold text-neutral-900 tabular-nums">
               {botStatus?.signals_today ?? 0}
             </p>
           </div>
 
           {/* Trades Today */}
-          <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+          <div className="p-3 rounded-md bg-neutral-50 border border-neutral-200">
             <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Trades Today</span>
+              <TrendingUp className="h-4 w-4 text-neutral-400" />
+              <span className="text-xs text-neutral-500 uppercase tracking-wider">Trades Today</span>
             </div>
-            <p className="text-lg font-bold text-foreground">
+            <p className="text-lg font-semibold text-neutral-900 tabular-nums">
               {botStatus?.trades_today ?? 0}
             </p>
           </div>
@@ -514,13 +528,13 @@ function BotStatus() {
 
         {/* Active Strategy */}
         {botStatus?.active_strategy && (
-          <div className="p-4 rounded-lg border border-border bg-card">
-            <h4 className="text-sm font-semibold text-foreground mb-2">Active Strategy</h4>
-            <p className="text-base font-medium text-primary">
+          <div className="p-4 rounded-md border border-neutral-200 bg-white">
+            <h4 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Active Strategy</h4>
+            <p className="text-base font-semibold text-primary">
               {botStatus.active_strategy.name}
             </p>
             {botStatus.active_strategy.description && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-neutral-500 mt-1">
                 {botStatus.active_strategy.description}
               </p>
             )}
@@ -530,20 +544,20 @@ function BotStatus() {
         {/* Monitored Pairs */}
         {botStatus?.monitored_pairs && botStatus.monitored_pairs.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-3">Monitored Pairs</h4>
+            <h4 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Monitored Pairs</h4>
             <div className="flex flex-wrap gap-2">
               {botStatus.monitored_pairs.map((pair, index) => (
                 <div
                   key={`${pair.symbol}-${index}`}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border",
+                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
                     pair.is_active
-                      ? "bg-primary/10 text-primary border-primary/30"
-                      : "bg-muted text-muted-foreground border-border"
+                      ? "bg-primary-light text-primary"
+                      : "bg-neutral-100 text-neutral-500"
                   )}
                 >
-                  <span className="font-medium">{pair.symbol}</span>
-                  <span className="text-xs opacity-70">{pair.timeframe}</span>
+                  <span>{pair.symbol}</span>
+                  <span className="opacity-70">{pair.timeframe}</span>
                 </div>
               ))}
             </div>
@@ -552,7 +566,7 @@ function BotStatus() {
 
         {/* PID Display (optional) */}
         {botStatus?.pid && (
-          <div className="text-xs text-muted-foreground text-right">
+          <div className="text-xs text-neutral-400 text-right tabular-nums">
             PID: {botStatus.pid}
           </div>
         )}

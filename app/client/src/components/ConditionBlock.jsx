@@ -216,7 +216,7 @@ function ConditionBlock({
       </div>
 
       {/* Content */}
-      <div className="p-3 pl-6">
+      <div className="p-2 pl-5">
         {/* Multi-Timeframe Badge */}
         {isMultiTimeframe && timeframeBadge && (
           <div className="flex items-center gap-1.5 mb-2">
@@ -242,7 +242,7 @@ function ConditionBlock({
         )}
 
         {/* Condition Dropdowns */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="space-y-2">
           {/* Pattern Condition Display (special case - no dropdowns, just text) */}
           {condition.isPatternCondition ? (
             <div className="flex items-center gap-2 text-sm">
@@ -266,7 +266,7 @@ function ConditionBlock({
                 options={leftOperandOptions}
                 onChange={handleLeftOperandChange}
                 placeholder="Select..."
-                className="min-w-[120px] flex-1"
+                className="w-full"
               />
 
               {/* Operator */}
@@ -275,34 +275,34 @@ function ConditionBlock({
                 options={operatorOptions}
                 onChange={handleOperatorChange}
                 placeholder="operator"
-                className="min-w-[100px]"
+                className="w-full"
               />
 
               {/* Range Condition: shows two value inputs */}
               {isRange ? (
-                <>
+                <div className="flex items-center gap-2">
                   {/* Min Value */}
                   <ConditionDropdown
                     value={condition.rightOperand}
                     options={operandOptions}
                     onChange={handleRightOperandChange}
                     placeholder="Min..."
-                    className="min-w-[90px] flex-1"
+                    className="flex-1"
                     showPercentageToggle={!!leftOperandBounds}
                     boundsValidation={rightOperandBoundsValidation}
                   />
-                  <span className="text-muted-foreground text-sm">and</span>
+                  <span className="text-muted-foreground text-sm flex-shrink-0">and</span>
                   {/* Max Value */}
                   <ConditionDropdown
                     value={condition.rightOperandMax}
                     options={operandOptions}
                     onChange={handleRightOperandMaxChange}
                     placeholder="Max..."
-                    className="min-w-[90px] flex-1"
+                    className="flex-1"
                     showPercentageToggle={!!leftOperandBounds}
                     boundsValidation={rightOperandMaxBoundsValidation}
                   />
-                </>
+                </div>
               ) : (
                 /* Standard Right Operand */
                 <ConditionDropdown
@@ -310,7 +310,7 @@ function ConditionBlock({
                   options={operandOptions}
                   onChange={handleRightOperandChange}
                   placeholder="Select..."
-                  className="min-w-[120px] flex-1"
+                  className="w-full"
                   showPercentageToggle={!!leftOperandBounds}
                   boundsValidation={rightOperandBoundsValidation}
                 />

@@ -7,66 +7,125 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Anek Odia', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'monospace'],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        // Precision Swiss Neutral Scale
+        neutral: {
+          50: '#FAFAFA',
+          100: '#F5F5F5',
+          200: '#E5E5E5',
+          300: '#D4D4D4',
+          400: '#A3A3A3',
+          500: '#737373',
+          600: '#525252',
+          700: '#404040',
+          800: '#262626',
+          900: '#171717',
+        },
+        // Primary Blue
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-          hover: "hsl(var(--primary-hover))",
+          DEFAULT: '#2563EB',
+          hover: '#1D4ED8',
+          light: '#EFF6FF',
+          foreground: '#FFFFFF',
         },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
+        // Semantic Colors
         success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
+          DEFAULT: '#16A34A',
+          light: '#DCFCE7',
+          foreground: '#FFFFFF',
         },
         warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+          DEFAULT: '#CA8A04',
+          light: '#FEF9C3',
+          foreground: '#FFFFFF',
+        },
+        error: {
+          DEFAULT: '#DC2626',
+          light: '#FEE2E2',
+          foreground: '#FFFFFF',
         },
         info: {
-          DEFAULT: "hsl(var(--info))",
-          foreground: "hsl(var(--info-foreground))",
+          DEFAULT: '#2563EB',
+          light: '#EFF6FF',
+          foreground: '#FFFFFF',
+        },
+        // Trading-specific
+        profit: '#16A34A',
+        loss: '#DC2626',
+        // Legacy mappings for compatibility
+        border: '#E5E5E5',
+        input: '#E5E5E5',
+        ring: '#2563EB',
+        background: '#FAFAFA',
+        foreground: '#171717',
+        secondary: {
+          DEFAULT: '#F5F5F5',
+          foreground: '#404040',
+        },
+        destructive: {
+          DEFAULT: '#DC2626',
+          foreground: '#FFFFFF',
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: '#F5F5F5',
+          foreground: '#737373',
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: '#EFF6FF',
+          foreground: '#2563EB',
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: '#FFFFFF',
+          foreground: '#171717',
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: '#FFFFFF',
+          foreground: '#171717',
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: '8px',
+        md: '6px',
+        sm: '4px',
+      },
+      boxShadow: {
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+      },
+      spacing: {
+        // 8px grid system
+        '0': '0',
+        '1': '4px',
+        '2': '8px',
+        '3': '12px',
+        '4': '16px',
+        '5': '20px',
+        '6': '24px',
+        '8': '32px',
+        '10': '40px',
+        '12': '48px',
+        '16': '64px',
+        '20': '80px',
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1rem' }],
+        'sm': ['0.875rem', { lineHeight: '1.25rem' }],
+        'base': ['1rem', { lineHeight: '1.5rem' }],
+        'lg': ['1.125rem', { lineHeight: '1.75rem' }],
+        'xl': ['1.25rem', { lineHeight: '1.75rem' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem' }],
+        '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+        '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
+        '5xl': ['3rem', { lineHeight: '1.2' }],
       },
       keyframes: {
         "price-flash": {
           "0%": { backgroundColor: "transparent" },
-          "50%": { backgroundColor: "hsl(var(--primary) / 0.2)" },
+          "50%": { backgroundColor: "rgba(37, 99, 235, 0.1)" },
           "100%": { backgroundColor: "transparent" },
         },
         "slide-in": {
@@ -82,6 +141,15 @@ module.exports = {
         "price-flash": "price-flash 250ms ease-out",
         "slide-in": "slide-in 300ms ease-out",
         "fade-in": "fade-in 200ms ease-out",
+      },
+      transitionTimingFunction: {
+        'ease-out': 'cubic-bezier(0.0, 0.0, 0.2, 1)',
+        'ease-in-out': 'cubic-bezier(0.4, 0.0, 0.2, 1)',
+      },
+      transitionDuration: {
+        'fast': '150ms',
+        'normal': '200ms',
+        'slow': '300ms',
       },
     },
   },

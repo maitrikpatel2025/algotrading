@@ -1,24 +1,26 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import endPoints from '../app/api';
 import { COUNTS, calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
-import Button from '../components/Button';
 import PriceChart from '../components/PriceChart';
 import PairSelector from '../components/PairSelector';
 import Technicals from '../components/Technicals';
-import IndicatorLibrary from '../components/IndicatorLibrary';
+// IndicatorLibrary sidebar removed - using IndicatorSearchPopup instead
 import LogicPanel from '../components/LogicPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IndicatorSettingsDialog from '../components/IndicatorSettingsDialog';
 import MultiTimeframeConditionDialog from '../components/MultiTimeframeConditionDialog';
 import TimeFilterDialog from '../components/TimeFilterDialog';
-import TradeDirectionSelector from '../components/TradeDirectionSelector';
-import CandleCloseToggle from '../components/CandleCloseToggle';
+// TradeDirectionSelector and CandleCloseToggle now integrated into StrategySettingsPopover
 import SaveStrategyDialog from '../components/SaveStrategyDialog';
 import LoadStrategyDialog from '../components/LoadStrategyDialog';
 import ImportStrategyDialog from '../components/ImportStrategyDialog';
 import Toast, { useToast } from '../components/Toast';
 import { cn } from '../lib/utils';
-import { Play, RefreshCw, BarChart3, AlertTriangle, Info, Sparkles, Save, FolderOpen, Upload, Download, Copy, Edit2, X, Settings, PanelLeftClose, PanelRightClose } from 'lucide-react';
+import { BarChart3, AlertTriangle, Info, Sparkles, Save, Download, Upload, Copy, Edit2, ChevronLeft, Plus, X, FolderOpen, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../components/ui/DropdownMenu';
+import IndicatorSearchPopup from '../components/IndicatorSearchPopup';
+import StrategySettingsPopover from '../components/StrategySettingsPopover';
 import { INDICATOR_TYPES, getIndicatorDisplayName, INDICATORS } from '../app/indicators';
 import { getPatternDisplayName } from '../app/patterns';
 import { detectPattern } from '../app/patternDetection';
@@ -61,10 +63,10 @@ import {
   getDrawingDisplayName,
 } from '../app/drawingUtils';
 import DrawingPropertiesDialog from '../components/DrawingPropertiesDialog';
+// DrawingToolbar removed - using dropdown menu for drawing tools
 
 // localStorage keys for persisting preferences
 const PREFERRED_TIMEFRAME_KEY = 'forex_dash_preferred_timeframe';
-const PANEL_COLLAPSED_KEY = 'forex_dash_indicator_panel_collapsed';
 const LOGIC_PANEL_COLLAPSED_KEY = 'forex_dash_logic_panel_collapsed';
 
 // Timeframe button definitions
@@ -82,6 +84,11 @@ const MAX_OVERLAY_INDICATORS = 5;
 const MAX_SUBCHART_INDICATORS = 3;
 
 function Strategy() {
+  // Route params for editing existing strategy
+  const { id: strategyIdFromUrl } = useParams();
+  const navigate = useNavigate();
+  const isNewStrategy = !strategyIdFromUrl;
+  
   const [selectedPair, setSelectedPair] = useState(null);
   const [selectedGran, setSelectedGran] = useState(null);
   const [technicalsData, setTechnicalsData] = useState(null);
@@ -92,24 +99,18 @@ function Strategy() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState(null);
   const [infoMessage, setInfoMessage] = useState(null);
+  
+  // Track if strategy has been loaded from URL
+  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
 
-  // Indicator panel state (left sidebar)
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
-    try {
-      const stored = localStorage.getItem(PANEL_COLLAPSED_KEY);
-      return stored === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  // Logic panel state (right sidebar)
+  // Logic panel state (slide-out drawer) - closed by default
   const [isLogicPanelCollapsed, setIsLogicPanelCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem(LOGIC_PANEL_COLLAPSED_KEY);
-      return stored === 'true';
+      // If explicitly set to 'false', expand it; otherwise default to collapsed
+      return stored === 'false' ? false : true;
     } catch {
-      return false;
+      return true;
     }
   });
 
@@ -209,8 +210,8 @@ function Strategy() {
   // Hover highlight state for visual connections
   const [highlightedIndicatorId, setHighlightedIndicatorId] = useState(null);
 
-  // Logic Panel mobile state
-  const [isLogicPanelMobileOpen, setIsLogicPanelMobileOpen] = useState(false);
+  // Indicator Search Popup state (TradingView-style)
+  const [isIndicatorSearchOpen, setIsIndicatorSearchOpen] = useState(false);
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -327,6 +328,115 @@ function Strategy() {
       }
     };
   }, []);
+
+  // Load strategy from URL when editing an existing strategy
+  useEffect(() => {
+    const loadStrategyFromUrl = async () => {
+      if (strategyIdFromUrl && !hasLoadedFromUrl && options) {
+        try {
+          const response = await endPoints.getStrategy(strategyIdFromUrl);
+          if (response.success && response.strategy) {
+            const strategy = response.strategy;
+
+            // Update all state from loaded strategy
+            setCurrentStrategyName(strategy.name || '');
+            setCurrentStrategyDescription(strategy.description || '');
+            setCurrentStrategyTags(strategy.tags || []);
+            setExistingStrategyId(strategy.id);
+            setTradeDirection(strategy.trade_direction || TRADE_DIRECTIONS.BOTH);
+            setConfirmOnCandleClose(strategy.confirm_on_candle_close || CANDLE_CLOSE_CONFIRMATION_DEFAULT);
+
+            if (strategy.pair) setSelectedPair(strategy.pair);
+            if (strategy.timeframe) setSelectedGran(strategy.timeframe);
+            if (strategy.candle_count) setSelectedCount(strategy.candle_count);
+
+            // Restore indicators
+            if (strategy.indicators && Array.isArray(strategy.indicators)) {
+              const restoredIndicators = strategy.indicators.map(ind => {
+                const indicatorDef = INDICATORS[ind.id];
+                return {
+                  ...indicatorDef,
+                  instanceId: ind.instance_id || `${ind.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  params: ind.params || indicatorDef?.defaultParams,
+                  color: ind.color || indicatorDef?.defaultColor,
+                  lineWidth: ind.line_width || 2,
+                  lineStyle: ind.line_style || 'solid',
+                  fillOpacity: ind.fill_opacity || 0.2,
+                };
+              }).filter(Boolean);
+              setActiveIndicators(restoredIndicators);
+            }
+
+            // Restore patterns
+            if (strategy.patterns && Array.isArray(strategy.patterns)) {
+              setActivePatterns(strategy.patterns.map(pat => ({
+                ...pat,
+                instanceId: pat.instance_id || `${pat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              })));
+            }
+
+            // Restore conditions
+            if (strategy.conditions && Array.isArray(strategy.conditions)) {
+              setConditions(strategy.conditions.map(c => ({
+                id: c.id,
+                section: c.section,
+                leftOperand: c.left_operand,
+                operator: c.operator,
+                rightOperand: c.right_operand,
+                indicatorInstanceId: c.indicator_instance_id,
+                indicatorDisplayName: c.indicator_display_name,
+                patternInstanceId: c.pattern_instance_id,
+                isPatternCondition: c.is_pattern_condition,
+              })));
+            }
+
+            // Restore groups
+            if (strategy.groups && Array.isArray(strategy.groups)) {
+              setGroups(strategy.groups.map(g => ({
+                id: g.id,
+                operator: g.operator,
+                conditionIds: g.condition_ids || [],
+                parentId: g.parent_id,
+                section: g.section,
+              })));
+            }
+
+            // Restore reference indicators
+            if (strategy.reference_indicators && Array.isArray(strategy.reference_indicators)) {
+              setReferenceIndicators(strategy.reference_indicators);
+            }
+
+            // Restore time filter
+            if (strategy.time_filter) {
+              setTimeFilter(strategy.time_filter);
+            }
+
+            // Restore drawings
+            if (strategy.drawings) {
+              setDrawings(deserializeDrawings(JSON.stringify(strategy.drawings)));
+            }
+
+            setHasLoadedFromUrl(true);
+          } else {
+            console.error('Failed to load strategy:', response.error);
+            // Navigate back to library if strategy not found
+            navigate('/strategies');
+          }
+        } catch (error) {
+          console.error('Error loading strategy from URL:', error);
+          navigate('/strategies');
+        }
+      }
+    };
+
+    loadStrategyFromUrl();
+  }, [strategyIdFromUrl, hasLoadedFromUrl, options, navigate]);
+
+  // Navigate back to library
+  const handleBackToLibrary = useCallback(() => {
+    // Could add unsaved changes check here
+    navigate('/strategies');
+  }, [navigate]);
 
   const handleCountChange = (count) => {
     setSelectedCount(count);
@@ -492,20 +602,7 @@ function Strategy() {
     setInfoMessage(null);
   };
 
-  // Handle panel collapse toggle with localStorage persistence (left sidebar)
-  const handlePanelToggle = useCallback(() => {
-    setIsPanelCollapsed(prev => {
-      const newValue = !prev;
-      try {
-        localStorage.setItem(PANEL_COLLAPSED_KEY, String(newValue));
-      } catch (e) {
-        console.warn('Failed to save panel state to localStorage:', e);
-      }
-      return newValue;
-    });
-  }, []);
-
-  // Handle logic panel collapse toggle with localStorage persistence (right sidebar)
+  // Handle logic panel toggle (slide-out drawer)
   const handleLogicPanelToggle = useCallback(() => {
     setIsLogicPanelCollapsed(prev => {
       const newValue = !prev;
@@ -1537,6 +1634,11 @@ function Strategy() {
         // Clear draft after successful save
         clearDraft();
 
+        // Update URL to edit route if this was a new strategy
+        if (isNewStrategy && response.strategy_id) {
+          navigate(`/strategies/${response.strategy_id}/edit`, { replace: true });
+        }
+
         showSuccess(`Strategy '${name}' saved successfully`);
       } else {
         showError(response.error || 'Failed to save strategy');
@@ -1548,7 +1650,7 @@ function Strategy() {
       setIsSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectStrategyState, showSuccess, showError]);
+  }, [collectStrategyState, showSuccess, showError, isNewStrategy, navigate]);
 
   // Handle overwrite confirmation
   const handleOverwriteConfirm = useCallback(() => {
@@ -1589,7 +1691,8 @@ function Strategy() {
     }
   }, [showError]);
 
-  // Open load dialog
+  // Open load dialog - may be used via menu/shortcuts in future
+  // eslint-disable-next-line no-unused-vars
   const handleOpenLoadDialog = useCallback(() => {
     setLoadDialogOpen(true);
     fetchStrategiesList();
@@ -1721,7 +1824,8 @@ function Strategy() {
     }
   }, [loadDialogOpen, fetchStrategiesList, showSuccess, showError]);
 
-  // Duplicate the current loaded strategy
+  // Duplicate the current loaded strategy - may be used via menu/shortcuts in future
+  // eslint-disable-next-line no-unused-vars
   const handleDuplicateCurrentStrategy = useCallback(async () => {
     if (!existingStrategyId) {
       showError('No strategy is currently loaded');
@@ -1732,6 +1836,8 @@ function Strategy() {
       if (response.success) {
         setExistingStrategyId(response.strategy_id);
         setCurrentStrategyName(response.strategy_name);
+        // Navigate to the duplicated strategy's edit page
+        navigate(`/strategies/${response.strategy_id}/edit`, { replace: true });
         showSuccess(`Strategy duplicated as '${response.strategy_name}'`);
       } else {
         showError(response.error || 'Failed to duplicate strategy');
@@ -1740,7 +1846,7 @@ function Strategy() {
       console.error('Failed to duplicate strategy:', error);
       showError('Failed to duplicate strategy');
     }
-  }, [existingStrategyId, showSuccess, showError]);
+  }, [existingStrategyId, showSuccess, showError, navigate]);
 
   // Delete strategy - show confirmation
   const handleDeleteStrategyConfirm = useCallback((strategy) => {
@@ -1848,7 +1954,8 @@ function Strategy() {
     await handleExportStrategy({ id: existingStrategyId, name: currentStrategyName });
   }, [existingStrategyId, currentStrategyName, handleExportStrategy, showError]);
 
-  // Open import dialog
+  // Open import dialog - may be used via menu/shortcuts in future
+  // eslint-disable-next-line no-unused-vars
   const handleOpenImportDialog = useCallback(() => {
     setImportDialogOpen(true);
   }, []);
@@ -2248,436 +2355,323 @@ function Strategy() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo]);
 
-  // Loading state
+  // Loading state - Precision Swiss Design
   if (loading) {
     return (
-      <div className="py-8 animate-fade-in">
+      <div className="min-h-[calc(100vh-8rem)] bg-neutral-50 py-8 animate-fade-in">
         <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
           <div className="relative">
-            <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
-            <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <div className="h-12 w-12 rounded-full border-4 border-neutral-200 animate-pulse" />
+            <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
           </div>
-          <p className="text-muted-foreground font-medium">Loading strategy...</p>
+          <p className="text-neutral-500 font-medium">Loading strategy...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] animate-fade-in flex flex-col">
-      {/* Page Header Bar */}
-      <div className="border-b border-border bg-card">
-        <div className="py-4 px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          {/* Editable Strategy Name */}
-          <div className="flex items-center gap-3">
-            {isEditingName ? (
-              <input
-                type="text"
-                value={editingNameValue}
-                onChange={(e) => setEditingNameValue(e.target.value)}
-                onBlur={handleFinishEditingName}
-                onKeyDown={handleNameKeyDown}
-                className="text-xl font-semibold text-foreground bg-transparent border-b-2 border-primary outline-none px-1 py-0.5 min-w-[200px]"
-                autoFocus
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={handleStartEditingName}
-                className="flex items-center gap-2 text-xl font-semibold text-foreground hover:text-primary transition-colors group"
-              >
-                <span>{currentStrategyName || 'Untitled Strategy'}</span>
-                <Edit2 className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              text="Load"
-              handleClick={handleOpenLoadDialog}
-              icon={FolderOpen}
-              className="btn-secondary"
-            />
-            <Button
-              text="Import"
-              handleClick={handleOpenImportDialog}
-              icon={Upload}
-              className="btn-secondary"
-            />
-            <Button
-              text="Export"
-              handleClick={handleExportCurrentStrategy}
-              icon={Download}
-              className="btn-secondary"
-              disabled={!existingStrategyId}
-            />
-            <Button
-              text="Duplicate"
-              handleClick={handleDuplicateCurrentStrategy}
-              icon={Copy}
-              className="btn-secondary"
-              disabled={!existingStrategyId}
-            />
-            <Button
-              text="Save"
-              handleClick={handleOpenSaveDialog}
-              icon={Save}
-              className="btn-primary"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Control Bar */}
-      <div className="border-b border-border bg-card/50">
-        <div className="py-3 px-6 flex flex-col gap-3">
-          {/* Main Controls Row */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4 flex-wrap">
-            {/* Left: Pair Selector & Timeframe Buttons */}
-            <div className="flex flex-wrap items-center gap-4">
-              <PairSelector
-                options={options.pairs}
-                defaultValue={selectedPair}
-                onSelected={setSelectedPair}
-                hasLoadedData={!!(technicalsData || priceData)}
-                className="w-44"
-              />
-
-              {/* Timeframe Button Group */}
-              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                {TIMEFRAME_BUTTONS.map((tf) => (
+    <div className="min-h-[calc(100vh-4rem)] animate-fade-in bg-neutral-50">
+      {/* Page Header - Matching other pages */}
+      <div className="bg-white border-b border-neutral-200">
+        <div className="max-w-[1400px] mx-auto px-6 py-6">
+          <div className="flex items-start justify-between gap-4">
+            {/* Left: Title and Description */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-3 mb-1">
+                <button
+                  type="button"
+                  onClick={handleBackToLibrary}
+                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                  title="Back to Strategies"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                {isEditingName ? (
+                  <input
+                    type="text"
+                    value={editingNameValue}
+                    onChange={(e) => setEditingNameValue(e.target.value)}
+                    onBlur={handleFinishEditingName}
+                    onKeyDown={handleNameKeyDown}
+                    className="text-2xl font-semibold text-neutral-900 bg-transparent border-b-2 border-primary outline-none"
+                    autoFocus
+                  />
+                ) : (
                   <button
-                    key={tf.value}
                     type="button"
-                    onClick={() => handleTimeframeChange(tf.value)}
-                    className={cn(
-                      "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                      selectedGran === tf.value
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10"
-                    )}
+                    onClick={handleStartEditingName}
+                    className="flex items-center gap-2 text-2xl font-semibold text-neutral-900 hover:text-primary transition-colors group"
                   >
-                    {tf.label}
+                    {currentStrategyName || 'Untitled Strategy'}
+                    <Edit2 className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
-                ))}
+                )}
+                {hasUnsavedChanges && (
+                  <span className="text-xs text-warning bg-warning-light px-2 py-0.5 rounded">Unsaved</span>
+                )}
               </div>
-
-              {/* Load Button */}
-              <Button
-                text={loadingData ? "Loading..." : "Load Data"}
-                handleClick={() => loadTechnicals()}
-                disabled={loadingData}
-                icon={loadingData ? RefreshCw : Play}
-                className={cn("btn-primary", loadingData && "[&_svg]:animate-spin")}
-              />
+              <p className="text-neutral-500 ml-8">Build and test your trading strategy</p>
             </div>
 
-            {/* Right: Trade Direction, Candle Close, Layout Toggles */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <TradeDirectionSelector
-              value={tradeDirection}
-              onChange={handleTradeDirectionChange}
-            />
-            <CandleCloseToggle
-              value={confirmOnCandleClose}
-              onChange={handleCandleCloseChange}
-            />
-            {/* Layout Toggle Buttons */}
-            <div className="hidden lg:flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePanelToggle}
-                className={cn(
-                  "p-2 rounded-md transition-colors",
-                  isPanelCollapsed
-                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    : "text-primary bg-primary/10"
-                )}
-                title={isPanelCollapsed ? "Show Indicator Library" : "Hide Indicator Library"}
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleLogicPanelToggle}
-                className={cn(
-                  "p-2 rounded-md transition-colors",
-                  isLogicPanelCollapsed
-                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    : "text-primary bg-primary/10"
-                )}
-                title={isLogicPanelCollapsed ? "Show Logic Panel" : "Hide Logic Panel"}
-              >
-                <PanelRightClose className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          </div>
-
-          {/* Active Indicators Chips Row */}
-          {activeIndicators.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/50">
-              <span className="text-xs text-muted-foreground font-medium">Active:</span>
-              {activeIndicators.map((indicator) => {
-                const displayName = getDisplayName(indicator);
-                const isPreview = indicator.isPreview;
-                const isBeingPreviewed = previewIndicator && previewIndicator.instanceId === indicator.instanceId && !comparisonMode;
-
-                if (isBeingPreviewed && !indicator.isPreview) {
-                  return null;
-                }
-
-                return (
-                  <span
-                    key={indicator.instanceId}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-                      isPreview
-                        ? "bg-amber-500/20 text-foreground border border-amber-500/30 border-dashed"
-                        : "bg-muted text-foreground",
-                      "cursor-pointer hover:bg-muted/80 transition-colors group"
-                    )}
-                    style={{ borderLeft: `3px solid ${indicator.color}` }}
-                    onClick={(e) => {
-                      if (e.target.closest('button')) return;
-                      if (!isPreview) {
-                        handleEditIndicator(indicator.instanceId);
-                      }
-                    }}
-                    title={!isPreview ? `Click to edit ${displayName}` : displayName}
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <DropdownMenu
+                align="right"
+                trigger={
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-4 py-2 border border-neutral-200 rounded-md text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
                   >
-                    {displayName}
-                    {isPreview && <span className="text-amber-600 dark:text-amber-400">(Preview)</span>}
-                    {!isPreview && (
-                      <Settings className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
-                    {!isPreview && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveIndicator(indicator.instanceId);
-                        }}
-                        className="ml-0.5 p-0.5 rounded hover:bg-muted-foreground/20 transition-colors"
-                        title={`Remove ${displayName}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
+                    <MoreHorizontal className="h-4 w-4" />
+                    More
+                  </button>
+                }
+              >
+                <DropdownMenuItem icon={<FolderOpen className="h-4 w-4" />} onClick={handleOpenLoadDialog}>
+                  Load Strategy
+                </DropdownMenuItem>
+                <DropdownMenuItem icon={<Upload className="h-4 w-4" />} onClick={handleOpenImportDialog}>
+                  Import
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem icon={<Copy className="h-4 w-4" />} onClick={handleDuplicateCurrentStrategy} disabled={!existingStrategyId}>
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem icon={<Download className="h-4 w-4" />} onClick={handleExportCurrentStrategy} disabled={!existingStrategyId}>
+                  Export
+                </DropdownMenuItem>
+              </DropdownMenu>
+              <button
+                type="button"
+                onClick={handleOpenSaveDialog}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover transition-colors"
+              >
+                <Save className="h-4 w-4" />
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-[1400px] mx-auto px-6 py-6">
+        {/* Chart Controls Bar - Single Row */}
+        <div className="flex items-center gap-2 p-3 bg-white border border-neutral-200 rounded-lg mb-6">
+          {/* Pair Selector */}
+          <PairSelector
+            options={options.pairs}
+            defaultValue={selectedPair}
+            onSelected={(pair) => {
+              setSelectedPair(pair);
+              if (pair && selectedGran) {
+                setTimeout(() => loadTechnicals(), 100);
+              }
+            }}
+            hasLoadedData={!!(technicalsData || priceData)}
+            className="w-28"
+          />
+
+          {/* Timeframe Buttons */}
+          <div className="flex items-center bg-neutral-100 rounded-md p-0.5">
+            {TIMEFRAME_BUTTONS.map((tf) => (
+              <button
+                key={tf.value}
+                type="button"
+                onClick={() => {
+                  handleTimeframeChange(tf.value);
+                  if (selectedPair) {
+                    setTimeout(() => loadTechnicals(), 100);
+                  }
+                }}
+                className={cn(
+                  "px-2.5 py-1 text-xs font-medium rounded transition-colors",
+                  selectedGran === tf.value
+                    ? "bg-primary text-white"
+                    : "text-neutral-500 hover:text-neutral-900"
+                )}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-5 w-px bg-neutral-200" />
+
+          {/* Indicators */}
+          <button
+            type="button"
+            onClick={() => setIsIndicatorSearchOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-md transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Indicators</span>
+            {activeIndicators.length > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] bg-primary text-white rounded-full">
+                {activeIndicators.length}
+              </span>
+            )}
+          </button>
+
+          {/* Drawing Tools Dropdown */}
+          <DropdownMenu
+            align="left"
+            trigger={
+              <button
+                type="button"
+                disabled={!priceData || loadingData}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-md transition-colors",
+                  activeDrawingTool
+                    ? "bg-primary text-white"
+                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100",
+                  (!priceData || loadingData) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <Edit2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Draw</span>
+                {drawings.length > 0 && (
+                  <span className={cn(
+                    "px-1.5 py-0.5 text-[10px] rounded-full",
+                    activeDrawingTool ? "bg-white/20" : "bg-neutral-200"
+                  )}>
+                    {drawings.length}
                   </span>
-                );
-              })}
+                )}
+              </button>
+            }
+          >
+            <DropdownMenuItem
+              icon={<span className="text-xs">—</span>}
+              onClick={() => handleDrawingToolChange('horizontal')}
+            >
+              Horizontal Line
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              icon={<span className="text-xs">↗</span>}
+              onClick={() => handleDrawingToolChange('trendline')}
+            >
+              Trendline
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              icon={<span className="text-xs">⊟</span>}
+              onClick={() => handleDrawingToolChange('fibonacci')}
+            >
+              Fibonacci
+            </DropdownMenuItem>
+            {activeDrawingTool && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  icon={<X className="h-3 w-3" />}
+                  onClick={() => handleDrawingToolChange(null)}
+                >
+                  Cancel Drawing
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenu>
+
+          <div className="flex-1" />
+
+          {/* Active Indicators - Compact */}
+          {activeIndicators.length > 0 && (
+            <div className="hidden md:flex items-center gap-1">
+              {activeIndicators.slice(0, 3).map((indicator) => (
+                <span
+                  key={indicator.instanceId}
+                  className="px-2 py-0.5 text-xs bg-neutral-100 rounded border-l-2"
+                  style={{ borderLeftColor: indicator.color }}
+                >
+                  {indicator.shortName}
+                </span>
+              ))}
+              {activeIndicators.length > 3 && (
+                <span className="text-xs text-neutral-400">+{activeIndicators.length - 3}</span>
+              )}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Mobile Panel Toggle Buttons */}
-      <div className="lg:hidden fixed bottom-6 z-40 flex gap-4 left-4 right-4 justify-between pointer-events-none">
-        <button
-          type="button"
-          onClick={handlePanelToggle}
-          className={cn(
-            "flex items-center justify-center w-14 h-14 pointer-events-auto",
-            "bg-primary text-primary-foreground rounded-full shadow-xl",
-            "hover:bg-primary/90 transition-all hover:scale-105 active:scale-95",
-            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-          )}
-          aria-label="Toggle indicator library"
-        >
-          <BarChart3 className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsLogicPanelMobileOpen(true)}
-          className={cn(
-            "flex items-center justify-center w-14 h-14 pointer-events-auto",
-            "bg-accent text-accent-foreground rounded-full shadow-xl",
-            "hover:bg-accent/90 transition-all hover:scale-105 active:scale-95",
-            "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
-          )}
-          aria-label="Toggle logic panel"
-        >
-          <Sparkles className="h-5 w-5" />
-        </button>
-      </div>
+          <div className="h-5 w-px bg-neutral-200" />
 
-      {/* Mobile Indicator Panel - Overlay */}
-      <div
-        className={cn(
-          "lg:hidden fixed inset-0 z-50 transition-opacity duration-200",
-          !isPanelCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-      >
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={handlePanelToggle}
-        />
-        <div
-          className={cn(
-            "absolute left-0 top-0 h-full transition-transform duration-200",
-            !isPanelCollapsed ? "translate-x-0" : "-translate-x-full"
-          )}
-        >
-          <IndicatorLibrary
-            isCollapsed={false}
-            onToggleCollapse={handlePanelToggle}
-          />
-        </div>
-      </div>
-
-      {/* Mobile Logic Panel - Overlay */}
-      <div
-        className={cn(
-          "lg:hidden fixed inset-0 z-50 transition-opacity duration-200",
-          isLogicPanelMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-      >
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={() => setIsLogicPanelMobileOpen(false)}
-        />
-        <div
-          className={cn(
-            "absolute right-0 top-0 h-full transition-transform duration-200",
-            isLogicPanelMobileOpen ? "translate-x-0" : "translate-x-full"
-          )}
-        >
-          <LogicPanel
-            conditions={conditions}
-            groups={groups}
-            activeIndicators={activeIndicators}
-            activePatterns={activePatterns}
-            getIndicatorDisplayName={getDisplayName}
-            onConditionUpdate={handleConditionUpdate}
-            onConditionDelete={handleConditionDelete}
-            onConditionMove={handleConditionMove}
-            onIndicatorHover={handleIndicatorHover}
-            highlightedIndicatorId={highlightedIndicatorId}
+          {/* Settings */}
+          <StrategySettingsPopover
             tradeDirection={tradeDirection}
-            onAddCondition={handleAddCondition}
-            onAddMultiTimeframeCondition={handleAddMultiTimeframeCondition}
-            onGroupCreate={handleGroupCreate}
-            onGroupUpdate={handleGroupUpdate}
-            onGroupDelete={handleGroupDelete}
-            onGroupOperatorChange={handleGroupOperatorChange}
-            onUngroup={handleUngroup}
-            referenceIndicators={referenceIndicators}
-            referenceIndicatorValues={referenceIndicatorValues}
-            getReferenceDisplayName={getReferenceDisplayName}
-            onDeleteReferenceIndicator={handleDeleteReferenceIndicator}
-            referenceDataLoading={referenceDataLoading}
-            onConditionReorderInGroup={handleConditionReorderInGroup}
-            onTestLogic={handleTestLogic}
-            testLogicData={testLogicData}
-            timeFilter={timeFilter}
-            onTimeFilterEdit={handleTimeFilterEdit}
-            onTimeFilterClear={handleTimeFilterClear}
+            onTradeDirectionChange={handleTradeDirectionChange}
+            candleCloseConfirmation={confirmOnCandleClose}
+            onCandleCloseChange={handleCandleCloseChange}
           />
-        </div>
-      </div>
 
-      {/* Three-Column Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Indicator Library */}
-        <div
-          className={cn(
-            "hidden lg:flex flex-shrink-0 border-r border-border transition-all duration-200 ease-out",
-            isPanelCollapsed ? "w-10" : "w-[280px]"
-          )}
-        >
-          <IndicatorLibrary
-            isCollapsed={isPanelCollapsed}
-            onToggleCollapse={handlePanelToggle}
-          />
+          {/* Logic Toggle */}
+          <button
+            type="button"
+            onClick={handleLogicPanelToggle}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors",
+              !isLogicPanelCollapsed
+                ? "bg-primary text-white"
+                : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+            )}
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">Logic</span>
+            {conditions.length > 0 && (
+              <span className={cn(
+                "px-1.5 py-0.5 text-[10px] rounded-full",
+                !isLogicPanelCollapsed ? "bg-white/20 text-white" : "bg-primary text-white"
+              )}>
+                {conditions.length}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Center - Main Content Area */}
-        <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-6">
-
-        {/* Error Display */}
+        {/* Error Messages */}
         {error && (
-          <div className="card p-5 border-destructive bg-destructive/10">
-            <div className="flex items-start gap-4">
-              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+          <div className="card p-4 border-l-4 border-l-error bg-error-light mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-error shrink-0" />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-destructive mb-1">
-                  Unable to Load Data
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {error}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This may be due to external data sources being temporarily unavailable. Please try again later.
-                </p>
+                <p className="text-sm font-medium text-error">Unable to Load Data</p>
+                <p className="text-sm text-neutral-600 mt-1">{error}</p>
               </div>
-              <button
-                onClick={clearError}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Dismiss error"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={clearError} className="text-neutral-400 hover:text-neutral-600">
+                <X className="h-4 w-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Indicator Error Display */}
         {indicatorError && (
-          <div className="card p-5 border-amber-500 bg-amber-500/10">
-            <div className="flex items-start gap-4">
-              <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-foreground">
-                  {indicatorError}
-                </p>
-              </div>
-              <button
-                onClick={() => setIndicatorError(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Dismiss warning"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+          <div className="card p-4 border-l-4 border-l-warning bg-warning-light mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+              <p className="text-sm text-neutral-900 flex-1">{indicatorError}</p>
+              <button onClick={() => setIndicatorError(null)} className="text-neutral-400 hover:text-neutral-600">
+                <X className="h-4 w-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Info Message Display (for insufficient data etc.) */}
         {infoMessage && (
-          <div className="card p-5 border-info bg-info/10">
-            <div className="flex items-start gap-4">
-              <Info className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">
-                  {infoMessage}
-                </p>
-              </div>
-              <button
-                onClick={clearInfoMessage}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Dismiss info"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+          <div className="card p-4 border-l-4 border-l-primary bg-primary-light mb-6">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-primary shrink-0" />
+              <p className="text-sm text-neutral-600 flex-1">{infoMessage}</p>
+              <button onClick={clearInfoMessage} className="text-neutral-400 hover:text-neutral-600">
+                <X className="h-4 w-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Main Chart Area */}
         {(technicalsData || priceData) ? (
-          <div className="space-y-8">
-            {/* Price Chart - Full Width Priority */}
+          <div className="space-y-6">
             {priceData && (
-              <div>
+              <div className="card p-4">
                 <PriceChart
                   selectedCount={selectedCount}
                   selectedPair={selectedPair}
@@ -2703,7 +2697,6 @@ function Strategy() {
                   onIndicatorDuplicate={handleIndicatorDuplicate}
                   previewIndicator={previewIndicator}
                   comparisonMode={comparisonMode}
-                  // Drawing props
                   drawings={drawings}
                   activeDrawingTool={activeDrawingTool}
                   onDrawingToolChange={handleDrawingToolChange}
@@ -2720,27 +2713,23 @@ function Strategy() {
               </div>
             )}
 
-            {/* Technicals - Full Width Below Chart */}
             {technicalsData && (
-              <div>
+              <div className="card p-4">
                 <Technicals data={technicalsData} />
               </div>
             )}
           </div>
         ) : (
-          /* Empty State */
           <div className="card">
-            <div className="flex flex-col items-center justify-center py-20 lg:py-24 px-6 text-center">
-              <div className="p-5 rounded-full bg-muted mb-6">
-                <BarChart3 className="h-10 w-10 text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
+              <div className="p-5 rounded-full bg-neutral-100 mb-6">
+                <BarChart3 className="h-10 w-10 text-neutral-400" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">
-                Ready to Analyze
-              </h3>
-              <p className="text-muted-foreground max-w-md mb-8">
-                Select a currency pair and timeframe above, then click "Load Data" to view technical analysis and price charts.
+              <h3 className="text-xl font-semibold text-neutral-900 mb-3">Ready to Analyze</h3>
+              <p className="text-neutral-500 max-w-md mb-8">
+                Select a currency pair and timeframe above to view technical analysis and price charts.
               </p>
-              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-6 text-sm text-neutral-500">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
                   Real-time data
@@ -2753,13 +2742,23 @@ function Strategy() {
             </div>
           </div>
         )}
-        </div>
+      </div>
 
-        {/* Right Sidebar - Logic Panel */}
+      {/* Logic Panel - Slide-out Drawer */}
+      <div
+        className={cn(
+          "fixed inset-0 z-50 transition-opacity duration-200",
+          !isLogicPanelCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <div
+          className="absolute inset-0 bg-black/30"
+          onClick={handleLogicPanelToggle}
+        />
         <div
           className={cn(
-            "hidden lg:flex flex-shrink-0 border-l border-border transition-all duration-200 ease-out",
-            isLogicPanelCollapsed ? "w-10" : "w-[320px]"
+            "absolute right-0 top-0 h-full w-1/4 min-w-[280px] max-w-[400px] bg-white shadow-xl transition-transform duration-200",
+            !isLogicPanelCollapsed ? "translate-x-0" : "translate-x-full"
           )}
         >
           <LogicPanel
@@ -2792,11 +2791,18 @@ function Strategy() {
             timeFilter={timeFilter}
             onTimeFilterEdit={handleTimeFilterEdit}
             onTimeFilterClear={handleTimeFilterClear}
-            isCollapsed={isLogicPanelCollapsed}
+            isCollapsed={false}
             onToggleCollapse={handleLogicPanelToggle}
           />
         </div>
       </div>
+
+      {/* Indicator Search Popup */}
+      <IndicatorSearchPopup
+        isOpen={isIndicatorSearchOpen}
+        onClose={() => setIsIndicatorSearchOpen(false)}
+        onSelect={handleIndicatorDrop}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

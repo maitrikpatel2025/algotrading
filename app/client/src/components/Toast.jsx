@@ -3,17 +3,11 @@ import { cn } from '../lib/utils';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 /**
- * Toast Notification Component
+ * Toast Notification Component - Precision Swiss Design System
  *
- * A dismissible notification that appears in the bottom-right corner.
- * Supports multiple types: success, error, warning, info.
+ * Clean white background with colored left border.
+ * No gradients, simple typography.
  * Auto-dismisses after configurable duration.
- *
- * @param {string} type - Toast type: 'success' | 'error' | 'warning' | 'info'
- * @param {string} message - Toast message to display
- * @param {boolean} isVisible - Whether the toast is visible
- * @param {Function} onClose - Callback when toast is closed
- * @param {number} duration - Auto-dismiss duration in ms (default 5000, 0 to disable)
  */
 function Toast({
   type = 'info',
@@ -43,31 +37,27 @@ function Toast({
 
   if (!isVisible) return null;
 
-  // Type-based styling
+  // Type-based styling - Precision Swiss Design
   const typeStyles = {
     success: {
       icon: CheckCircle,
-      iconColor: 'text-green-500',
-      bgColor: 'bg-green-500/10',
-      borderColor: 'border-green-500/30',
+      iconColor: 'text-success',
+      borderColor: 'border-l-success',
     },
     error: {
       icon: AlertCircle,
-      iconColor: 'text-red-500',
-      bgColor: 'bg-red-500/10',
-      borderColor: 'border-red-500/30',
+      iconColor: 'text-danger',
+      borderColor: 'border-l-danger',
     },
     warning: {
       icon: AlertTriangle,
-      iconColor: 'text-amber-500',
-      bgColor: 'bg-amber-500/10',
-      borderColor: 'border-amber-500/30',
+      iconColor: 'text-warning',
+      borderColor: 'border-l-warning',
     },
     info: {
       icon: Info,
-      iconColor: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
-      borderColor: 'border-blue-500/30',
+      iconColor: 'text-primary',
+      borderColor: 'border-l-primary',
     },
   };
 
@@ -79,10 +69,10 @@ function Toast({
       className={cn(
         "fixed bottom-4 right-4 z-50",
         "flex items-center gap-3",
-        "px-4 py-3 rounded-lg shadow-lg",
-        "border bg-card",
+        "px-4 py-3 rounded-md shadow-elevated",
+        "bg-white border border-neutral-200 border-l-4",
         styles.borderColor,
-        isAnimating ? "animate-slide-in-right" : ""
+        isAnimating ? "animate-slide-in" : ""
       )}
       role="alert"
       aria-live="polite"
@@ -93,7 +83,7 @@ function Toast({
       </div>
 
       {/* Message */}
-      <p className="text-sm text-foreground flex-1 pr-2">
+      <p className="text-sm text-neutral-900 flex-1 pr-2">
         {message}
       </p>
 
@@ -101,12 +91,7 @@ function Toast({
       <button
         type="button"
         onClick={onClose}
-        className={cn(
-          "flex-shrink-0 p-1 rounded-md",
-          "text-muted-foreground hover:text-foreground",
-          "hover:bg-muted transition-colors",
-          "focus:outline-none focus:ring-2 focus:ring-primary/50"
-        )}
+        className="flex-shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
         aria-label="Close notification"
       >
         <X className="h-4 w-4" />
@@ -119,10 +104,6 @@ function Toast({
  * ToastContainer Component
  *
  * A container for managing multiple toasts with stacking support.
- * Use this when you need to display multiple toasts simultaneously.
- *
- * @param {Array} toasts - Array of toast objects: { id, type, message }
- * @param {Function} onRemove - Callback to remove a toast by id
  */
 export function ToastContainer({ toasts = [], onRemove }) {
   return (
@@ -149,7 +130,6 @@ export function ToastContainer({ toasts = [], onRemove }) {
  * useToast Hook
  *
  * A custom hook for managing toast state.
- * Returns functions to show different types of toasts.
  */
 export function useToast() {
   const [toast, setToast] = useState(null);
