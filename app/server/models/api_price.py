@@ -22,10 +22,13 @@ class ApiPrice:
         Args:
             api_obj: API response dictionary
         """
-        self.instrument = api_obj["Symbol"]
-        self.ask = api_obj["BestBid"]["Price"]
-        self.bid = api_obj["BestAsk"]["Price"]
-        self.time = dt.datetime.fromtimestamp(api_obj["Timestamp"] / 1000, pytz.timezone("UTC"))
+        self.instrument = api_obj['Symbol']
+        self.ask = api_obj['BestBid']['Price']
+        self.bid = api_obj['BestAsk']['Price']
+        self.time = dt.datetime.fromtimestamp(
+            api_obj['Timestamp'] / 1000,
+            pytz.timezone("UTC")
+        )
 
     def __repr__(self) -> str:
         return f"ApiPrice() {self.instrument} {self.ask} {self.bid} {self.time}"
@@ -37,4 +40,9 @@ class ApiPrice:
         Returns:
             Dictionary representation of the price
         """
-        return {"instrument": self.instrument, "time": self.time, "ask": self.ask, "bid": self.bid}
+        return {
+            'instrument': self.instrument,
+            'time': self.time,
+            'ask': self.ask,
+            'bid': self.bid
+        }

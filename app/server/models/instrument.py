@@ -34,7 +34,7 @@ class Instrument:
         return str(vars(self))
 
     @classmethod
-    def from_api_object(cls, obj: Dict[str, Any]) -> "Instrument":
+    def from_api_object(cls, obj: Dict[str, Any]) -> 'Instrument':
         """
         Create an Instrument from an API response object.
 
@@ -44,4 +44,8 @@ class Instrument:
         Returns:
             New Instrument instance
         """
-        return cls(obj["Symbol"], obj["Precision"], obj["TradeAmountStep"])
+        return cls(
+            obj['Symbol'],
+            obj['Precision'],
+            obj['TradeAmountStep']
+        )

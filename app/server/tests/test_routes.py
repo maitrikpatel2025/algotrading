@@ -4,6 +4,7 @@ Tests for API Routes
 Unit tests for the trading API routes module.
 """
 
+
 from api.routes import GRANULARITY_LABELS, get_options, make_option
 from config import settings
 
@@ -49,7 +50,8 @@ class TestGranularityLabels:
         }
         for key, expected_label in expected_labels.items():
             assert GRANULARITY_LABELS.get(key) == expected_label, (
-                f"Label for {key} expected '{expected_label}', got '{GRANULARITY_LABELS.get(key)}'"
+                f"Label for {key} expected '{expected_label}', "
+                f"got '{GRANULARITY_LABELS.get(key)}'"
             )
 
 

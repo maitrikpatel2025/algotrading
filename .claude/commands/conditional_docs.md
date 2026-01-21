@@ -81,26 +81,14 @@ This prompt helps you determine what documentation you should read based on the 
 
 - app_docs/feature-dc50bbc5-interactive-ohlc-chart.md
   - Conditions:
-    - When working with legacy Plotly.js chart implementation (deprecated)
-    - When working with OHLC price data from /api/prices endpoint
-
-- app_docs/feature-72441440-websocket-tradingview-realtime-chart.md
-  - Conditions:
     - When working with price charts or candlestick visualization
     - When implementing or modifying the PriceChart component
-    - When working with TradingView Lightweight Charts rendering
-    - When implementing or modifying WebSocket connections for real-time price data
-    - When working with real-time tick data or candle aggregation
-    - When implementing or modifying useWebSocket or useCandleAggregator hooks
-    - When working with tradingViewChart.js helper functions
-    - When adding chart types, volume indicators, or real-time updates
-    - When troubleshooting chart loading states, WebSocket connection issues, or reconnection logic
+    - When working with chart.js or Plotly.js chart rendering
+    - When adding chart types, volume indicators, or date range controls
+    - When troubleshooting chart loading states, empty states, or error handling
     - When working with the Strategy page chart integration
-    - When implementing interactive chart features (zoom, pan, crosshair)
-    - When working with backend WebSocket endpoints (/ws/prices/{pair}/{granularity})
-    - When implementing auto-reconnection with exponential backoff
-    - When working with connection status indicators or WebSocket state management
-    - When migrating from Plotly.js to TradingView Lightweight Charts
+    - When implementing interactive chart features (zoom, pan, hover tooltips)
+    - When working with OHLC price data from /api/prices endpoint
 
 - app_docs/feature-947a25d2-chart-zoom-scroll-controls.md
   - Conditions:

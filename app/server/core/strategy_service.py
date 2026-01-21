@@ -35,17 +35,11 @@ def _strategy_to_db_row(strategy: StrategyConfig) -> dict:
         "pair": strategy.pair,
         "timeframe": strategy.timeframe,
         "candle_count": strategy.candle_count,
-        "indicators": [ind.model_dump() for ind in strategy.indicators]
-        if strategy.indicators
-        else [],
+        "indicators": [ind.model_dump() for ind in strategy.indicators] if strategy.indicators else [],
         "patterns": [pat.model_dump() for pat in strategy.patterns] if strategy.patterns else [],
-        "conditions": [cond.model_dump() for cond in strategy.conditions]
-        if strategy.conditions
-        else [],
+        "conditions": [cond.model_dump() for cond in strategy.conditions] if strategy.conditions else [],
         "groups": [grp.model_dump() for grp in strategy.groups] if strategy.groups else [],
-        "reference_indicators": [ri.model_dump() for ri in strategy.reference_indicators]
-        if strategy.reference_indicators
-        else [],
+        "reference_indicators": [ri.model_dump() for ri in strategy.reference_indicators] if strategy.reference_indicators else [],
         "time_filter": strategy.time_filter.model_dump() if strategy.time_filter else None,
         "drawings": strategy.drawings or [],
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -184,9 +178,7 @@ def list_strategies() -> Tuple[bool, List[StrategyListItem], Optional[str]]:
     try:
         result = (
             client.table("strategies")
-            .select(
-                "id, name, description, tags, trade_direction, pair, timeframe, created_at, updated_at"
-            )
+            .select("id, name, description, tags, trade_direction, pair, timeframe, created_at, updated_at")
             .order("updated_at", desc=True)
             .execute()
         )
@@ -248,7 +240,12 @@ def check_name_exists(name: str) -> Tuple[bool, CheckNameResponse, Optional[str]
         return False, CheckNameResponse(exists=False), "Failed to get Supabase client"
 
     try:
-        result = client.table("strategies").select("id").eq("name", name).execute()
+        result = (
+            client.table("strategies")
+            .select("id")
+            .eq("name", name)
+            .execute()
+        )
 
         if result.data and len(result.data) > 0:
             return True, CheckNameResponse(exists=True, strategy_id=result.data[0].get("id")), None
@@ -301,16 +298,12 @@ def list_strategies_extended() -> Tuple[bool, List[StrategyListItemExtended], Op
     try:
         result = (
             client.table("strategies")
-            .select(
-                "id, name, description, tags, trade_direction, pair, timeframe, created_at, updated_at, indicators, conditions, drawings, patterns"
-            )
+            .select("id, name, description, tags, trade_direction, pair, timeframe, created_at, updated_at, indicators, conditions, drawings, patterns")
             .order("updated_at", desc=True)
             .execute()
         )
 
-        strategies = (
-            [_db_row_to_extended_list_item(row) for row in result.data] if result.data else []
-        )
+        strategies = [_db_row_to_extended_list_item(row) for row in result.data] if result.data else []
         return True, strategies, None
 
     except Exception as e:
@@ -351,9 +344,7 @@ def _generate_copy_name(original_name: str, existing_names: List[str]) -> str:
     return f"{original_name} - Copy ({max_num + 1})"
 
 
-def duplicate_strategy(
-    strategy_id: str,
-) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+def duplicate_strategy(strategy_id: str) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
     """
     Duplicate a strategy by ID.
 
@@ -426,9 +417,7 @@ def duplicate_strategy(
         return False, None, None, str(e)
 
 
-def get_strategy_for_export(
-    strategy_id: str,
-) -> Tuple[bool, Optional[StrategyExport], Optional[str]]:
+def get_strategy_for_export(strategy_id: str) -> Tuple[bool, Optional[StrategyExport], Optional[str]]:
     """
     Get a strategy wrapped in export schema.
 
@@ -511,9 +500,7 @@ def validate_import(import_data: dict) -> ImportValidationResult:
         warnings.append("No schema version found. Assuming version 1.0.")
         schema_version = "1.0"
     elif schema_version not in SUPPORTED_SCHEMA_VERSIONS:
-        errors.append(
-            f"Unsupported schema version: {schema_version}. Supported versions: {', '.join(SUPPORTED_SCHEMA_VERSIONS)}"
-        )
+        errors.append(f"Unsupported schema version: {schema_version}. Supported versions: {', '.join(SUPPORTED_SCHEMA_VERSIONS)}")
 
     # Get strategy data - support both formats
     strategy_data = import_data.get("strategy")
@@ -534,16 +521,12 @@ def validate_import(import_data: dict) -> ImportValidationResult:
         # Validate name length
         name = strategy_data.get("name", "")
         if len(name) > 50:
-            errors.append(
-                f"Strategy name exceeds maximum length of 50 characters (got {len(name)})"
-            )
+            errors.append(f"Strategy name exceeds maximum length of 50 characters (got {len(name)})")
 
         # Validate trade direction
         trade_direction = strategy_data.get("trade_direction", "both")
         if trade_direction not in ["long", "short", "both"]:
-            errors.append(
-                f"Invalid trade_direction: {trade_direction}. Must be 'long', 'short', or 'both'."
-            )
+            errors.append(f"Invalid trade_direction: {trade_direction}. Must be 'long', 'short', or 'both'.")
 
         # Check for name conflicts
         if name and is_configured():

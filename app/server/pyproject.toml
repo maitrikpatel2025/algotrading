@@ -21,7 +21,6 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "lxml>=6.0.2",
     "psycopg2-binary>=2.9.11",
-    "websockets>=15.0.1",
 ]
 
 [project.optional-dependencies]

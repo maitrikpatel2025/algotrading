@@ -122,7 +122,9 @@ class BotController:
 
         if not self._is_pid_running(self._pid):
             # Process died unexpectedly
-            logger.warning(f"[BOT_CONTROLLER] Bot process {self._pid} is no longer running")
+            logger.warning(
+                f"[BOT_CONTROLLER] Bot process {self._pid} is no longer running"
+            )
             self._cleanup_after_stop()
             return False
 
@@ -134,13 +136,9 @@ class BotController:
         is_actually_running = self.is_running()
 
         return {
-            "status": self._status
-            if is_actually_running or self._status in ["stopped", "starting", "stopping"]
-            else "stopped",
+            "status": self._status if is_actually_running or self._status in ["stopped", "starting", "stopping"] else "stopped",
             "pid": self._pid if is_actually_running else None,
-            "started_at": self._started_at.isoformat()
-            if self._started_at and is_actually_running
-            else None,
+            "started_at": self._started_at.isoformat() if self._started_at and is_actually_running else None,
             "can_start": self._status == "stopped" and not is_actually_running,
             "can_stop": self._status == "running" and is_actually_running,
         }

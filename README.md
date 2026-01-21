@@ -4,8 +4,7 @@ A full-stack forex trading application with real-time price charts, technical an
 
 ## Features
 
-- 📈 Real-time forex price charts with TradingView Lightweight Charts
-- 📡 Real-time price streaming via WebSocket
+- 📈 Real-time forex price charts
 - 🤖 Automated trading bot
 - 📊 Technical analysis indicators from Investing.com
 - 📰 Live market headlines from Bloomberg
@@ -275,8 +274,7 @@ The bot uses a Bollinger Bands breakout strategy:
 | React 18 | UI framework |
 | React Router v6 | Client-side routing |
 | Axios | HTTP client |
-| TradingView Lightweight Charts | Real-time financial charts |
-| WebSocket | Real-time price streaming |
+| Plotly.js | Interactive charts |
 | Tailwind CSS | Styling |
 | Lucide React | Icons |
 
@@ -287,7 +285,6 @@ The bot uses a Bollinger Bands breakout strategy:
 | FastAPI | High-performance async API framework |
 | UV | Fast Python package manager |
 | Uvicorn | ASGI server |
-| WebSockets | Real-time price streaming |
 | Pydantic | Data validation |
 | Pandas | Data processing |
 | BeautifulSoup4 | Web scraping |

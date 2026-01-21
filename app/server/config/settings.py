@@ -12,9 +12,8 @@ from typing import Dict
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
-
     # Load .env from server directory
-    env_path = Path(__file__).resolve().parent.parent / ".env"
+    env_path = Path(__file__).resolve().parent.parent / '.env'
     load_dotenv(env_path)
 except ImportError:
     pass  # python-dotenv not installed, using system env vars only
@@ -64,7 +63,7 @@ TFS: Dict[str, int] = {
     "H1": 3600,
     "H4": 14400,
     "D": 86400,
-    "W1": 604800,
+    "W1": 604800
 }
 
 # =============================================================================

@@ -136,7 +136,9 @@ class TestBotControllerStart:
 
         with patch.object(controller, "_is_pid_running", return_value=True):
             result = controller.start_bot(
-                strategy="Test Strategy", pairs=["EURUSD", "GBPJPY"], timeframe="H1"
+                strategy="Test Strategy",
+                pairs=["EURUSD", "GBPJPY"],
+                timeframe="H1"
             )
 
         assert result["success"] is True
@@ -228,11 +230,11 @@ class TestBotControllerRestart:
         # 5. is_running() check before start_bot
         # 6. _is_pid_running check in start_bot success
         is_running_sequence = [
-            True,  # is_running() in restart_bot
-            True,  # is_running() in stop_bot
+            True,   # is_running() in restart_bot
+            True,   # is_running() in stop_bot
             False,  # loop check after SIGTERM - process is stopped
             False,  # is_running() before start (but already stopped via cleanup)
-            True,  # after starting new process
+            True,   # after starting new process
         ]
         with patch.object(controller, "_is_pid_running", side_effect=is_running_sequence):
             with patch("core.bot_controller.os.kill"):

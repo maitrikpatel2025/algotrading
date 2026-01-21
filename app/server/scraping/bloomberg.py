@@ -27,10 +27,13 @@ def _get_article(data) -> Dict[str, str]:
     Returns:
         Dictionary with headline and link
     """
-    href = data.get("href", "")
-    if href.startswith("/"):
-        href = "https://www.bloomberg.com" + href
-    return {"headline": data.get_text().strip(), "link": href}
+    href = data.get('href', '')
+    if href.startswith('/'):
+        href = 'https://www.bloomberg.com' + href
+    return {
+        'headline': data.get_text().strip(),
+        'link': href
+    }
 
 
 def _get_headlines_via_rss() -> Optional[List[Dict[str, str]]]:
@@ -58,35 +61,30 @@ def _get_headlines_via_rss() -> Optional[List[Dict[str, str]]]:
             logger.warning(f"Google News RSS returned status {resp.status_code}")
             return None
 
-        soup = BeautifulSoup(resp.content, "xml")
+        soup = BeautifulSoup(resp.content, 'xml')
 
         all_links = []
-        items = soup.find_all("item")
+        items = soup.find_all('item')
 
         for item in items[:20]:  # Get more items to filter
-            title = item.find("title")
-            link = item.find("link")
-            source = item.find("source")
+            title = item.find('title')
+            link = item.find('link')
+            source = item.find('source')
 
             if title and link:
                 headline = title.get_text().strip()
                 url = link.get_text().strip()
                 source_name = source.get_text().strip() if source else ""
-                source_url = source.get("url") if source else None
+                source_url = source.get('url') if source else None
 
                 # Skip non-news content (converters, calculators, etc.)
-                skip_keywords = [
-                    "converter",
-                    "calculator",
-                    "exchange rate calculator",
-                    "currency converter",
-                ]
+                skip_keywords = ['converter', 'calculator', 'exchange rate calculator', 'currency converter']
                 if any(kw in headline.lower() for kw in skip_keywords):
                     continue
 
                 # Clean headline - remove source suffix if present
                 if source_name and headline.endswith(f" - {source_name}"):
-                    headline = headline[: -len(f" - {source_name}")].strip()
+                    headline = headline[:-len(f" - {source_name}")].strip()
 
                 # Use source URL if available, otherwise use Google News link
                 actual_url = source_url if source_url else url
@@ -97,7 +95,10 @@ def _get_headlines_via_rss() -> Optional[List[Dict[str, str]]]:
                     display_headline = f"{headline} ({source_name})"
 
                 if headline and len(all_links) < 15:
-                    all_links.append({"headline": display_headline, "link": actual_url})
+                    all_links.append({
+                        'headline': display_headline,
+                        'link': actual_url
+                    })
 
         if all_links:
             logger.info(f"Fetched {len(all_links)} headlines via Google News RSS")
@@ -125,14 +126,16 @@ def _get_forex_news_fallback() -> Optional[List[Dict[str, str]]]:
         }
 
         resp = requests.get(
-            "https://www.investing.com/news/forex-news", headers=headers, timeout=10
+            "https://www.investing.com/news/forex-news",
+            headers=headers,
+            timeout=10
         )
 
         if resp.status_code != 200:
             logger.warning(f"Investing.com returned status {resp.status_code}")
             return None
 
-        soup = BeautifulSoup(resp.content, "html.parser")
+        soup = BeautifulSoup(resp.content, 'html.parser')
 
         all_links = []
 
@@ -148,16 +151,19 @@ def _get_forex_news_fallback() -> Optional[List[Dict[str, str]]]:
             articles = soup.select(selector)
             for article in articles[:15]:
                 headline = article.get_text().strip()
-                link = article.get("href", "")
+                link = article.get('href', '')
 
                 if headline and link:
                     # Make absolute URL if relative
-                    if link.startswith("/"):
-                        link = "https://www.investing.com" + link
+                    if link.startswith('/'):
+                        link = 'https://www.investing.com' + link
 
                     # Avoid duplicates
-                    if not any(a["headline"] == headline for a in all_links):
-                        all_links.append({"headline": headline, "link": link})
+                    if not any(a['headline'] == headline for a in all_links):
+                        all_links.append({
+                            'headline': headline,
+                            'link': link
+                        })
 
             if len(all_links) >= 10:
                 break
@@ -196,13 +202,17 @@ def _get_headlines_direct() -> Optional[List[Dict[str, str]]]:
     }
 
     try:
-        resp = requests.get("https://www.bloomberg.com/fx-center", headers=headers, timeout=15)
+        resp = requests.get(
+            "https://www.bloomberg.com/fx-center",
+            headers=headers,
+            timeout=15
+        )
 
         if resp.status_code == 403:
             logger.warning("Bloomberg returned 403 Forbidden - site is blocking scraping")
             return None
 
-        soup = BeautifulSoup(resp.content, "html.parser")
+        soup = BeautifulSoup(resp.content, 'html.parser')
 
         all_links = []
 
@@ -221,9 +231,9 @@ def _get_headlines_direct() -> Optional[List[Dict[str, str]]]:
             for element in elements:
                 try:
                     article = _get_article(element)
-                    if article["headline"] and article["link"]:
+                    if article['headline'] and article['link']:
                         # Avoid duplicates
-                        if not any(a["link"] == article["link"] for a in all_links):
+                        if not any(a['link'] == article['link'] for a in all_links):
                             all_links.append(article)
                 except Exception:
                     continue
