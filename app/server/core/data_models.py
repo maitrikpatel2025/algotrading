@@ -5,7 +5,7 @@ Request and response models for the Forex Trading API.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -391,7 +391,7 @@ class StrategyConfig(BaseModel):
     confirm_on_candle_close: str = Field(default="yes", description="Candle close confirmation setting")
     pair: Optional[str] = Field(None, description="Currency pair")
     timeframe: Optional[str] = Field(None, description="Timeframe")
-    candle_count: Optional[str] = Field(None, description="Number of candles to display")
+    candle_count: Union[int, str, None] = Field(None, description="Number of candles to display")
     indicators: List[StrategyIndicator] = Field(default=[], description="Indicator instances")
     patterns: List[StrategyPattern] = Field(default=[], description="Pattern instances")
     conditions: List[StrategyCondition] = Field(default=[], description="Trading conditions")
