@@ -23,6 +23,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import get_options
 from config import settings
+from core.backtest_service import (
+    delete_backtest as service_delete_backtest,
+)
+from core.backtest_service import (
+    duplicate_backtest as service_duplicate_backtest,
+)
+from core.backtest_service import (
+    get_backtest as service_get_backtest,
+)
+from core.backtest_service import (
+    list_backtests as service_list_backtests,
+)
+from core.backtest_service import (
+    save_backtest as service_save_backtest,
+)
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
 from core.data_models import (
@@ -30,7 +45,9 @@ from core.data_models import (
     BotStartRequest,
     BotStatusResponse,
     CheckNameResponse,
+    DeleteBacktestResponse,
     DeleteStrategyResponse,
+    DuplicateBacktestResponse,
     DuplicateStrategyResponse,
     HeadlineItem,
     HeadlinesResponse,
@@ -39,10 +56,14 @@ from core.data_models import (
     ImportStrategyResponse,
     ImportStrategySaveRequest,
     ImportValidationResult,
+    ListBacktestsResponse,
     ListStrategiesExtendedResponse,
     ListStrategiesResponse,
+    LoadBacktestResponse,
     LoadStrategyResponse,
     OpenTradesResponse,
+    SaveBacktestRequest,
+    SaveBacktestResponse,
     SaveStrategyRequest,
     SaveStrategyResponse,
     SpreadResponse,
@@ -1183,6 +1204,214 @@ async def save_imported_strategy(request: ImportStrategySaveRequest):
             success=False,
             message="Failed to import strategy",
             error=str(e)
+        )
+
+
+# =============================================================================
+# Backtest Routes
+# =============================================================================
+
+@app.post("/api/backtests", response_model=SaveBacktestResponse, tags=["Backtests"])
+async def save_backtest(request: SaveBacktestRequest):
+    """
+    Save a new backtest or update an existing one.
+
+    Args:
+        request: Backtest configuration to save
+
+    Returns:
+        JSON object with success status, backtest ID, and message
+    """
+    try:
+        backtest = request.backtest
+        logger.info(f"[BACKTEST] Save request received for backtest: {backtest.name}")
+
+        success, backtest_id, error = service_save_backtest(backtest)
+
+        if success:
+            logger.info(f"[SUCCESS] Backtest saved: {backtest.name} (ID: {backtest_id})")
+            return SaveBacktestResponse(
+                success=True,
+                backtest_id=backtest_id,
+                message=f"Backtest '{backtest.name}' saved successfully"
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest save failed: {error}")
+            return SaveBacktestResponse(
+                success=False,
+                message="Failed to save backtest",
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest save failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return SaveBacktestResponse(
+            success=False,
+            message="Failed to save backtest",
+            error=str(e)
+        )
+
+
+@app.get("/api/backtests", response_model=ListBacktestsResponse, tags=["Backtests"])
+async def list_backtests():
+    """
+    List all saved backtests.
+
+    Returns:
+        JSON object with list of backtest summaries
+    """
+    try:
+        logger.info("[BACKTEST] List backtests request received")
+
+        success, backtests, error = service_list_backtests()
+
+        if success:
+            logger.info(f"[SUCCESS] Listed {len(backtests)} backtests")
+            return ListBacktestsResponse(
+                success=True,
+                backtests=backtests,
+                count=len(backtests)
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest list failed: {error}")
+            return ListBacktestsResponse(
+                success=False,
+                backtests=[],
+                count=0,
+                error=error
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest list failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return ListBacktestsResponse(
+            success=False,
+            backtests=[],
+            count=0,
+            error=str(e)
+        )
+
+
+@app.get("/api/backtests/{backtest_id}", response_model=LoadBacktestResponse, tags=["Backtests"])
+async def get_backtest(backtest_id: str):
+    """
+    Get a specific backtest by ID.
+
+    Args:
+        backtest_id: The backtest ID to retrieve
+
+    Returns:
+        JSON object with the backtest configuration
+    """
+    try:
+        logger.info(f"[BACKTEST] Get backtest request for ID: {backtest_id}")
+
+        success, backtest, error = service_get_backtest(backtest_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Backtest retrieved: {backtest.name}")
+            return LoadBacktestResponse(
+                success=True,
+                backtest=backtest
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest get failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Backtest not found: {backtest_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest get failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.delete("/api/backtests/{backtest_id}", response_model=DeleteBacktestResponse, tags=["Backtests"])
+async def delete_backtest(backtest_id: str):
+    """
+    Delete a backtest by ID.
+
+    Args:
+        backtest_id: The backtest ID to delete
+
+    Returns:
+        JSON object with success status and message
+    """
+    try:
+        logger.info(f"[BACKTEST] Delete backtest request for ID: {backtest_id}")
+
+        success, error = service_delete_backtest(backtest_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Backtest deleted: {backtest_id}")
+            return DeleteBacktestResponse(
+                success=True,
+                message="Backtest deleted successfully"
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest delete failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Backtest not found: {backtest_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest delete failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.post("/api/backtests/{backtest_id}/duplicate", response_model=DuplicateBacktestResponse, tags=["Backtests"])
+async def duplicate_backtest(backtest_id: str):
+    """
+    Duplicate a backtest by ID.
+
+    Args:
+        backtest_id: The backtest ID to duplicate
+
+    Returns:
+        JSON object with new backtest ID and name
+    """
+    try:
+        logger.info(f"[BACKTEST] Duplicate backtest request for ID: {backtest_id}")
+
+        success, new_id, new_name, error = service_duplicate_backtest(backtest_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Backtest duplicated: {new_name} (ID: {new_id})")
+            return DuplicateBacktestResponse(
+                success=True,
+                backtest_id=new_id,
+                backtest_name=new_name,
+                message=f"Backtest duplicated as '{new_name}'"
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest duplicate failed: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error or f"Backtest not found: {backtest_id}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest duplicate failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
         )
 
 

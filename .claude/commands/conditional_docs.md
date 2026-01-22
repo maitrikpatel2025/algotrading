@@ -409,3 +409,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing chart refresh on strategy load
     - When improving error messages for missing indicators or patterns
     - When adding pattern detection user feedback (toast notifications)
+
+- app_docs/feature-b503685d-backtest-configuration.md
+  - Conditions:
+    - When working with backtesting features or backtest configuration
+    - When implementing or modifying BacktestLibrary or BacktestConfiguration pages
+    - When working with /api/backtests endpoints (save, list, get, delete, duplicate)
+    - When implementing position sizing options (fixed lot, fixed dollar, percentage, risk-based)
+    - When working with risk management settings (stop loss, take profit, trailing stop, partial closes)
+    - When troubleshooting backtest save/load or validation issues
+    - When extending BacktestConfig or related Pydantic data models
+    - When working with the backtests database table or migrations
+    - When implementing backtest execution or results visualization
+    - When adding new components to the Backtest Configuration page
