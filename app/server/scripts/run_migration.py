@@ -32,7 +32,7 @@ def run_migration(migration_file: str, database_url: str) -> bool:
     with open(migration_file, "r") as f:
         sql = f.read()
 
-    print(f"Connecting to database...")
+    print("Connecting to database...")
     try:
         conn = psycopg2.connect(database_url)
         conn.autocommit = True

@@ -392,7 +392,7 @@ class BacktestExecutor:
             # Get backtest parameters
             start_date = backtest_data.get("start_date")
             end_date = backtest_data.get("end_date")
-            pair = backtest_data.get("pair") or strategy.get("pair", "EUR_USD")
+            _pair = backtest_data.get("pair") or strategy.get("pair", "EUR_USD")  # noqa: F841
             timeframe = backtest_data.get("timeframe") or strategy.get("timeframe", "H1")
             initial_balance = float(backtest_data.get("initial_balance", 10000))
             position_sizing = backtest_data.get("position_sizing", {})
@@ -432,8 +432,8 @@ class BacktestExecutor:
             conditions = strategy.get("conditions", {}) or {}
             long_entry_conditions = conditions.get("long_entry", []) or []
             short_entry_conditions = conditions.get("short_entry", []) or []
-            long_exit_conditions = conditions.get("long_exit", []) or []
-            short_exit_conditions = conditions.get("short_exit", []) or []
+            _long_exit_conditions = conditions.get("long_exit", []) or []  # noqa: F841
+            _short_exit_conditions = conditions.get("short_exit", []) or []  # noqa: F841
 
             # Process candles
             for i, candle in enumerate(candles):

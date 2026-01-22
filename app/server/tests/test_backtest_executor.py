@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.backtest_executor import BacktestExecutor, BacktestExecution
+from core.backtest_executor import BacktestExecution, BacktestExecutor
 from core.data_models import BacktestProgress
 
 
