@@ -445,3 +445,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing performance mode or variable polling intervals
     - When troubleshooting backtest progress metrics or visualization issues
     - When extending BacktestProgress model with new metric fields
+
+- app_docs/feature-632a538d-backtest-summary-statistics.md
+  - Conditions:
+    - When working with backtest results or summary statistics display
+    - When implementing or modifying BacktestResultsSummary, MetricCard, or EquityCurveChart components
+    - When working with Sharpe Ratio, Sortino Ratio, or risk-adjusted return calculations
+    - When implementing maximum drawdown calculations or recovery factor metrics
+    - When working with buy-and-hold benchmark comparisons
+    - When implementing metric color coding or tooltip explanations
+    - When troubleshooting backtest statistics calculations or display issues
+    - When extending BacktestResultsSummary data model with new metrics
+    - When working with metricDefinitions.js or getMetricTrend functions
