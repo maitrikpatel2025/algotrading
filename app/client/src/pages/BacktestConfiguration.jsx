@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Play } from 'lucide-react';
 import endPoints from '../app/api';
 import StrategySelector from '../components/StrategySelector';
 import DateRangePicker from '../components/DateRangePicker';
@@ -8,6 +8,8 @@ import PositionSizingForm from '../components/PositionSizingForm';
 import RiskManagementForm from '../components/RiskManagementForm';
 import RiskPreviewChart from '../components/RiskPreviewChart';
 import Toast from '../components/Toast';
+import BacktestProgressModal from '../components/BacktestProgressModal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 /**
  * BacktestConfiguration Page
@@ -59,6 +61,14 @@ function BacktestConfiguration() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Execution state
+  const [isRunning, setIsRunning] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [backtestProgress, setBacktestProgress] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const pollingIntervalRef = useRef(null);
 
   // Load backtest function
   const loadBacktest = useCallback(async () => {
@@ -196,6 +206,149 @@ function BacktestConfiguration() {
     }
   };
 
+  // Stop polling helper (defined first to avoid circular dependency)
+  const clearPollingInterval = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
+  // Start polling for progress
+  const startProgressPolling = useCallback((backtestId) => {
+    // Clear any existing interval
+    clearPollingInterval();
+
+    const pollProgress = async () => {
+      try {
+        const result = await endPoints.getBacktestProgress(backtestId);
+        if (result.success && result.progress) {
+          setBacktestProgress(result.progress);
+
+          // Check if completed or failed
+          if (result.progress.status === 'completed') {
+            clearPollingInterval();
+            setIsRunning(false);
+            showToast('Backtest completed successfully');
+          } else if (result.progress.status === 'failed') {
+            clearPollingInterval();
+            setIsRunning(false);
+            showToast(result.progress.error_message || 'Backtest failed', 'error');
+          } else if (result.progress.status === 'pending' && isCancelling) {
+            // Cancelled successfully
+            clearPollingInterval();
+            setIsRunning(false);
+            setIsCancelling(false);
+            setShowProgressModal(false);
+            showToast('Backtest cancelled');
+          }
+        }
+      } catch (error) {
+        console.error('Error polling progress:', error);
+      }
+    };
+
+    // Poll immediately, then every 1.5 seconds
+    pollProgress();
+    pollingIntervalRef.current = setInterval(pollProgress, 1500);
+  }, [isCancelling, clearPollingInterval]);
+
+  // Alias for external use
+  const stopProgressPolling = clearPollingInterval;
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      stopProgressPolling();
+    };
+  }, [stopProgressPolling]);
+
+  // Handle run backtest
+  const handleRunBacktest = async () => {
+    // Must have a saved backtest ID to run
+    if (!isEditing || !id) {
+      showToast('Please save the backtest first before running', 'error');
+      return;
+    }
+
+    // Validate strategy is selected
+    if (!formData.strategy_id) {
+      showToast('Please select a strategy before running', 'error');
+      return;
+    }
+
+    try {
+      setIsRunning(true);
+      setShowProgressModal(true);
+      setBacktestProgress({
+        backtest_id: id,
+        status: 'pending',
+        progress_percentage: 0,
+        candles_processed: 0,
+        total_candles: 0,
+        trade_count: 0,
+      });
+
+      const result = await endPoints.runBacktest(id);
+
+      if (result.success) {
+        startProgressPolling(id);
+      } else {
+        setIsRunning(false);
+        setShowProgressModal(false);
+        showToast(result.message || 'Failed to start backtest', 'error');
+      }
+    } catch (error) {
+      console.error('Error running backtest:', error);
+      setIsRunning(false);
+      setShowProgressModal(false);
+      showToast('Failed to start backtest', 'error');
+    }
+  };
+
+  // Handle cancel button click (show confirmation)
+  const handleCancelClick = () => {
+    setShowCancelDialog(true);
+  };
+
+  // Handle actual cancel
+  const handleCancelBacktest = async (keepPartial = false) => {
+    setShowCancelDialog(false);
+    setIsCancelling(true);
+
+    try {
+      const result = await endPoints.cancelBacktest(id, keepPartial);
+
+      if (result.success) {
+        if (result.partial_results_saved) {
+          showToast('Backtest cancelled - partial results saved');
+        } else {
+          showToast('Backtest cancelled');
+        }
+        stopProgressPolling();
+        setIsRunning(false);
+        setIsCancelling(false);
+        setShowProgressModal(false);
+      } else {
+        showToast(result.message || 'Failed to cancel backtest', 'error');
+        setIsCancelling(false);
+      }
+    } catch (error) {
+      console.error('Error cancelling backtest:', error);
+      showToast('Failed to cancel backtest', 'error');
+      setIsCancelling(false);
+    }
+  };
+
+  // Handle close progress modal
+  const handleCloseProgressModal = () => {
+    if (!isRunning || backtestProgress?.status === 'completed' || backtestProgress?.status === 'failed') {
+      stopProgressPolling();
+      setShowProgressModal(false);
+      setBacktestProgress(null);
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -244,7 +397,7 @@ function BacktestConfiguration() {
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || isRunning}
               className="btn btn-primary flex items-center gap-2"
             >
               {saving ? (
@@ -259,6 +412,26 @@ function BacktestConfiguration() {
                 </>
               )}
             </button>
+            {isEditing && (
+              <button
+                onClick={handleRunBacktest}
+                disabled={saving || isRunning || !formData.strategy_id}
+                className="btn btn-success flex items-center gap-2"
+                title={!formData.strategy_id ? 'Select a strategy to run backtest' : 'Run Backtest'}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Run Backtest
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -400,6 +573,41 @@ function BacktestConfiguration() {
             onClose={() => setToast({ ...toast, show: false })}
           />
         )}
+
+        {/* Progress Modal */}
+        <BacktestProgressModal
+          isOpen={showProgressModal}
+          onClose={handleCloseProgressModal}
+          onCancel={handleCancelClick}
+          progress={backtestProgress}
+          isCancelling={isCancelling}
+        />
+
+        {/* Cancel Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showCancelDialog}
+          onClose={() => setShowCancelDialog(false)}
+          title="Cancel Running Backtest?"
+          message="Cancel backtest? Partial results will be discarded."
+          variant="warning"
+          actions={[
+            {
+              label: 'Continue Running',
+              variant: 'secondary',
+              onClick: () => setShowCancelDialog(false),
+            },
+            {
+              label: 'Cancel and Keep Partial',
+              variant: 'secondary',
+              onClick: () => handleCancelBacktest(true),
+            },
+            {
+              label: 'Cancel Backtest',
+              variant: 'danger',
+              onClick: () => handleCancelBacktest(false),
+            },
+          ]}
+        />
       </div>
     </div>
   );
