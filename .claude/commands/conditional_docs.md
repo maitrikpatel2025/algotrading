@@ -422,3 +422,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with the backtests database table or migrations
     - When implementing backtest execution or results visualization
     - When adding new components to the Backtest Configuration page
+
+- app_docs/feature-2bf4bcfd-backtest-execution-progress-cancel.md
+  - Conditions:
+    - When working with backtest execution or running backtests
+    - When implementing or modifying the BacktestExecutor class
+    - When working with /api/backtests/{id}/run, /api/backtests/{id}/progress, or /api/backtests/{id}/cancel endpoints
+    - When implementing real-time progress tracking or polling mechanisms
+    - When working with BacktestProgressModal component
+    - When troubleshooting backtest execution, progress updates, or cancellation issues
+    - When implementing background thread execution patterns
+    - When working with backtest progress database fields (progress_percentage, candles_processed, trade_count)
+    - When extending backtest execution with new metrics or features
