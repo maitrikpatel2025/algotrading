@@ -23,6 +23,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import get_options
 from config import settings
+from core.backtest_service import (
+    delete_backtest as service_delete_backtest,
+)
+from core.backtest_service import (
+    duplicate_backtest as service_duplicate_backtest,
+)
+from core.backtest_service import (
+    get_backtest as service_get_backtest,
+)
+from core.backtest_service import (
+    list_backtests as service_list_backtests,
+)
+from core.backtest_service import (
+    save_backtest as service_save_backtest,
+)
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
 from core.data_models import (
@@ -87,21 +102,6 @@ from core.strategy_service import (
 )
 from core.strategy_service import (
     validate_import as service_validate_import,
-)
-from core.backtest_service import (
-    delete_backtest as service_delete_backtest,
-)
-from core.backtest_service import (
-    duplicate_backtest as service_duplicate_backtest,
-)
-from core.backtest_service import (
-    get_backtest as service_get_backtest,
-)
-from core.backtest_service import (
-    list_backtests as service_list_backtests,
-)
-from core.backtest_service import (
-    save_backtest as service_save_backtest,
 )
 from db import is_configured, validate_connection
 from scraping import get_bloomberg_headlines, get_pair_technicals
