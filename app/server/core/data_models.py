@@ -754,6 +754,30 @@ class BacktestProgress(BaseModel):
         None,
         description="When the backtest execution started"
     )
+    # Live performance metrics for progress visualization
+    current_pnl: Optional[float] = Field(
+        None,
+        description="Current cumulative P/L during execution"
+    )
+    running_win_rate: Optional[float] = Field(
+        None,
+        ge=0,
+        le=100,
+        description="Running win rate as percentage (0-100)"
+    )
+    current_drawdown: Optional[float] = Field(
+        None,
+        ge=0,
+        description="Current drawdown as percentage from peak equity"
+    )
+    equity_curve: Optional[List[float]] = Field(
+        None,
+        description="Last 50 equity curve points for mini chart"
+    )
+    peak_equity: Optional[float] = Field(
+        None,
+        description="Peak equity value for drawdown calculation"
+    )
 
 
 class RunBacktestRequest(BaseModel):
