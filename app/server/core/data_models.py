@@ -541,3 +541,165 @@ class ImportStrategyResponse(BaseModel):
     strategy_name: Optional[str] = Field(None, description="Name of the imported strategy")
     message: str = Field(..., description="Success or error message")
     error: Optional[str] = Field(None, description="Error details if failed")
+
+
+# =============================================================================
+# Backtest Configuration Models
+# =============================================================================
+
+class PositionSizingConfig(BaseModel):
+    """Position sizing configuration for a backtest."""
+    method: Literal["fixed_lot", "fixed_dollar", "percentage", "risk_based"] = Field(
+        default="percentage",
+        description="Position sizing method"
+    )
+    value: float = Field(default=2.0, description="Value for the sizing method (lots, dollars, percentage, or risk %)")
+    leverage: int = Field(default=1, ge=1, le=500, description="Leverage ratio (1:1 to 1:500)")
+    max_position_size: Optional[float] = Field(None, description="Maximum position size cap")
+    compound: bool = Field(default=True, description="Whether to reinvest profits (True) or use fixed base (False)")
+
+
+class StopLossConfig(BaseModel):
+    """Stop loss configuration."""
+    type: Literal["fixed_pips", "fixed_dollar", "atr_based", "percentage", "none"] = Field(
+        default="none",
+        description="Stop loss type"
+    )
+    value: Optional[float] = Field(None, description="Stop loss value based on type")
+
+
+class TakeProfitConfig(BaseModel):
+    """Take profit configuration."""
+    type: Literal["fixed_pips", "fixed_dollar", "atr_based", "percentage", "risk_reward", "none"] = Field(
+        default="none",
+        description="Take profit type"
+    )
+    value: Optional[float] = Field(None, description="Take profit value based on type")
+
+
+class TrailingStopConfig(BaseModel):
+    """Trailing stop configuration."""
+    type: Literal["fixed_pips", "atr_based", "percentage", "break_even", "none"] = Field(
+        default="none",
+        description="Trailing stop type"
+    )
+    value: Optional[float] = Field(None, description="Trailing stop value based on type")
+    break_even_trigger: Optional[float] = Field(None, description="Price move to trigger break-even (in pips or %)")
+
+
+class PartialCloseLevel(BaseModel):
+    """A single partial close level."""
+    target_pips: float = Field(..., description="Target profit in pips to trigger partial close")
+    close_percentage: float = Field(..., ge=1, le=100, description="Percentage of position to close (1-100)")
+
+
+class PartialClosesConfig(BaseModel):
+    """Partial closes configuration."""
+    enabled: bool = Field(default=False, description="Whether partial closes are enabled")
+    levels: List[PartialCloseLevel] = Field(default=[], description="List of partial close levels")
+
+
+class RiskManagementConfig(BaseModel):
+    """Complete risk management configuration for a backtest."""
+    stop_loss: StopLossConfig = Field(default_factory=StopLossConfig, description="Stop loss settings")
+    take_profit: TakeProfitConfig = Field(default_factory=TakeProfitConfig, description="Take profit settings")
+    trailing_stop: TrailingStopConfig = Field(default_factory=TrailingStopConfig, description="Trailing stop settings")
+    partial_closes: PartialClosesConfig = Field(default_factory=PartialClosesConfig, description="Partial close settings")
+
+
+class BacktestConfig(BaseModel):
+    """Complete backtest configuration."""
+    id: Optional[str] = Field(None, description="Backtest ID (generated on save)")
+    name: str = Field(..., description="Backtest name", max_length=100)
+    description: Optional[str] = Field(None, description="Backtest description", max_length=500)
+    strategy_id: Optional[str] = Field(None, description="ID of the strategy to backtest")
+    strategy_name: Optional[str] = Field(None, description="Name of the strategy (for display)")
+    pair: Optional[str] = Field(None, description="Currency pair")
+    timeframe: Optional[str] = Field(None, description="Timeframe")
+    start_date: datetime = Field(..., description="Backtest start date")
+    end_date: datetime = Field(..., description="Backtest end date")
+    initial_balance: float = Field(
+        default=10000.0,
+        ge=100,
+        le=10000000,
+        description="Initial account balance"
+    )
+    currency: Literal["USD", "EUR", "GBP"] = Field(default="USD", description="Account currency")
+    position_sizing: PositionSizingConfig = Field(
+        default_factory=PositionSizingConfig,
+        description="Position sizing configuration"
+    )
+    risk_management: RiskManagementConfig = Field(
+        default_factory=RiskManagementConfig,
+        description="Risk management configuration"
+    )
+    status: Literal["pending", "running", "completed", "failed"] = Field(
+        default="pending",
+        description="Backtest status"
+    )
+    results: Optional[Dict[str, Any]] = Field(None, description="Backtest results (null until completed)")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+
+
+class BacktestListItem(BaseModel):
+    """Backtest list item for library display."""
+    id: str = Field(..., description="Backtest ID")
+    name: str = Field(..., description="Backtest name")
+    description: Optional[str] = Field(None, description="Backtest description")
+    strategy_id: Optional[str] = Field(None, description="Strategy ID")
+    strategy_name: Optional[str] = Field(None, description="Strategy name")
+    pair: Optional[str] = Field(None, description="Currency pair")
+    timeframe: Optional[str] = Field(None, description="Timeframe")
+    start_date: datetime = Field(..., description="Backtest start date")
+    end_date: datetime = Field(..., description="Backtest end date")
+    initial_balance: float = Field(..., description="Initial account balance")
+    currency: str = Field(..., description="Account currency")
+    status: str = Field(..., description="Backtest status")
+    results: Optional[Dict[str, Any]] = Field(None, description="Backtest results summary")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+
+
+class SaveBacktestRequest(BaseModel):
+    """Request to save a backtest."""
+    backtest: BacktestConfig = Field(..., description="Backtest configuration to save")
+
+
+class SaveBacktestResponse(BaseModel):
+    """Response from saving a backtest."""
+    success: bool = Field(..., description="Whether the save was successful")
+    backtest_id: Optional[str] = Field(None, description="ID of the saved backtest")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class LoadBacktestResponse(BaseModel):
+    """Response from loading a backtest."""
+    success: bool = Field(..., description="Whether the load was successful")
+    backtest: Optional[BacktestConfig] = Field(None, description="Loaded backtest configuration")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class ListBacktestsResponse(BaseModel):
+    """Response from listing backtests."""
+    success: bool = Field(..., description="Whether the list was successful")
+    backtests: List[BacktestListItem] = Field(default=[], description="List of backtests")
+    count: int = Field(0, description="Number of backtests")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class DeleteBacktestResponse(BaseModel):
+    """Response from deleting a backtest."""
+    success: bool = Field(..., description="Whether the delete was successful")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class DuplicateBacktestResponse(BaseModel):
+    """Response from duplicating a backtest."""
+    success: bool = Field(..., description="Whether the duplicate was successful")
+    backtest_id: Optional[str] = Field(None, description="ID of the new duplicated backtest")
+    backtest_name: Optional[str] = Field(None, description="Name of the new duplicated backtest")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")

@@ -80,7 +80,13 @@ const endPoints = {
         strategy_data: data,
         name_override: options.name_override,
         conflict_resolution: options.conflict_resolution
-    })
+    }),
+    // Backtest endpoints
+    saveBacktest: (backtest) => requests.post("/backtests", { backtest }),
+    listBacktests: () => requests.get("/backtests"),
+    getBacktest: (id) => requests.get(`/backtests/${id}`),
+    deleteBacktest: (id) => requests.delete(`/backtests/${id}`),
+    duplicateBacktest: (id) => requests.post(`/backtests/${id}/duplicate`)
 }
 
 export default endPoints;

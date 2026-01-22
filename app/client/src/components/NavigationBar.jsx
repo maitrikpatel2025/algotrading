@@ -13,6 +13,7 @@ import { Menu, X, TrendingUp } from 'lucide-react';
 
 const navItems = [
   { href: '/strategies', label: 'Strategies' },
+  { href: '/backtests', label: 'Backtest' },
   { href: '/monitor', label: 'Monitor' },
   { href: '/account', label: 'Account' },
 ];
@@ -40,6 +41,8 @@ function NavigationBar() {
           {navItems.map((item) => {
             const isActive = item.href === '/strategies'
               ? location.pathname.startsWith('/strategies')
+              : item.href === '/backtests'
+              ? location.pathname.startsWith('/backtests')
               : location.pathname === item.href;
             return (
               <NavLink
@@ -90,6 +93,8 @@ function NavigationBar() {
             {navItems.map((item) => {
               const isActive = item.href === '/strategies'
                 ? location.pathname.startsWith('/strategies')
+                : item.href === '/backtests'
+                ? location.pathname.startsWith('/backtests')
                 : location.pathname === item.href;
               return (
                 <NavLink
