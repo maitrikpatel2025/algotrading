@@ -107,9 +107,18 @@ class BacktestExecutor:
             strategy = result.data[0]
 
             # Check for entry conditions
-            conditions = strategy.get("conditions", {}) or {}
-            long_entry = conditions.get("long_entry", []) or []
-            short_entry = conditions.get("short_entry", []) or []
+            # Conditions can be a list of condition objects with 'section' field
+            # or a dict with 'long_entry'/'short_entry' keys
+            conditions = strategy.get("conditions", []) or []
+
+            if isinstance(conditions, list):
+                # New format: list of condition objects with 'section' field
+                long_entry = [c for c in conditions if c.get("section") == "long_entry"]
+                short_entry = [c for c in conditions if c.get("section") == "short_entry"]
+            else:
+                # Legacy format: dict with entry type keys
+                long_entry = conditions.get("long_entry", []) or []
+                short_entry = conditions.get("short_entry", []) or []
 
             if not long_entry and not short_entry:
                 return False, "Strategy must have at least one entry condition (long_entry or short_entry)"
