@@ -35,6 +35,13 @@ class BacktestExecution:
     status: Literal["pending", "running", "cancelling", "completed", "failed"] = "pending"
     error_message: Optional[str] = None
     trades: List[Dict[str, Any]] = field(default_factory=list)
+    # Live performance metrics
+    current_pnl: float = 0.0
+    running_win_rate: float = 0.0
+    current_drawdown: float = 0.0
+    equity_curve: List[float] = field(default_factory=list)
+    peak_equity: float = 0.0
+    initial_balance: float = 0.0
 
 
 class BacktestExecutor:
@@ -100,9 +107,18 @@ class BacktestExecutor:
             strategy = result.data[0]
 
             # Check for entry conditions
-            conditions = strategy.get("conditions", {}) or {}
-            long_entry = conditions.get("long_entry", []) or []
-            short_entry = conditions.get("short_entry", []) or []
+            # Conditions can be a list of condition objects with 'section' field
+            # or a dict with 'long_entry'/'short_entry' keys
+            conditions = strategy.get("conditions", []) or []
+
+            if isinstance(conditions, list):
+                # New format: list of condition objects with 'section' field
+                long_entry = [c for c in conditions if c.get("section") == "long_entry"]
+                short_entry = [c for c in conditions if c.get("section") == "short_entry"]
+            else:
+                # Legacy format: dict with entry type keys
+                long_entry = conditions.get("long_entry", []) or []
+                short_entry = conditions.get("short_entry", []) or []
 
             if not long_entry and not short_entry:
                 return False, "Strategy must have at least one entry condition (long_entry or short_entry)"
@@ -257,7 +273,13 @@ class BacktestExecutor:
                     trade_count=execution.trade_count,
                     estimated_seconds_remaining=estimated_seconds,
                     error_message=execution.error_message,
-                    started_at=execution.started_at
+                    started_at=execution.started_at,
+                    # Live performance metrics
+                    current_pnl=execution.current_pnl,
+                    running_win_rate=execution.running_win_rate,
+                    current_drawdown=execution.current_drawdown,
+                    equity_curve=execution.equity_curve if execution.equity_curve else None,
+                    peak_equity=execution.peak_equity if execution.peak_equity > 0 else None
                 )
 
         # Check database for completed/failed backtests
@@ -428,6 +450,17 @@ class BacktestExecutor:
             balance = initial_balance
             trade_count = 0
 
+            # Initialize live metrics tracking
+            with self._executions_lock:
+                execution.initial_balance = initial_balance
+                execution.peak_equity = initial_balance
+                execution.equity_curve = [initial_balance]
+                execution.current_pnl = 0.0
+                execution.running_win_rate = 0.0
+                execution.current_drawdown = 0.0
+
+            winning_trades = 0
+
             # Get strategy conditions
             conditions = strategy.get("conditions", {}) or {}
             long_entry_conditions = conditions.get("long_entry", []) or []
@@ -489,11 +522,23 @@ class BacktestExecutor:
                         }
                         trades.append(trade)
                         trade_count += 1
+                        if pnl > 0:
+                            winning_trades += 1
                         current_position = None
 
+                        # Update live metrics
                         with self._executions_lock:
                             execution.trade_count = trade_count
                             execution.trades = trades
+                            # Calculate cumulative P/L
+                            execution.current_pnl = round(balance - initial_balance, 2)
+                            # Calculate win rate
+                            execution.running_win_rate = round((winning_trades / trade_count) * 100, 1) if trade_count > 0 else 0.0
+                            # Update peak equity and drawdown
+                            if balance > execution.peak_equity:
+                                execution.peak_equity = balance
+                            if execution.peak_equity > 0:
+                                execution.current_drawdown = round(((execution.peak_equity - balance) / execution.peak_equity) * 100, 2)
 
                 # Update progress periodically
                 if i % self.PROGRESS_UPDATE_INTERVAL == 0 or i == total_candles - 1:
@@ -503,6 +548,10 @@ class BacktestExecutor:
                         execution.candles_processed = i + 1
                         execution.progress_percentage = progress_pct
                         execution.current_date = candle_time
+                        # Update equity curve (limit to last 50 points)
+                        execution.equity_curve.append(balance)
+                        if len(execution.equity_curve) > 50:
+                            execution.equity_curve = execution.equity_curve[-50:]
 
                     self._update_backtest_progress(
                         backtest_id,

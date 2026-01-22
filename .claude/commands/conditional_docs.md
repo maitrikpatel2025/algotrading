@@ -434,3 +434,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing background thread execution patterns
     - When working with backtest progress database fields (progress_percentage, candles_processed, trade_count)
     - When extending backtest execution with new metrics or features
+
+- app_docs/feature-62d0b3e2-backtest-progress-visualization.md
+  - Conditions:
+    - When working with live performance metrics during backtest execution
+    - When implementing or modifying the MiniEquityCurve component
+    - When working with real-time P/L, win rate, or drawdown calculations
+    - When implementing equity curve visualization or SVG charts
+    - When working with view mode toggles (compact/detailed) in backtest modal
+    - When implementing performance mode or variable polling intervals
+    - When troubleshooting backtest progress metrics or visualization issues
+    - When extending BacktestProgress model with new metric fields

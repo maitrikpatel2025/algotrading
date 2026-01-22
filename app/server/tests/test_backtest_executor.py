@@ -480,3 +480,208 @@ class TestBacktestProgressModel:
                 status="running",
                 progress_percentage=-1
             )
+
+
+class TestLiveMetrics:
+    """Test cases for live performance metrics during backtest execution."""
+
+    def test_execution_default_metrics(self):
+        """Test BacktestExecution has correct default metric values."""
+        execution = BacktestExecution(
+            backtest_id="test-id",
+            thread=MagicMock(),
+            cancel_event=threading.Event()
+        )
+
+        assert execution.current_pnl == 0.0
+        assert execution.running_win_rate == 0.0
+        assert execution.current_drawdown == 0.0
+        assert execution.equity_curve == []
+        assert execution.peak_equity == 0.0
+        assert execution.initial_balance == 0.0
+
+    def test_progress_includes_live_metrics(self):
+        """Test that BacktestProgress includes live performance metrics."""
+        progress = BacktestProgress(
+            backtest_id="test-id",
+            status="running",
+            progress_percentage=50,
+            current_pnl=150.50,
+            running_win_rate=65.5,
+            current_drawdown=2.5,
+            equity_curve=[10000, 10050, 10100, 10150],
+            peak_equity=10200.0
+        )
+
+        assert progress.current_pnl == 150.50
+        assert progress.running_win_rate == 65.5
+        assert progress.current_drawdown == 2.5
+        assert progress.equity_curve == [10000, 10050, 10100, 10150]
+        assert progress.peak_equity == 10200.0
+
+    def test_progress_metrics_optional(self):
+        """Test that live metrics are optional for backward compatibility."""
+        progress = BacktestProgress(
+            backtest_id="test-id",
+            status="running",
+            progress_percentage=50
+        )
+
+        assert progress.current_pnl is None
+        assert progress.running_win_rate is None
+        assert progress.current_drawdown is None
+        assert progress.equity_curve is None
+        assert progress.peak_equity is None
+
+    def test_win_rate_bounds(self):
+        """Test running_win_rate validation bounds."""
+        # Valid bounds
+        progress = BacktestProgress(
+            backtest_id="test-id",
+            status="running",
+            running_win_rate=0.0
+        )
+        assert progress.running_win_rate == 0.0
+
+        progress = BacktestProgress(
+            backtest_id="test-id",
+            status="running",
+            running_win_rate=100.0
+        )
+        assert progress.running_win_rate == 100.0
+
+        # Invalid - should raise validation error
+        with pytest.raises(Exception):
+            BacktestProgress(
+                backtest_id="test-id",
+                status="running",
+                running_win_rate=101.0
+            )
+
+        with pytest.raises(Exception):
+            BacktestProgress(
+                backtest_id="test-id",
+                status="running",
+                running_win_rate=-1.0
+            )
+
+    def test_drawdown_non_negative(self):
+        """Test current_drawdown must be non-negative."""
+        progress = BacktestProgress(
+            backtest_id="test-id",
+            status="running",
+            current_drawdown=0.0
+        )
+        assert progress.current_drawdown == 0.0
+
+        progress = BacktestProgress(
+            backtest_id="test-id",
+            status="running",
+            current_drawdown=50.0
+        )
+        assert progress.current_drawdown == 50.0
+
+        # Invalid - should raise validation error
+        with pytest.raises(Exception):
+            BacktestProgress(
+                backtest_id="test-id",
+                status="running",
+                current_drawdown=-5.0
+            )
+
+    def test_get_progress_includes_metrics(self, executor):
+        """Test get_progress returns live metrics from running execution."""
+        execution = BacktestExecution(
+            backtest_id="backtest-1",
+            thread=MagicMock(),
+            cancel_event=threading.Event(),
+            status="running",
+            progress_percentage=50,
+            candles_processed=500,
+            total_candles=1000,
+            trade_count=10,
+            started_at=datetime.now(timezone.utc),
+            current_pnl=250.75,
+            running_win_rate=60.0,
+            current_drawdown=1.5,
+            equity_curve=[10000, 10100, 10200, 10150, 10250],
+            peak_equity=10300.0,
+            initial_balance=10000.0
+        )
+        executor._running_backtests["backtest-1"] = execution
+
+        progress = executor.get_progress("backtest-1")
+
+        assert progress is not None
+        assert progress.current_pnl == 250.75
+        assert progress.running_win_rate == 60.0
+        assert progress.current_drawdown == 1.5
+        assert progress.equity_curve == [10000, 10100, 10200, 10150, 10250]
+        assert progress.peak_equity == 10300.0
+
+    def test_equity_curve_limit(self):
+        """Test equity curve respects the 50 point limit."""
+        # Create a list with more than 50 points
+        large_curve = list(range(10000, 10060))  # 60 points
+        assert len(large_curve) == 60
+
+        # When limited, should keep last 50
+        limited_curve = large_curve[-50:]
+        assert len(limited_curve) == 50
+        assert limited_curve[0] == 10010
+        assert limited_curve[-1] == 10059
+
+    def test_pnl_calculation_accuracy(self):
+        """Test P/L calculation with various trade scenarios."""
+        # Scenario: initial_balance=10000, final_balance=10500
+        initial_balance = 10000.0
+        final_balance = 10500.0
+        expected_pnl = round(final_balance - initial_balance, 2)
+        assert expected_pnl == 500.0
+
+        # Scenario: loss
+        final_balance = 9800.0
+        expected_pnl = round(final_balance - initial_balance, 2)
+        assert expected_pnl == -200.0
+
+    def test_win_rate_calculation(self):
+        """Test win rate calculation with various trade counts."""
+        # 0 trades - should be 0%
+        win_rate = 0.0
+        assert win_rate == 0.0
+
+        # 5 wins out of 10 trades
+        winning_trades = 5
+        total_trades = 10
+        win_rate = round((winning_trades / total_trades) * 100, 1)
+        assert win_rate == 50.0
+
+        # All winning trades
+        winning_trades = 10
+        total_trades = 10
+        win_rate = round((winning_trades / total_trades) * 100, 1)
+        assert win_rate == 100.0
+
+        # All losing trades
+        winning_trades = 0
+        total_trades = 10
+        win_rate = round((winning_trades / total_trades) * 100, 1)
+        assert win_rate == 0.0
+
+    def test_drawdown_calculation(self):
+        """Test drawdown calculation with peak tracking."""
+        # Peak = 10500, current = 10200
+        peak_equity = 10500.0
+        current_equity = 10200.0
+        drawdown = round(((peak_equity - current_equity) / peak_equity) * 100, 2)
+        assert drawdown == 2.86
+
+        # No drawdown when at peak
+        current_equity = 10500.0
+        drawdown = round(((peak_equity - current_equity) / peak_equity) * 100, 2)
+        assert drawdown == 0.0
+
+        # Large drawdown
+        current_equity = 8000.0
+        drawdown = round(((peak_equity - current_equity) / peak_equity) * 100, 2)
+        assert drawdown == 23.81

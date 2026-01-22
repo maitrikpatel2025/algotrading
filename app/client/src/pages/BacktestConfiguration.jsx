@@ -68,7 +68,12 @@ function BacktestConfiguration() {
   const [backtestProgress, setBacktestProgress] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [performanceMode, setPerformanceMode] = useState(false);
   const pollingIntervalRef = useRef(null);
+
+  // Polling intervals
+  const NORMAL_POLL_INTERVAL = 1500;  // 1.5 seconds
+  const PERFORMANCE_POLL_INTERVAL = 5000;  // 5 seconds
 
   // Load backtest function
   const loadBacktest = useCallback(async () => {
@@ -215,9 +220,11 @@ function BacktestConfiguration() {
   }, []);
 
   // Start polling for progress
-  const startProgressPolling = useCallback((backtestId) => {
+  const startProgressPolling = useCallback((backtestId, usePerformanceMode = false) => {
     // Clear any existing interval
     clearPollingInterval();
+
+    const pollInterval = usePerformanceMode ? PERFORMANCE_POLL_INTERVAL : NORMAL_POLL_INTERVAL;
 
     const pollProgress = async () => {
       try {
@@ -248,9 +255,9 @@ function BacktestConfiguration() {
       }
     };
 
-    // Poll immediately, then every 1.5 seconds
+    // Poll immediately, then at the configured interval
     pollProgress();
-    pollingIntervalRef.current = setInterval(pollProgress, 1500);
+    pollingIntervalRef.current = setInterval(pollProgress, pollInterval);
   }, [isCancelling, clearPollingInterval]);
 
   // Alias for external use
@@ -348,6 +355,15 @@ function BacktestConfiguration() {
       setBacktestProgress(null);
     }
   };
+
+  // Handle performance mode change from modal
+  const handlePerformanceModeChange = useCallback((enabled) => {
+    setPerformanceMode(enabled);
+    // Restart polling with new interval if running
+    if (isRunning && id) {
+      startProgressPolling(id, enabled);
+    }
+  }, [isRunning, id, startProgressPolling]);
 
   // Loading state
   if (loading) {
@@ -581,6 +597,7 @@ function BacktestConfiguration() {
           onCancel={handleCancelClick}
           progress={backtestProgress}
           isCancelling={isCancelling}
+          onPerformanceModeChange={handlePerformanceModeChange}
         />
 
         {/* Cancel Confirmation Dialog */}
