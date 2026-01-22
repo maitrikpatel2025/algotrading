@@ -6,14 +6,13 @@ Follows the BotController singleton pattern for background execution management.
 """
 
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Event, Lock
 from typing import Any, Dict, List, Literal, Optional
-
-import math
 
 from core.data_models import BacktestProgress, BacktestResultsSummary
 from db.supabase_client import get_supabase_client, is_configured
