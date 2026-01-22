@@ -836,6 +836,62 @@ class BacktestExecutor:
 
         return round(max_dd_dollars, 2), round(max_dd_percent, 2)
 
+    def _identify_drawdown_periods(self, equity_curve: List[float]) -> List[Dict[str, Any]]:
+        """
+        Identify drawdown periods in the equity curve.
+
+        Args:
+            equity_curve: List of equity values
+
+        Returns:
+            List of drawdown period dicts with start_index, end_index, max_drawdown_pct
+        """
+        if len(equity_curve) < 2:
+            return []
+
+        drawdown_periods = []
+        peak = equity_curve[0]
+        peak_index = 0
+        in_drawdown = False
+        drawdown_start = 0
+        max_drawdown_in_period = 0.0
+
+        for i, equity in enumerate(equity_curve):
+            if equity >= peak:
+                # New peak reached
+                if in_drawdown and max_drawdown_in_period > 0.01:  # Only record if > 0.01%
+                    # End of drawdown period
+                    drawdown_periods.append({
+                        "start_index": drawdown_start,
+                        "end_index": i - 1,
+                        "max_drawdown_pct": round(max_drawdown_in_period, 2)
+                    })
+                peak = equity
+                peak_index = i
+                in_drawdown = False
+                max_drawdown_in_period = 0.0
+            else:
+                # In drawdown
+                if not in_drawdown:
+                    # Start of new drawdown period
+                    in_drawdown = True
+                    drawdown_start = peak_index
+
+                # Calculate current drawdown percentage
+                drawdown_pct = ((peak - equity) / peak * 100) if peak > 0 else 0
+                if drawdown_pct > max_drawdown_in_period:
+                    max_drawdown_in_period = drawdown_pct
+
+        # Handle case where we end in a drawdown
+        if in_drawdown and max_drawdown_in_period > 0.01:
+            drawdown_periods.append({
+                "start_index": drawdown_start,
+                "end_index": len(equity_curve) - 1,
+                "max_drawdown_pct": round(max_drawdown_in_period, 2)
+            })
+
+        return drawdown_periods
+
     def _calculate_recovery_factor(self, total_return: float, max_drawdown: float) -> float:
         """
         Calculate recovery factor = total_return / max_drawdown.
@@ -953,6 +1009,14 @@ class BacktestExecutor:
         """Calculate comprehensive backtest results summary."""
         # Handle empty trades case
         if not trades:
+            # Extract dates from candles
+            equity_curve_dates = []
+            if candles:
+                equity_curve_dates = [
+                    candle["time"].isoformat() if hasattr(candle["time"], "isoformat") else candle["time"]
+                    for candle in candles
+                ]
+
             return BacktestResultsSummary(
                 total_net_profit=0.0,
                 return_on_investment=0.0,
@@ -978,6 +1042,9 @@ class BacktestExecutor:
                 strategy_vs_benchmark=0.0,
                 equity_curve=equity_curve or [initial_balance],
                 buy_hold_curve=[initial_balance],
+                equity_curve_dates=equity_curve_dates if equity_curve_dates else None,
+                trade_counts_per_candle=[0] * len(candles) if candles else None,
+                drawdown_periods=None,
                 trades=[]
             ).model_dump()
 
@@ -1053,6 +1120,46 @@ class BacktestExecutor:
         # Calculate strategy vs benchmark
         strategy_vs_benchmark = roi - buy_hold_return
 
+        # Extract dates from candles for equity curve
+        equity_curve_dates = []
+        if candles:
+            equity_curve_dates = [
+                candle["time"].isoformat() if hasattr(candle["time"], "isoformat") else candle["time"]
+                for candle in candles
+            ]
+
+        # Calculate trade counts per candle
+        trade_counts_per_candle = [0] * len(candles) if candles else []
+        if candles and trades:
+            # Create a mapping of candle times to indices
+            for trade in trades:
+                exit_time = trade.get("exit_time")
+                if exit_time and candles:
+                    # Convert exit_time to datetime if string
+                    if isinstance(exit_time, str):
+                        try:
+                            exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+                        except (ValueError, TypeError):
+                            continue
+
+                    # Find the closest candle index
+                    for i, candle in enumerate(candles):
+                        candle_time = candle["time"]
+                        if isinstance(candle_time, str):
+                            try:
+                                candle_time = datetime.fromisoformat(candle_time.replace("Z", "+00:00"))
+                            except (ValueError, TypeError):
+                                continue
+
+                        # Check if trade exit is at or before this candle
+                        if hasattr(exit_time, "timestamp") and hasattr(candle_time, "timestamp"):
+                            if exit_time <= candle_time:
+                                trade_counts_per_candle[i] += 1
+                                break
+
+        # Identify drawdown periods
+        drawdown_periods = self._identify_drawdown_periods(equity_curve)
+
         # Build the results summary
         results = BacktestResultsSummary(
             total_net_profit=round(total_net_profit, 2),
@@ -1079,6 +1186,9 @@ class BacktestExecutor:
             strategy_vs_benchmark=round(strategy_vs_benchmark, 2),
             equity_curve=equity_curve,
             buy_hold_curve=buy_hold_curve,
+            equity_curve_dates=equity_curve_dates if equity_curve_dates else None,
+            trade_counts_per_candle=trade_counts_per_candle if trade_counts_per_candle else None,
+            drawdown_periods=drawdown_periods if drawdown_periods else None,
             trades=trades[-100:]  # Keep last 100 trades for detail view
         )
 

@@ -1,125 +1,317 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createChart } from 'lightweight-charts';
+import { Download, Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 /**
- * EquityCurveChart Component - Precision Swiss Design System
+ * EquityCurveChart Component - Interactive Equity Curve Visualization
  *
- * Responsive SVG chart showing strategy equity curve vs buy-and-hold benchmark.
  * Features:
- * - Strategy equity curve as primary line (blue/green/red based on performance)
- * - Buy-and-hold curve as secondary line (gray dashed)
- * - Break-even reference line at initial balance
- * - Hover tooltips showing value at each point
- * - Legend showing "Strategy" vs "Buy & Hold"
+ * - Interactive chart using lightweight-charts library
+ * - Zoom and pan capabilities
+ * - Drawdown period highlighting with toggle
+ * - Buy-and-hold comparison overlay with toggle
+ * - Rich tooltips showing date, balance, drawdown %, trade count
+ * - PNG export functionality
+ * - Precision Swiss Design System styling
  */
 function EquityCurveChart({
   equityCurve = [],
   buyHoldCurve = [],
+  equityCurveDates = [],
+  tradeCountsPerCandle = [],
+  drawdownPeriods = [],
   initialBalance = 10000,
-  height = 200,
+  height = 400,
   className,
 }) {
-  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const chartContainerRef = useRef(null);
+  const chartRef = useRef(null);
+  const equitySeriesRef = useRef(null);
+  const buyHoldSeriesRef = useRef(null);
+  const tooltipRef = useRef(null);
 
-  // Calculate chart dimensions and scaling
-  const chartData = useMemo(() => {
-    if (!equityCurve || equityCurve.length < 2) {
-      return null;
+  const [showDrawdowns, setShowDrawdowns] = useState(true);
+  const [showBuyHold, setShowBuyHold] = useState(true);
+
+  // Initialize chart
+  useEffect(() => {
+    if (!chartContainerRef.current || !equityCurve || equityCurve.length < 2) {
+      return;
     }
 
-    const width = 600;
-    const padding = { top: 20, right: 60, bottom: 30, left: 60 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+    // Create chart instance
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { color: '#fafafa' },
+        textColor: '#737373',
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: '#e5e7eb' },
+        horzLines: { color: '#e5e7eb' },
+      },
+      crosshair: {
+        mode: 1, // Normal crosshair
+        vertLine: {
+          color: '#6b7280',
+          width: 1,
+          style: 3, // Dashed
+          labelBackgroundColor: '#6b7280',
+        },
+        horzLine: {
+          color: '#6b7280',
+          width: 1,
+          style: 3,
+          labelBackgroundColor: '#6b7280',
+        },
+      },
+      timeScale: {
+        borderColor: '#d1d5db',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      rightPriceScale: {
+        borderColor: '#d1d5db',
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: true,
+        mouseWheel: true,
+        pinch: true,
+      },
+    });
 
-    // Combine all values for min/max calculation
-    const allValues = [
-      ...equityCurve,
-      ...(buyHoldCurve.length > 0 ? buyHoldCurve : []),
-      initialBalance,
-    ];
-    const minValue = Math.min(...allValues) * 0.99;
-    const maxValue = Math.max(...allValues) * 1.01;
-    const valueRange = maxValue - minValue || 1;
+    chartRef.current = chart;
 
-    // Scale functions
-    const scaleX = (index, dataLength) =>
-      padding.left + (index / (dataLength - 1)) * chartWidth;
-    const scaleY = (value) =>
-      padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight;
-
-    // Generate equity curve path
-    const equityPathPoints = equityCurve
-      .map((value, index) => {
-        const x = scaleX(index, equityCurve.length);
-        const y = scaleY(value);
-        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-
-    // Generate equity curve area fill path
-    const equityAreaPath = `${equityPathPoints} L ${scaleX(equityCurve.length - 1, equityCurve.length)} ${scaleY(minValue)} L ${scaleX(0, equityCurve.length)} ${scaleY(minValue)} Z`;
-
-    // Generate buy-hold path if available
-    let buyHoldPathPoints = '';
-    if (buyHoldCurve.length >= 2) {
-      // Normalize buy-hold curve to match equity curve length if different
-      const sampleRate = Math.max(1, Math.floor(buyHoldCurve.length / equityCurve.length));
-      const sampledBuyHold = [];
-      for (let i = 0; i < equityCurve.length; i++) {
-        const bhIndex = Math.min(Math.floor(i * sampleRate), buyHoldCurve.length - 1);
-        sampledBuyHold.push(buyHoldCurve[bhIndex]);
+    // Prepare equity curve data
+    const equityData = equityCurve.map((value, index) => {
+      let time;
+      if (equityCurveDates && equityCurveDates[index]) {
+        const dateStr = equityCurveDates[index];
+        time = new Date(dateStr).getTime() / 1000;
+      } else {
+        // Fallback: use index as time (will show as numbers)
+        time = index;
       }
-      buyHoldPathPoints = sampledBuyHold
-        .map((value, index) => {
-          const x = scaleX(index, sampledBuyHold.length);
-          const y = scaleY(value);
-          return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-        })
-        .join(' ');
-    }
+      return { time, value };
+    });
 
-    // Break-even line
-    const breakEvenY = scaleY(initialBalance);
-
-    // Final equity
+    // Create area series for equity curve
     const finalEquity = equityCurve[equityCurve.length - 1];
     const isProfit = finalEquity >= initialBalance;
 
-    // Y-axis ticks
-    const yTickCount = 5;
-    const yTicks = [];
-    for (let i = 0; i <= yTickCount; i++) {
-      const value = minValue + (valueRange * i) / yTickCount;
-      yTicks.push({
-        value,
-        y: scaleY(value),
-        label: `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+    const equitySeries = chart.addAreaSeries({
+      topColor: isProfit ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)',
+      bottomColor: isProfit ? 'rgba(34, 197, 94, 0.02)' : 'rgba(239, 68, 68, 0.02)',
+      lineColor: isProfit ? '#22c55e' : '#ef4444',
+      lineWidth: 2,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      priceLineVisible: false,
+    });
+
+    equitySeries.setData(equityData);
+    equitySeriesRef.current = equitySeries;
+
+    // Add buy-and-hold series if available
+    if (buyHoldCurve && buyHoldCurve.length >= 2 && showBuyHold) {
+      const buyHoldData = buyHoldCurve.map((value, index) => {
+        let time;
+        if (equityCurveDates && equityCurveDates[index]) {
+          time = new Date(equityCurveDates[index]).getTime() / 1000;
+        } else {
+          time = index;
+        }
+        return { time, value };
+      });
+
+      const buyHoldSeries = chart.addLineSeries({
+        color: '#9ca3af',
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 3,
+        priceLineVisible: false,
+      });
+
+      buyHoldSeries.setData(buyHoldData);
+      buyHoldSeriesRef.current = buyHoldSeries;
+    }
+
+    // Add drawdown period markers if enabled
+    if (showDrawdowns && drawdownPeriods && drawdownPeriods.length > 0) {
+      drawdownPeriods.forEach((period) => {
+        const startIndex = period.start_index;
+        const endIndex = period.end_index;
+
+        if (startIndex < equityData.length && endIndex < equityData.length) {
+          const startTime = equityData[startIndex].time;
+          const endTime = equityData[endIndex].time;
+
+          // Create markers at start and end
+          const markers = [
+            {
+              time: startTime,
+              position: 'belowBar',
+              color: '#ef4444',
+              shape: 'arrowDown',
+              text: `DD: ${period.max_drawdown_pct.toFixed(2)}%`,
+            },
+          ];
+
+          equitySeries.setMarkers(markers);
+        }
       });
     }
 
-    return {
-      width,
-      height,
-      padding,
-      chartWidth,
-      chartHeight,
-      equityPathPoints,
-      equityAreaPath,
-      buyHoldPathPoints,
-      breakEvenY,
-      isProfit,
-      finalEquity,
-      scaleX,
-      scaleY,
-      yTicks,
-      minValue,
-      maxValue,
+    // Fit content initially
+    chart.timeScale().fitContent();
+
+    // Resize handler
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+        });
+      }
     };
-  }, [equityCurve, buyHoldCurve, initialBalance, height]);
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    // Custom tooltip handler
+    chart.subscribeCrosshairMove((param) => {
+      if (!tooltipRef.current) return;
+
+      if (
+        param.point === undefined ||
+        !param.time ||
+        param.point.x < 0 ||
+        param.point.y < 0
+      ) {
+        tooltipRef.current.style.display = 'none';
+        return;
+      }
+
+      // Find the data index for this time
+      const timeValue = param.time;
+      let dataIndex = equityData.findIndex((d) => d.time === timeValue);
+
+      if (dataIndex === -1) {
+        tooltipRef.current.style.display = 'none';
+        return;
+      }
+
+      // Get values
+      const equityValue = equityCurve[dataIndex];
+      const buyHoldValue = buyHoldCurve && buyHoldCurve[dataIndex] ? buyHoldCurve[dataIndex] : null;
+      const tradeCount = tradeCountsPerCandle && tradeCountsPerCandle[dataIndex] ? tradeCountsPerCandle[dataIndex] : 0;
+
+      // Calculate drawdown at this point
+      let drawdownPct = 0;
+      let peak = initialBalance;
+      for (let i = 0; i <= dataIndex; i++) {
+        if (equityCurve[i] > peak) peak = equityCurve[i];
+      }
+      if (peak > 0) {
+        drawdownPct = ((peak - equityValue) / peak) * 100;
+      }
+
+      // Format date
+      let dateStr = 'N/A';
+      if (equityCurveDates && equityCurveDates[dataIndex]) {
+        const date = new Date(equityCurveDates[dataIndex]);
+        dateStr = date.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+
+      // Update tooltip content
+      tooltipRef.current.innerHTML = `
+        <div class="text-xs text-neutral-600 mb-1.5 font-medium">${dateStr}</div>
+        <div class="flex items-center justify-between gap-4 mb-1">
+          <span class="text-neutral-500">Balance:</span>
+          <span class="font-semibold ${equityValue >= initialBalance ? 'text-success' : 'text-danger'}">
+            $${equityValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
+        ${buyHoldValue !== null && showBuyHold ? `
+          <div class="flex items-center justify-between gap-4 mb-1">
+            <span class="text-neutral-500">Buy & Hold:</span>
+            <span class="font-medium text-neutral-700">
+              $${buyHoldValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        ` : ''}
+        <div class="flex items-center justify-between gap-4 mb-1">
+          <span class="text-neutral-500">Drawdown:</span>
+          <span class="font-medium ${drawdownPct > 0 ? 'text-danger' : 'text-neutral-700'}">
+            ${drawdownPct.toFixed(2)}%
+          </span>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-neutral-500">Trades:</span>
+          <span class="font-medium text-neutral-700">${tradeCount}</span>
+        </div>
+      `;
+
+      // Position tooltip
+      tooltipRef.current.style.display = 'block';
+      const tooltipWidth = tooltipRef.current.clientWidth;
+      const containerWidth = chartContainerRef.current.clientWidth;
+
+      let left = param.point.x;
+      if (left > containerWidth - tooltipWidth - 20) {
+        left = param.point.x - tooltipWidth - 20;
+      } else {
+        left = param.point.x + 20;
+      }
+
+      tooltipRef.current.style.left = `${left}px`;
+      tooltipRef.current.style.top = `${Math.max(10, param.point.y - 100)}px`;
+    });
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, [equityCurve, buyHoldCurve, equityCurveDates, tradeCountsPerCandle, drawdownPeriods, initialBalance, showDrawdowns, showBuyHold]);
+
+  // Export PNG handler
+  const handleExportPNG = () => {
+    if (!chartRef.current) return;
+
+    try {
+      const canvas = chartRef.current.takeScreenshot();
+      const dataUrl = canvas.toDataURL('image/png');
+
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `equity-curve-${new Date().toISOString().slice(0, 10)}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Failed to export chart:', error);
+    }
+  };
 
   // No data state
-  if (!chartData) {
+  if (!equityCurve || equityCurve.length < 2) {
     return (
       <div
         className={cn(
@@ -135,252 +327,63 @@ function EquityCurveChart({
     );
   }
 
-  // Format currency for tooltip
-  const formatCurrency = (value) => {
-    return `$${value.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
-
-  // Get value at hovered index
-  const getHoverInfo = () => {
-    if (hoveredIndex === null) return null;
-
-    const equityValue = equityCurve[hoveredIndex];
-    const buyHoldValue = buyHoldCurve.length > 0
-      ? buyHoldCurve[Math.min(
-          Math.floor(hoveredIndex * (buyHoldCurve.length / equityCurve.length)),
-          buyHoldCurve.length - 1
-        )]
-      : null;
-
-    return { equityValue, buyHoldValue };
-  };
-
-  const hoverInfo = getHoverInfo();
-
   return (
     <div className={cn('relative', className)}>
-      {/* Legend */}
-      <div className="flex items-center justify-end gap-4 mb-2 text-xs">
-        <div className="flex items-center gap-1.5">
-          <div
+      {/* Controls */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDrawdowns(!showDrawdowns)}
             className={cn(
-              'w-4 h-0.5',
-              chartData.isProfit ? 'bg-success' : 'bg-danger'
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+              showDrawdowns
+                ? 'bg-danger/10 text-danger hover:bg-danger/20'
+                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
             )}
-          />
-          <span className="text-neutral-600">Strategy</span>
+          >
+            {showDrawdowns ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            Drawdowns
+          </button>
+
+          {buyHoldCurve && buyHoldCurve.length >= 2 && (
+            <button
+              onClick={() => setShowBuyHold(!showBuyHold)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                showBuyHold
+                  ? 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              )}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              Buy & Hold
+            </button>
+          )}
         </div>
-        {buyHoldCurve.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-0.5 border-t border-dashed border-neutral-400" />
-            <span className="text-neutral-600">Buy & Hold</span>
-          </div>
-        )}
+
+        <button
+          onClick={handleExportPNG}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export PNG
+        </button>
       </div>
 
-      {/* SVG Chart */}
-      <svg
-        viewBox={`0 0 ${chartData.width} ${chartData.height}`}
-        className="w-full bg-neutral-50 rounded-md"
-        style={{ height }}
-        preserveAspectRatio="xMidYMid meet"
-        onMouseLeave={() => setHoveredIndex(null)}
-      >
-        {/* Gradient definitions */}
-        <defs>
-          <linearGradient
-            id="equityGradientProfit"
-            x1="0%"
-            y1="0%"
-            x2="0%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity="0.2" />
-            <stop
-              offset="100%"
-              stopColor="rgb(34, 197, 94)"
-              stopOpacity="0.02"
-            />
-          </linearGradient>
-          <linearGradient
-            id="equityGradientLoss"
-            x1="0%"
-            y1="0%"
-            x2="0%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor="rgb(239, 68, 68)" stopOpacity="0.2" />
-            <stop
-              offset="100%"
-              stopColor="rgb(239, 68, 68)"
-              stopOpacity="0.02"
-            />
-          </linearGradient>
-        </defs>
-
-        {/* Y-axis grid lines and labels */}
-        {chartData.yTicks.map((tick, i) => (
-          <g key={i}>
-            <line
-              x1={chartData.padding.left}
-              y1={tick.y}
-              x2={chartData.width - chartData.padding.right}
-              y2={tick.y}
-              stroke="#e5e7eb"
-              strokeWidth="1"
-            />
-            <text
-              x={chartData.padding.left - 8}
-              y={tick.y}
-              textAnchor="end"
-              dominantBaseline="middle"
-              className="text-[10px] fill-neutral-400"
-            >
-              {tick.label}
-            </text>
-          </g>
-        ))}
-
-        {/* Area fill under equity curve */}
-        <path
-          d={chartData.equityAreaPath}
-          fill={
-            chartData.isProfit
-              ? 'url(#equityGradientProfit)'
-              : 'url(#equityGradientLoss)'
-          }
-        />
-
-        {/* Break-even reference line */}
-        <line
-          x1={chartData.padding.left}
-          y1={chartData.breakEvenY}
-          x2={chartData.width - chartData.padding.right}
-          y2={chartData.breakEvenY}
-          stroke="#94a3b8"
-          strokeWidth="1"
-          strokeDasharray="6 3"
-        />
-        <text
-          x={chartData.width - chartData.padding.right + 4}
-          y={chartData.breakEvenY}
-          dominantBaseline="middle"
-          className="text-[9px] fill-neutral-400"
-        >
-          Initial
-        </text>
-
-        {/* Buy-and-hold curve (dashed gray) */}
-        {chartData.buyHoldPathPoints && (
-          <path
-            d={chartData.buyHoldPathPoints}
-            fill="none"
-            stroke="#9ca3af"
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
-            strokeLinecap="round"
-          />
-        )}
-
-        {/* Equity curve line */}
-        <path
-          d={chartData.equityPathPoints}
-          fill="none"
-          stroke={chartData.isProfit ? '#22c55e' : '#ef4444'}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Current point indicator */}
-        <circle
-          cx={chartData.scaleX(equityCurve.length - 1, equityCurve.length)}
-          cy={chartData.scaleY(chartData.finalEquity)}
-          r="4"
-          fill={chartData.isProfit ? '#22c55e' : '#ef4444'}
-        />
-
-        {/* Hover detection areas */}
-        {equityCurve.map((_, index) => {
-          const x = chartData.scaleX(index, equityCurve.length);
-          const segmentWidth = chartData.chartWidth / (equityCurve.length - 1);
-          return (
-            <rect
-              key={index}
-              x={x - segmentWidth / 2}
-              y={chartData.padding.top}
-              width={segmentWidth}
-              height={chartData.chartHeight}
-              fill="transparent"
-              onMouseEnter={() => setHoveredIndex(index)}
-            />
-          );
-        })}
-
-        {/* Hover indicator */}
-        {hoveredIndex !== null && (
-          <>
-            {/* Vertical line */}
-            <line
-              x1={chartData.scaleX(hoveredIndex, equityCurve.length)}
-              y1={chartData.padding.top}
-              x2={chartData.scaleX(hoveredIndex, equityCurve.length)}
-              y2={chartData.height - chartData.padding.bottom}
-              stroke="#6b7280"
-              strokeWidth="1"
-              strokeDasharray="3 3"
-            />
-            {/* Equity point */}
-            <circle
-              cx={chartData.scaleX(hoveredIndex, equityCurve.length)}
-              cy={chartData.scaleY(equityCurve[hoveredIndex])}
-              r="5"
-              fill={chartData.isProfit ? '#22c55e' : '#ef4444'}
-              stroke="white"
-              strokeWidth="2"
-            />
-          </>
-        )}
-      </svg>
-
-      {/* Hover Tooltip */}
-      {hoveredIndex !== null && hoverInfo && (
+      {/* Chart Container */}
+      <div className="relative bg-neutral-50 rounded-md overflow-hidden">
         <div
-          className="absolute z-10 bg-white border border-neutral-200 rounded-md shadow-lg p-2 text-xs pointer-events-none"
-          style={{
-            left: `${((hoveredIndex / (equityCurve.length - 1)) * 100)}%`,
-            top: '20%',
-            transform: 'translateX(-50%)',
-          }}
-        >
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-neutral-500">Strategy:</span>
-              <span
-                className={cn(
-                  'font-medium',
-                  hoverInfo.equityValue >= initialBalance
-                    ? 'text-success'
-                    : 'text-danger'
-                )}
-              >
-                {formatCurrency(hoverInfo.equityValue)}
-              </span>
-            </div>
-            {hoverInfo.buyHoldValue !== null && (
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-neutral-500">Buy & Hold:</span>
-                <span className="font-medium text-neutral-700">
-                  {formatCurrency(hoverInfo.buyHoldValue)}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          ref={chartContainerRef}
+          style={{ height }}
+        />
+
+        {/* Custom Tooltip */}
+        <div
+          ref={tooltipRef}
+          className="absolute z-50 bg-white border border-neutral-200 rounded-md shadow-lg p-2.5 pointer-events-none"
+          style={{ display: 'none' }}
+        />
+      </div>
     </div>
   );
 }

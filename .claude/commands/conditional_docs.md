@@ -457,3 +457,18 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting backtest statistics calculations or display issues
     - When extending BacktestResultsSummary data model with new metrics
     - When working with metricDefinitions.js or getMetricTrend functions
+
+- app_docs/feature-69a9dc86-equity-curve-chart.md
+  - Conditions:
+    - When working with interactive equity curve chart or chart visualization
+    - When implementing or modifying EquityCurveChart component with lightweight-charts
+    - When working with chart zoom, pan, or interactive controls
+    - When implementing drawdown period highlighting or visualization
+    - When working with buy-and-hold comparison overlays
+    - When implementing rich tooltips showing date, balance, drawdown %, and trade count
+    - When adding PNG export functionality to charts
+    - When troubleshooting chart performance or rendering issues
+    - When extending BacktestResultsSummary with temporal data (equity_curve_dates, trade_counts_per_candle, drawdown_periods)
+    - When working with drawdown identification algorithms in backtest_executor.py
+    - When implementing crosshair handlers or custom chart tooltips
+    - When working with chart responsiveness or resize behavior

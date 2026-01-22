@@ -168,8 +168,11 @@ function BacktestResultsSummary({
             <EquityCurveChart
               equityCurve={results.equity_curve || []}
               buyHoldCurve={results.buy_hold_curve || []}
+              equityCurveDates={results.equity_curve_dates || []}
+              tradeCountsPerCandle={results.trade_counts_per_candle || []}
+              drawdownPeriods={results.drawdown_periods || []}
               initialBalance={initialBalance}
-              height={200}
+              height={300}
             />
           </div>
 

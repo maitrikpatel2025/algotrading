@@ -982,11 +982,13 @@ class TestStatisticsCalculations:
 
     def test_calculate_results_with_candles(self, executor):
         """Test _calculate_results with candles for buy-and-hold comparison."""
+        from datetime import datetime, timezone
+
         trades = [{"pnl": 500.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"}]
         candles = [
-            {"close": 100.0},
-            {"close": 102.0},
-            {"close": 105.0},  # 5% buy-and-hold return
+            {"time": datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc), "close": 100.0},
+            {"time": datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc), "close": 102.0},
+            {"time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc), "close": 105.0},  # 5% buy-and-hold return
         ]
 
         results = executor._calculate_results(
@@ -1067,3 +1069,164 @@ class TestBacktestResultsSummaryModel:
 
         assert summary.sharpe_ratio is None
         assert summary.sortino_ratio is None
+
+
+class TestEnhancedEquityCurveData:
+    """Test cases for enhanced equity curve data for interactive charting."""
+
+    def test_equity_curve_dates_array_matches_length(self, executor):
+        """Test equity curve dates array matches equity curve values array in length."""
+        from datetime import datetime, timezone
+
+        candles = [
+            {"time": datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc), "close": 100.0},
+            {"time": datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc), "close": 102.0},
+            {"time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc), "close": 105.0},
+        ]
+
+        trades = [{"pnl": 100.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"}]
+
+        results = executor._calculate_results(
+            trades=trades,
+            initial_balance=10000.0,
+            final_balance=10100.0,
+            candles=candles
+        )
+
+        assert results["equity_curve_dates"] is not None
+        assert len(results["equity_curve_dates"]) == len(candles)
+        assert all(isinstance(date, str) for date in results["equity_curve_dates"])
+
+    def test_trade_counts_per_candle_array_matches_length(self, executor):
+        """Test trade counts per candle array matches equity curve length."""
+        from datetime import datetime, timezone
+
+        candles = [
+            {"time": datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc), "close": 100.0},
+            {"time": datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc), "close": 102.0},
+            {"time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc), "close": 105.0},
+        ]
+
+        trades = [
+            {"pnl": 50.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"},
+            {"pnl": 50.0, "entry_time": "2025-01-01T10:30:00Z", "exit_time": "2025-01-01T12:00:00Z"},
+        ]
+
+        results = executor._calculate_results(
+            trades=trades,
+            initial_balance=10000.0,
+            final_balance=10100.0,
+            candles=candles
+        )
+
+        assert results["trade_counts_per_candle"] is not None
+        assert len(results["trade_counts_per_candle"]) == len(candles)
+        assert all(isinstance(count, int) for count in results["trade_counts_per_candle"])
+
+    def test_identify_drawdown_periods_single_drawdown(self, executor):
+        """Test drawdown period identification with a single drawdown."""
+        # Peak at 10500, drawdown to 10200, recovery to 10800
+        equity_curve = [10000, 10200, 10500, 10400, 10200, 10400, 10800]
+
+        drawdown_periods = executor._identify_drawdown_periods(equity_curve)
+
+        assert len(drawdown_periods) == 1
+        assert drawdown_periods[0]["start_index"] == 2
+        assert drawdown_periods[0]["end_index"] == 5
+        assert drawdown_periods[0]["max_drawdown_pct"] > 0
+
+    def test_identify_drawdown_periods_multiple_drawdowns(self, executor):
+        """Test drawdown period identification with multiple drawdowns."""
+        # Two separate drawdown periods
+        equity_curve = [10000, 10500, 10300, 10600, 10400, 10800]
+
+        drawdown_periods = executor._identify_drawdown_periods(equity_curve)
+
+        assert len(drawdown_periods) == 2
+
+    def test_identify_drawdown_periods_no_drawdown(self, executor):
+        """Test drawdown period identification with no drawdowns."""
+        # Monotonically increasing equity
+        equity_curve = [10000, 10100, 10200, 10300, 10400, 10500]
+
+        drawdown_periods = executor._identify_drawdown_periods(equity_curve)
+
+        assert len(drawdown_periods) == 0
+
+    def test_identify_drawdown_periods_ending_in_drawdown(self, executor):
+        """Test drawdown period identification when ending in a drawdown."""
+        # Peak at 10500, then continuous drawdown to end
+        equity_curve = [10000, 10500, 10400, 10300, 10200]
+
+        drawdown_periods = executor._identify_drawdown_periods(equity_curve)
+
+        assert len(drawdown_periods) == 1
+        assert drawdown_periods[0]["end_index"] == len(equity_curve) - 1
+
+    def test_identify_drawdown_periods_insufficient_data(self, executor):
+        """Test drawdown period identification with insufficient data."""
+        drawdown_periods = executor._identify_drawdown_periods([10000])
+
+        assert len(drawdown_periods) == 0
+
+    def test_drawdown_periods_serializable(self, executor):
+        """Test drawdown periods are properly serialized in results."""
+        from datetime import datetime, timezone
+
+        candles = [
+            {"time": datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc), "close": 100.0},
+            {"time": datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc), "close": 102.0},
+            {"time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc), "close": 98.0},
+        ]
+
+        # Create equity curve with drawdown
+        equity_curve = [10000, 10200, 9900]
+
+        trades = [{"pnl": -100.0, "entry_time": "2025-01-01T11:00:00Z", "exit_time": "2025-01-01T12:00:00Z"}]
+
+        results = executor._calculate_results(
+            trades=trades,
+            initial_balance=10000.0,
+            final_balance=9900.0,
+            equity_curve=equity_curve,
+            candles=candles
+        )
+
+        assert results["drawdown_periods"] is not None
+        # Verify it serializes to JSON properly
+        import json
+        json_str = json.dumps(results["drawdown_periods"])
+        assert json_str is not None
+
+    def test_enhanced_fields_backward_compatible(self, executor):
+        """Test enhanced fields are optional for backward compatibility."""
+        from core.data_models import BacktestResultsSummary
+
+        # Create results without enhanced fields
+        summary = BacktestResultsSummary(
+            total_trades=5,
+            equity_curve=[10000, 10500, 11000],
+            equity_curve_dates=None,
+            trade_counts_per_candle=None,
+            drawdown_periods=None
+        )
+
+        assert summary.equity_curve_dates is None
+        assert summary.trade_counts_per_candle is None
+        assert summary.drawdown_periods is None
+
+    def test_enhanced_fields_with_data(self, executor):
+        """Test enhanced fields can be populated with data."""
+        from core.data_models import BacktestResultsSummary
+
+        summary = BacktestResultsSummary(
+            total_trades=5,
+            equity_curve=[10000, 10500, 11000],
+            equity_curve_dates=["2025-01-01T10:00:00Z", "2025-01-01T11:00:00Z", "2025-01-01T12:00:00Z"],
+            trade_counts_per_candle=[0, 1, 2],
+            drawdown_periods=[{"start_index": 1, "end_index": 2, "max_drawdown_pct": 5.0}]
+        )
+
+        assert len(summary.equity_curve_dates) == 3
+        assert len(summary.trade_counts_per_candle) == 3
+        assert len(summary.drawdown_periods) == 1
