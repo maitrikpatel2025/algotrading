@@ -14,7 +14,11 @@ import {
   XCircle,
   Loader2,
   ArrowUpDown,
-  FlaskConical
+  FlaskConical,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import endPoints from '../app/api';
@@ -406,6 +410,54 @@ function BacktestLibrary() {
                       <StatusIcon className={cn("h-3 w-3", statusConfig.animate && "animate-spin")} />
                       {statusConfig.label}
                     </div>
+
+                    {/* Results Preview for Completed Backtests */}
+                    {backtest.status === 'completed' && backtest.results && (
+                      <div className="grid grid-cols-3 gap-2 p-2 bg-neutral-50 rounded-md">
+                        {/* ROI */}
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {(backtest.results.return_on_investment || 0) >= 0 ? (
+                              <TrendingUp className="h-3 w-3 text-success" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3 text-danger" />
+                            )}
+                          </div>
+                          <p className={cn(
+                            "text-sm font-semibold tabular-nums",
+                            (backtest.results.return_on_investment || 0) >= 0 ? "text-success" : "text-danger"
+                          )}>
+                            {(backtest.results.return_on_investment || 0) >= 0 ? '+' : ''}
+                            {(backtest.results.return_on_investment || 0).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-neutral-500 uppercase">ROI</p>
+                        </div>
+                        {/* Win Rate */}
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Target className="h-3 w-3 text-neutral-400" />
+                          </div>
+                          <p className={cn(
+                            "text-sm font-semibold tabular-nums",
+                            (backtest.results.win_rate || 0) >= 50 ? "text-success" :
+                            (backtest.results.win_rate || 0) < 40 ? "text-danger" : "text-neutral-900"
+                          )}>
+                            {(backtest.results.win_rate || 0).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-neutral-500 uppercase">Win</p>
+                        </div>
+                        {/* Total Trades */}
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <BarChart3 className="h-3 w-3 text-neutral-400" />
+                          </div>
+                          <p className="text-sm font-semibold tabular-nums text-neutral-900">
+                            {backtest.results.total_trades || 0}
+                          </p>
+                          <p className="text-[10px] text-neutral-500 uppercase">Trades</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Info */}
                     <div className="space-y-2 text-xs text-neutral-500">

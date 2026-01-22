@@ -819,3 +819,51 @@ class CancelBacktestResponse(BaseModel):
         description="Whether partial results were saved"
     )
     error: Optional[str] = Field(None, description="Error details if failed")
+
+
+# ============================================================================
+# Backtest Results Summary Models
+# ============================================================================
+
+class BacktestResultsSummary(BaseModel):
+    """Comprehensive backtest results summary with all performance metrics."""
+    # Core P/L metrics
+    total_net_profit: float = Field(default=0.0, description="Total Net Profit/Loss ($)")
+    return_on_investment: float = Field(default=0.0, description="ROI (%)")
+    final_balance: float = Field(default=0.0, description="Final account balance")
+
+    # Trade counts
+    total_trades: int = Field(default=0, description="Total number of trades")
+    winning_trades: int = Field(default=0, description="Number of winning trades")
+    losing_trades: int = Field(default=0, description="Number of losing trades")
+    win_rate: float = Field(default=0.0, description="Win Rate (%)")
+
+    # Profit metrics
+    profit_factor: float = Field(default=0.0, description="Gross profit / gross loss")
+    average_win: float = Field(default=0.0, description="Average profit from winning trades ($)")
+    average_loss: float = Field(default=0.0, description="Average loss from losing trades ($)")
+    win_loss_ratio: float = Field(default=0.0, description="Average win / average loss")
+    largest_win: float = Field(default=0.0, description="Largest single winning trade ($)")
+    largest_loss: float = Field(default=0.0, description="Largest single losing trade ($)")
+    expectancy: float = Field(default=0.0, description="Expected value per trade ($)")
+
+    # Time metrics
+    average_trade_duration_minutes: float = Field(default=0.0, description="Average trade duration in minutes")
+
+    # Risk metrics
+    max_drawdown_dollars: float = Field(default=0.0, description="Maximum Drawdown ($)")
+    max_drawdown_percent: float = Field(default=0.0, description="Maximum Drawdown (%)")
+    recovery_factor: float = Field(default=0.0, description="Net profit / max drawdown")
+    sharpe_ratio: Optional[float] = Field(default=None, description="Risk-adjusted return (annualized)")
+    sortino_ratio: Optional[float] = Field(default=None, description="Downside risk-adjusted return")
+
+    # Benchmark comparison
+    buy_hold_return: float = Field(default=0.0, description="Buy-and-hold benchmark return (%)")
+    strategy_vs_benchmark: float = Field(default=0.0, description="Strategy return minus buy-hold return")
+
+    # Equity curves for visualization
+    equity_curve: List[float] = Field(default=[], description="Full equity curve data points")
+    buy_hold_curve: List[float] = Field(default=[], description="Buy-and-hold equity curve for comparison")
+
+    # Trade list for detailed view
+    trades: List[Dict[str, Any]] = Field(default=[], description="List of all trades")
