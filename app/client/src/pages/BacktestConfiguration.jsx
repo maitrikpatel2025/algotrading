@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, Play } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Play, BarChart3 } from 'lucide-react';
 import endPoints from '../app/api';
 import StrategySelector from '../components/StrategySelector';
 import DateRangePicker from '../components/DateRangePicker';
@@ -10,6 +10,7 @@ import RiskPreviewChart from '../components/RiskPreviewChart';
 import Toast from '../components/Toast';
 import BacktestProgressModal from '../components/BacktestProgressModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BacktestResultsSummary from '../components/BacktestResultsSummary';
 
 /**
  * BacktestConfiguration Page
@@ -71,6 +72,11 @@ function BacktestConfiguration() {
   const [performanceMode, setPerformanceMode] = useState(false);
   const pollingIntervalRef = useRef(null);
 
+  // Results state
+  const [backtestResults, setBacktestResults] = useState(null);
+  const [showResults, setShowResults] = useState(false);
+  const [backtestStatus, setBacktestStatus] = useState('pending');
+
   // Polling intervals
   const NORMAL_POLL_INTERVAL = 1500;  // 1.5 seconds
   const PERFORMANCE_POLL_INTERVAL = 5000;  // 5 seconds
@@ -96,6 +102,13 @@ function BacktestConfiguration() {
           position_sizing: backtest.position_sizing || DEFAULT_FORM_STATE.position_sizing,
           risk_management: backtest.risk_management || DEFAULT_FORM_STATE.risk_management
         });
+
+        // Check if backtest is completed and has results
+        setBacktestStatus(backtest.status || 'pending');
+        if (backtest.status === 'completed' && backtest.results) {
+          setBacktestResults(backtest.results);
+          setShowResults(true);
+        }
       }
     } catch (error) {
       console.error('Error loading backtest:', error);
@@ -236,7 +249,10 @@ function BacktestConfiguration() {
           if (result.progress.status === 'completed') {
             clearPollingInterval();
             setIsRunning(false);
+            setBacktestStatus('completed');
             showToast('Backtest completed successfully');
+            // Reload the backtest to get the full results
+            loadBacktest();
           } else if (result.progress.status === 'failed') {
             clearPollingInterval();
             setIsRunning(false);
@@ -258,7 +274,7 @@ function BacktestConfiguration() {
     // Poll immediately, then at the configured interval
     pollProgress();
     pollingIntervalRef.current = setInterval(pollProgress, pollInterval);
-  }, [isCancelling, clearPollingInterval]);
+  }, [isCancelling, clearPollingInterval, loadBacktest]);
 
   // Alias for external use
   const stopProgressPolling = clearPollingInterval;
@@ -579,6 +595,29 @@ function BacktestConfiguration() {
               </div>
             </div>
           </div>
+
+          {/* Full Width - Backtest Results (shown after completion) */}
+          {showResults && backtestResults && (
+            <div className="lg:col-span-2">
+              <BacktestResultsSummary
+                results={backtestResults}
+                initialBalance={formData.initial_balance}
+              />
+            </div>
+          )}
+
+          {/* View Results Button (shown when completed but results hidden) */}
+          {backtestStatus === 'completed' && backtestResults && !showResults && (
+            <div className="lg:col-span-2">
+              <button
+                onClick={() => setShowResults(true)}
+                className="w-full btn btn-secondary flex items-center justify-center gap-2 py-4"
+              >
+                <BarChart3 className="h-5 w-5" />
+                View Results
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Toast */}
