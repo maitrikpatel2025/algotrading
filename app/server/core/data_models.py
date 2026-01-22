@@ -865,5 +865,19 @@ class BacktestResultsSummary(BaseModel):
     equity_curve: List[float] = Field(default=[], description="Full equity curve data points")
     buy_hold_curve: List[float] = Field(default=[], description="Buy-and-hold equity curve for comparison")
 
+    # Enhanced equity curve data for interactive charting
+    equity_curve_dates: Optional[List[str]] = Field(
+        default=None,
+        description="ISO 8601 date strings for each equity curve point"
+    )
+    trade_counts_per_candle: Optional[List[int]] = Field(
+        default=None,
+        description="Number of trades executed at each candle"
+    )
+    drawdown_periods: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="List of drawdown periods with start_index, end_index, max_drawdown_pct"
+    )
+
     # Trade list for detailed view
     trades: List[Dict[str, Any]] = Field(default=[], description="List of all trades")
