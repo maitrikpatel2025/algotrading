@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import get_options
 from config import settings
+from core.backtest_executor import backtest_executor
 from core.backtest_service import (
     delete_backtest as service_delete_backtest,
 )
@@ -41,9 +42,12 @@ from core.backtest_service import (
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
 from core.data_models import (
+    BacktestProgressResponse,
     BotControlResponse,
     BotStartRequest,
     BotStatusResponse,
+    CancelBacktestRequest,
+    CancelBacktestResponse,
     CheckNameResponse,
     DeleteBacktestResponse,
     DeleteStrategyResponse,
@@ -62,6 +66,8 @@ from core.data_models import (
     LoadBacktestResponse,
     LoadStrategyResponse,
     OpenTradesResponse,
+    RunBacktestRequest,
+    RunBacktestResponse,
     SaveBacktestRequest,
     SaveBacktestResponse,
     SaveStrategyRequest,
@@ -1412,6 +1418,133 @@ async def duplicate_backtest(backtest_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        )
+
+
+# =============================================================================
+# Backtest Execution Routes
+# =============================================================================
+
+@app.post("/api/backtests/{backtest_id}/run", response_model=RunBacktestResponse, tags=["Backtest Execution"])
+async def run_backtest(backtest_id: str, request: RunBacktestRequest = None):
+    """
+    Start a backtest execution.
+
+    Args:
+        backtest_id: The backtest ID to execute
+        request: Optional request body with execution options
+
+    Returns:
+        JSON object with success status and message
+    """
+    try:
+        logger.info(f"[BACKTEST] Run backtest request for ID: {backtest_id}")
+
+        keep_partial = request.keep_partial_on_cancel if request else False
+        result = backtest_executor.start_backtest(backtest_id, keep_partial)
+
+        if result["success"]:
+            logger.info(f"[SUCCESS] Backtest started: {backtest_id}")
+            return RunBacktestResponse(
+                success=True,
+                message=result["message"]
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest run failed: {result.get('message')}")
+            return RunBacktestResponse(
+                success=False,
+                message=result["message"],
+                error=result.get("error")
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest run failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return RunBacktestResponse(
+            success=False,
+            message="Failed to start backtest",
+            error=str(e)
+        )
+
+
+@app.get("/api/backtests/{backtest_id}/progress", response_model=BacktestProgressResponse, tags=["Backtest Execution"])
+async def get_backtest_progress(backtest_id: str):
+    """
+    Get the current progress of a backtest execution.
+
+    Args:
+        backtest_id: The backtest ID to get progress for
+
+    Returns:
+        JSON object with backtest progress information
+    """
+    try:
+        logger.debug(f"[BACKTEST] Progress request for ID: {backtest_id}")
+
+        progress = backtest_executor.get_progress(backtest_id)
+
+        if progress:
+            return BacktestProgressResponse(
+                success=True,
+                progress=progress
+            )
+        else:
+            return BacktestProgressResponse(
+                success=False,
+                error=f"No progress data found for backtest: {backtest_id}"
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest progress failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return BacktestProgressResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@app.post("/api/backtests/{backtest_id}/cancel", response_model=CancelBacktestResponse, tags=["Backtest Execution"])
+async def cancel_backtest(backtest_id: str, request: CancelBacktestRequest = None):
+    """
+    Cancel a running backtest.
+
+    Args:
+        backtest_id: The backtest ID to cancel
+        request: Optional request body with cancellation options
+
+    Returns:
+        JSON object with success status and partial results flag
+    """
+    try:
+        logger.info(f"[BACKTEST] Cancel backtest request for ID: {backtest_id}")
+
+        keep_partial = request.keep_partial_results if request else False
+        result = backtest_executor.cancel_backtest(backtest_id, keep_partial)
+
+        if result["success"]:
+            logger.info(f"[SUCCESS] Backtest cancelled: {backtest_id}")
+            return CancelBacktestResponse(
+                success=True,
+                message=result["message"],
+                partial_results_saved=result.get("partial_results_saved", False)
+            )
+        else:
+            logger.warning(f"[WARNING] Backtest cancel failed: {result.get('message')}")
+            return CancelBacktestResponse(
+                success=False,
+                message=result["message"],
+                partial_results_saved=False,
+                error=result.get("error")
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Backtest cancel failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return CancelBacktestResponse(
+            success=False,
+            message="Failed to cancel backtest",
+            partial_results_saved=False,
+            error=str(e)
         )
 
 

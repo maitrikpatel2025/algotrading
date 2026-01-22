@@ -633,7 +633,7 @@ class BacktestConfig(BaseModel):
         default_factory=RiskManagementConfig,
         description="Risk management configuration"
     )
-    status: Literal["pending", "running", "completed", "failed"] = Field(
+    status: Literal["pending", "running", "cancelling", "completed", "failed"] = Field(
         default="pending",
         description="Backtest status"
     )
@@ -702,4 +702,96 @@ class DuplicateBacktestResponse(BaseModel):
     backtest_id: Optional[str] = Field(None, description="ID of the new duplicated backtest")
     backtest_name: Optional[str] = Field(None, description="Name of the new duplicated backtest")
     message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+# ============================================================================
+# Backtest Execution Progress Models
+# ============================================================================
+
+class BacktestProgress(BaseModel):
+    """Current progress of a running backtest."""
+    backtest_id: str = Field(..., description="ID of the backtest")
+    status: Literal["pending", "running", "cancelling", "completed", "failed"] = Field(
+        ...,
+        description="Current backtest status"
+    )
+    progress_percentage: int = Field(
+        default=0,
+        ge=0,
+        le=100,
+        description="Execution progress as percentage (0-100)"
+    )
+    current_date: Optional[datetime] = Field(
+        None,
+        description="Current date being processed"
+    )
+    candles_processed: int = Field(
+        default=0,
+        ge=0,
+        description="Number of candles processed so far"
+    )
+    total_candles: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Total number of candles to process"
+    )
+    trade_count: int = Field(
+        default=0,
+        ge=0,
+        description="Number of trades simulated so far"
+    )
+    estimated_seconds_remaining: Optional[float] = Field(
+        None,
+        ge=0,
+        description="Estimated seconds remaining for completion"
+    )
+    error_message: Optional[str] = Field(
+        None,
+        description="Error message if backtest failed"
+    )
+    started_at: Optional[datetime] = Field(
+        None,
+        description="When the backtest execution started"
+    )
+
+
+class RunBacktestRequest(BaseModel):
+    """Request to run a backtest."""
+    keep_partial_on_cancel: bool = Field(
+        default=False,
+        description="Whether to save partial results if cancelled"
+    )
+
+
+class RunBacktestResponse(BaseModel):
+    """Response from starting a backtest run."""
+    success: bool = Field(..., description="Whether the backtest started successfully")
+    message: str = Field(..., description="Success or error message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class BacktestProgressResponse(BaseModel):
+    """Response containing backtest progress information."""
+    success: bool = Field(..., description="Whether the progress query was successful")
+    progress: Optional[BacktestProgress] = Field(None, description="Current backtest progress")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class CancelBacktestRequest(BaseModel):
+    """Request to cancel a running backtest."""
+    keep_partial_results: bool = Field(
+        default=False,
+        description="Whether to keep partial results from the cancelled backtest"
+    )
+
+
+class CancelBacktestResponse(BaseModel):
+    """Response from cancelling a backtest."""
+    success: bool = Field(..., description="Whether the cancellation was successful")
+    message: str = Field(..., description="Success or error message")
+    partial_results_saved: bool = Field(
+        default=False,
+        description="Whether partial results were saved"
+    )
     error: Optional[str] = Field(None, description="Error details if failed")

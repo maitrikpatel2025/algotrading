@@ -41,6 +41,13 @@ const STATUS_CONFIG = {
     bg: 'bg-primary-light',
     animate: true
   },
+  cancelling: {
+    label: 'Cancelling',
+    icon: Loader2,
+    color: 'text-warning',
+    bg: 'bg-warning-light',
+    animate: true
+  },
   completed: {
     label: 'Completed',
     icon: CheckCircle,
@@ -87,6 +94,15 @@ function BacktestLibrary() {
   useEffect(() => {
     loadBacktests();
   }, [loadBacktests]);
+
+  // Poll for updates if any backtest is running
+  useEffect(() => {
+    const hasRunning = backtests.some(b => b.status === 'running' || b.status === 'cancelling');
+    if (hasRunning) {
+      const interval = setInterval(loadBacktests, 3000); // Poll every 3 seconds
+      return () => clearInterval(interval);
+    }
+  }, [backtests, loadBacktests]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -249,6 +265,7 @@ function BacktestLibrary() {
               {[
                 { value: 'all', label: 'All' },
                 { value: 'pending', label: 'Pending' },
+                { value: 'running', label: 'Running' },
                 { value: 'completed', label: 'Completed' },
                 { value: 'failed', label: 'Failed' }
               ].map((option) => (

@@ -86,7 +86,13 @@ const endPoints = {
     listBacktests: () => requests.get("/backtests"),
     getBacktest: (id) => requests.get(`/backtests/${id}`),
     deleteBacktest: (id) => requests.delete(`/backtests/${id}`),
-    duplicateBacktest: (id) => requests.post(`/backtests/${id}/duplicate`)
+    duplicateBacktest: (id) => requests.post(`/backtests/${id}/duplicate`),
+    // Backtest execution endpoints
+    runBacktest: (id, keepPartialOnCancel = false) =>
+        requests.post(`/backtests/${id}/run`, { keep_partial_on_cancel: keepPartialOnCancel }),
+    getBacktestProgress: (id) => requests.get(`/backtests/${id}/progress`),
+    cancelBacktest: (id, keepPartialResults = false) =>
+        requests.post(`/backtests/${id}/cancel`, { keep_partial_results: keepPartialResults })
 }
 
 export default endPoints;
