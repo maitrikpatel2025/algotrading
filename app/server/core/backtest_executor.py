@@ -451,6 +451,8 @@ class BacktestExecutor:
             if end_date.tzinfo is not None:
                 end_date = end_date.replace(tzinfo=None)
 
+            logger.debug(f"[BACKTEST_EXECUTOR] Normalized dates - start_date: {start_date} (tzinfo: {start_date.tzinfo}), end_date: {end_date} (tzinfo: {end_date.tzinfo})")
+
             # Simulate fetching historical data
             # In a real implementation, this would fetch from a data provider
             # For now, we'll simulate with generated candles
@@ -627,7 +629,9 @@ class BacktestExecutor:
                 execution.progress_percentage = 100
 
         except Exception as e:
+            import traceback
             logger.error(f"[BACKTEST_EXECUTOR] Error executing backtest {backtest_id}: {e}")
+            logger.error(f"[BACKTEST_EXECUTOR] Full traceback:\n{traceback.format_exc()}")
 
             with self._executions_lock:
                 if execution:
@@ -653,6 +657,8 @@ class BacktestExecutor:
         """Generate simulated candles for backtesting."""
         import random
 
+        logger.debug(f"[BACKTEST_EXECUTOR] Generating candles - start_date: {start_date} (tzinfo: {start_date.tzinfo}), end_date: {end_date} (tzinfo: {end_date.tzinfo})")
+
         # Map timeframe to minutes
         tf_minutes = {"M1": 1, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240, "D": 1440}
         minutes = tf_minutes.get(timeframe, 60)
@@ -662,6 +668,8 @@ class BacktestExecutor:
         price = 1.1000  # Starting price for simulation
 
         while current_time <= end_date:
+            if len(candles) == 0:  # Log only first candle
+                logger.debug(f"[BACKTEST_EXECUTOR] First candle - current_time: {current_time} (tzinfo: {current_time.tzinfo})")
             # Generate random OHLC data
             change = random.uniform(-0.002, 0.002)
             high_extra = random.uniform(0, 0.001)
@@ -1021,8 +1029,14 @@ class BacktestExecutor:
                     # Parse times if they're strings
                     if isinstance(entry_time, str):
                         entry_time = datetime.fromisoformat(entry_time.replace("Z", "+00:00"))
+                        # Normalize to timezone-naive for consistent comparisons
+                        if entry_time.tzinfo is not None:
+                            entry_time = entry_time.replace(tzinfo=None)
                     if isinstance(exit_time, str):
                         exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+                        # Normalize to timezone-naive for consistent comparisons
+                        if exit_time.tzinfo is not None:
+                            exit_time = exit_time.replace(tzinfo=None)
 
                     # Ensure both are datetime objects
                     if hasattr(entry_time, "timestamp") and hasattr(exit_time, "timestamp"):
@@ -1187,8 +1201,15 @@ class BacktestExecutor:
                     if isinstance(exit_time, str):
                         try:
                             exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+                            # Normalize to timezone-naive for consistent comparisons with candle times
+                            if exit_time.tzinfo is not None:
+                                exit_time = exit_time.replace(tzinfo=None)
                         except (ValueError, TypeError):
                             continue
+                    elif isinstance(exit_time, datetime):
+                        # Also normalize datetime objects that might have timezone info
+                        if exit_time.tzinfo is not None:
+                            exit_time = exit_time.replace(tzinfo=None)
 
                     # Find the closest candle index
                     for i, candle in enumerate(candles):
@@ -1198,8 +1219,15 @@ class BacktestExecutor:
                                 candle_time = datetime.fromisoformat(
                                     candle_time.replace("Z", "+00:00")
                                 )
+                                # Normalize to timezone-naive for consistent comparisons
+                                if candle_time.tzinfo is not None:
+                                    candle_time = candle_time.replace(tzinfo=None)
                             except (ValueError, TypeError):
                                 continue
+                        elif isinstance(candle_time, datetime):
+                            # Also normalize datetime objects that might have timezone info
+                            if candle_time.tzinfo is not None:
+                                candle_time = candle_time.replace(tzinfo=None)
 
                         # Check if trade exit is at or before this candle
                         if hasattr(exit_time, "timestamp") and hasattr(candle_time, "timestamp"):
