@@ -1407,8 +1407,6 @@ class TestConditionFormatHandling:
 
     def test_execute_backtest_with_empty_conditions_list(self, executor, mock_supabase):
         """Test graceful handling of empty conditions."""
-        from unittest.mock import patch
-
         # Mock the database responses with empty conditions list
         mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
             # Backtest lookup
