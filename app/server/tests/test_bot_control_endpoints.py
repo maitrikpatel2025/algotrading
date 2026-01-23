@@ -88,17 +88,18 @@ class TestBotStartEndpoint:
                 "pid": 12345,
             }
 
-            response = client.post("/api/bot/start", json={
-                "strategy": "Bollinger Bands Strategy",
-                "pairs": ["EURUSD", "GBPJPY"],
-                "timeframe": "H1"
-            })
+            response = client.post(
+                "/api/bot/start",
+                json={
+                    "strategy": "Bollinger Bands Strategy",
+                    "pairs": ["EURUSD", "GBPJPY"],
+                    "timeframe": "H1",
+                },
+            )
 
         assert response.status_code == 200
         mock_controller.start_bot.assert_called_once_with(
-            strategy="Bollinger Bands Strategy",
-            pairs=["EURUSD", "GBPJPY"],
-            timeframe="H1"
+            strategy="Bollinger Bands Strategy", pairs=["EURUSD", "GBPJPY"], timeframe="H1"
         )
 
     def test_start_bot_with_no_body(self, client, reset_bot_state):
@@ -211,17 +212,14 @@ class TestBotRestartEndpoint:
                 "pid": 12346,
             }
 
-            response = client.post("/api/bot/restart", json={
-                "strategy": "New Strategy",
-                "pairs": ["USDJPY"],
-                "timeframe": "M15"
-            })
+            response = client.post(
+                "/api/bot/restart",
+                json={"strategy": "New Strategy", "pairs": ["USDJPY"], "timeframe": "M15"},
+            )
 
         assert response.status_code == 200
         mock_controller.restart_bot.assert_called_once_with(
-            strategy="New Strategy",
-            pairs=["USDJPY"],
-            timeframe="M15"
+            strategy="New Strategy", pairs=["USDJPY"], timeframe="M15"
         )
 
     def test_restart_bot_returns_500_on_failure(self, client, reset_bot_state):
@@ -309,9 +307,7 @@ class TestBotStatusIntegration:
                 "pid": 12345,
             }
 
-            client.post("/api/bot/start", json={
-                "strategy": "Test Strategy"
-            })
+            client.post("/api/bot/start", json={"strategy": "Test Strategy"})
 
         # Check that status tracker was updated
         assert bot_status_tracker._status == "running"

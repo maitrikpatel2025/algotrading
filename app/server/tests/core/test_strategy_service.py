@@ -42,18 +42,14 @@ class TestGenerateCopyName:
             "Strategy A",
             "Strategy A - Copy",
             "Strategy A - Copy (2)",
-            "Strategy A - Copy (3)"
+            "Strategy A - Copy (3)",
         ]
         result = _generate_copy_name("Strategy A", existing_names)
         assert result == "Strategy A - Copy (4)"
 
     def test_handles_gaps_in_copy_numbers(self):
         """Test handling gaps in copy numbers."""
-        existing_names = [
-            "Strategy A",
-            "Strategy A - Copy",
-            "Strategy A - Copy (5)"
-        ]
+        existing_names = ["Strategy A", "Strategy A - Copy", "Strategy A - Copy (5)"]
         result = _generate_copy_name("Strategy A", existing_names)
         assert result == "Strategy A - Copy (6)"
 
@@ -82,10 +78,10 @@ class TestValidateImport:
                 "trade_direction": "long",
                 "indicators": [],
                 "conditions": [],
-            }
+            },
         }
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is True
@@ -97,13 +93,10 @@ class TestValidateImport:
         """Test rejection of unsupported schema version."""
         import_data = {
             "schema_version": "99.0",
-            "strategy": {
-                "name": "Test Strategy",
-                "trade_direction": "long"
-            }
+            "strategy": {"name": "Test Strategy", "trade_direction": "long"},
         }
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is False
@@ -111,14 +104,9 @@ class TestValidateImport:
 
     def test_accepts_legacy_format_without_version(self):
         """Test acceptance of legacy format without version (assumes 1.0)."""
-        import_data = {
-            "strategy": {
-                "name": "Legacy Strategy",
-                "trade_direction": "both"
-            }
-        }
+        import_data = {"strategy": {"name": "Legacy Strategy", "trade_direction": "both"}}
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is True
@@ -126,13 +114,9 @@ class TestValidateImport:
 
     def test_accepts_raw_strategy_data(self):
         """Test acceptance of raw strategy data without wrapper."""
-        import_data = {
-            "name": "Raw Strategy",
-            "trade_direction": "short",
-            "indicators": []
-        }
+        import_data = {"name": "Raw Strategy", "trade_direction": "short", "indicators": []}
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is True
@@ -140,12 +124,9 @@ class TestValidateImport:
 
     def test_rejects_missing_strategy_field(self):
         """Test rejection when strategy field is missing."""
-        import_data = {
-            "schema_version": "1.0",
-            "export_date": "2024-01-15T10:00:00Z"
-        }
+        import_data = {"schema_version": "1.0", "export_date": "2024-01-15T10:00:00Z"}
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is False
@@ -153,14 +134,9 @@ class TestValidateImport:
 
     def test_rejects_missing_name(self):
         """Test rejection when strategy name is missing."""
-        import_data = {
-            "schema_version": "1.0",
-            "strategy": {
-                "trade_direction": "long"
-            }
-        }
+        import_data = {"schema_version": "1.0", "strategy": {"trade_direction": "long"}}
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is False
@@ -170,13 +146,10 @@ class TestValidateImport:
         """Test rejection when name exceeds 50 characters."""
         import_data = {
             "schema_version": "1.0",
-            "strategy": {
-                "name": "A" * 51,
-                "trade_direction": "long"
-            }
+            "strategy": {"name": "A" * 51, "trade_direction": "long"},
         }
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is False
@@ -186,13 +159,10 @@ class TestValidateImport:
         """Test rejection of invalid trade direction."""
         import_data = {
             "schema_version": "1.0",
-            "strategy": {
-                "name": "Test Strategy",
-                "trade_direction": "invalid_direction"
-            }
+            "strategy": {"name": "Test Strategy", "trade_direction": "invalid_direction"},
         }
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is False
@@ -212,11 +182,11 @@ class TestValidateImport:
                 "indicators": [{"id": "rsi"}, {"id": "macd"}],
                 "conditions": [{"id": "cond1"}],
                 "drawings": [],
-                "patterns": [{"id": "pat1"}]
-            }
+                "patterns": [{"id": "pat1"}],
+            },
         }
 
-        with patch('core.strategy_service.is_configured', return_value=False):
+        with patch("core.strategy_service.is_configured", return_value=False):
             result = validate_import(import_data)
 
         assert result.valid is True
@@ -230,19 +200,18 @@ class TestValidateImport:
         """Test detection of name conflict when Supabase is configured."""
         import_data = {
             "schema_version": "1.0",
-            "strategy": {
-                "name": "Existing Strategy",
-                "trade_direction": "long"
-            }
+            "strategy": {"name": "Existing Strategy", "trade_direction": "long"},
         }
 
         mock_check_result = MagicMock()
         mock_check_result.exists = True
         mock_check_result.strategy_id = "existing-id-123"
 
-        with patch('core.strategy_service.is_configured', return_value=True):
-            with patch('core.strategy_service.check_name_exists',
-                       return_value=(True, mock_check_result, None)):
+        with patch("core.strategy_service.is_configured", return_value=True):
+            with patch(
+                "core.strategy_service.check_name_exists",
+                return_value=(True, mock_check_result, None),
+            ):
                 result = validate_import(import_data)
 
         assert result.valid is True
@@ -257,16 +226,11 @@ class TestStrategyExportModel:
     def test_creates_export_with_strategy(self):
         """Test creating an export model with strategy."""
         strategy = StrategyConfig(
-            name="Export Test",
-            trade_direction="long",
-            indicators=[],
-            conditions=[]
+            name="Export Test", trade_direction="long", indicators=[], conditions=[]
         )
 
         export = StrategyExport(
-            schema_version="1.0",
-            export_date=datetime.now(timezone.utc),
-            strategy=strategy
+            schema_version="1.0", export_date=datetime.now(timezone.utc), strategy=strategy
         )
 
         assert export.schema_version == "1.0"
@@ -278,13 +242,11 @@ class TestStrategyExportModel:
             name="JSON Test",
             trade_direction="both",
             indicators=[],  # Empty indicators for simple test
-            conditions=[]
+            conditions=[],
         )
 
         export = StrategyExport(
-            schema_version="1.0",
-            export_date=datetime.now(timezone.utc),
-            strategy=strategy
+            schema_version="1.0", export_date=datetime.now(timezone.utc), strategy=strategy
         )
 
         # Should not raise any errors
@@ -304,7 +266,7 @@ class TestImportValidationResult:
             warnings=["Minor warning"],
             strategy_preview={"name": "Test"},
             name_conflict=False,
-            conflicting_strategy_id=None
+            conflicting_strategy_id=None,
         )
 
         assert result.valid is True
@@ -318,7 +280,7 @@ class TestImportValidationResult:
             warnings=[],
             strategy_preview=None,
             name_conflict=False,
-            conflicting_strategy_id=None
+            conflicting_strategy_id=None,
         )
 
         assert result.valid is False
@@ -332,7 +294,7 @@ class TestImportValidationResult:
             warnings=["Name conflict detected"],
             strategy_preview={"name": "Conflicting"},
             name_conflict=True,
-            conflicting_strategy_id="conflict-id-456"
+            conflicting_strategy_id="conflict-id-456",
         )
 
         assert result.name_conflict is True

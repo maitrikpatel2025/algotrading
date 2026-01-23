@@ -17,7 +17,7 @@ GRANULARITY_LABELS: Dict[str, str] = {
     "H1": "1 Hour",
     "H4": "4 Hour",
     "D": "1 Day",
-    "W1": "1 Week"
+    "W1": "1 Week",
 }
 
 # =============================================================================
@@ -26,14 +26,17 @@ GRANULARITY_LABELS: Dict[str, str] = {
 
 # Major pairs: Most liquid, involve USD and major currencies
 MAJOR_PAIRS: List[str] = [
-    "EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF",
-    "AUD_USD", "USD_CAD", "NZD_USD"
+    "EUR_USD",
+    "GBP_USD",
+    "USD_JPY",
+    "USD_CHF",
+    "AUD_USD",
+    "USD_CAD",
+    "NZD_USD",
 ]
 
 # Exotic currency codes (currencies with lower liquidity)
-EXOTIC_CURRENCIES: List[str] = [
-    "ZAR", "TRY", "MXN", "PLN", "SEK", "SGD", "DKK", "NOK", "BTC"
-]
+EXOTIC_CURRENCIES: List[str] = ["ZAR", "TRY", "MXN", "PLN", "SEK", "SGD", "DKK", "NOK", "BTC"]
 
 
 def get_pair_category(pair: str) -> str:
@@ -71,9 +74,9 @@ def make_option(key: str, text: str = None, category: Optional[str] = None) -> D
     Returns:
         Dictionary with key, text, value, and optional category fields
     """
-    option = {'key': key, 'text': text or key, 'value': key}
+    option = {"key": key, "text": text or key, "value": key}
     if category is not None:
-        option['category'] = category
+        option["category"] = category
     return option
 
 
@@ -87,12 +90,8 @@ def get_options() -> Dict[str, Any]:
     pairs = sorted(settings.INVESTING_COM_PAIRS.keys())
 
     return {
-        'granularities': [
-            make_option(g, GRANULARITY_LABELS.get(g, g))
-            for g in settings.TFS.keys()
+        "granularities": [
+            make_option(g, GRANULARITY_LABELS.get(g, g)) for g in settings.TFS.keys()
         ],
-        'pairs': [
-            make_option(p, category=get_pair_category(p))
-            for p in pairs
-        ]
+        "pairs": [make_option(p, category=get_pair_category(p)) for p in pairs],
     }

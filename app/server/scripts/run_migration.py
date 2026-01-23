@@ -63,9 +63,7 @@ def run_migration(migration_file: str, database_url: str) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Run SQL migration against Supabase database"
-    )
+    parser = argparse.ArgumentParser(description="Run SQL migration against Supabase database")
     parser.add_argument("migration_file", help="Path to the SQL migration file")
     parser.add_argument(
         "--database-url",

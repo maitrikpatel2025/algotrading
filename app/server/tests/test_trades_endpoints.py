@@ -32,7 +32,7 @@ class TestOpenTradesEndpoint:
                 unrealizedPL=25.50,
                 marginUsed=100.0,
                 stop_loss=1.1000,
-                take_profit=1.1100
+                take_profit=1.1100,
             ),
             MagicMock(
                 id=2,
@@ -42,11 +42,11 @@ class TestOpenTradesEndpoint:
                 unrealizedPL=-10.0,
                 marginUsed=50.0,
                 stop_loss=0,
-                take_profit=0
+                take_profit=0,
             ),
         ]
 
-        with patch('server.api.get_open_trades', return_value=mock_trades):
+        with patch("server.api.get_open_trades", return_value=mock_trades):
             response = client.get("/api/trades/open")
 
         assert response.status_code == 200
@@ -59,7 +59,7 @@ class TestOpenTradesEndpoint:
 
     def test_open_trades_success_empty(self, client):
         """Test successful response with no open trades."""
-        with patch('server.api.get_open_trades', return_value=[]):
+        with patch("server.api.get_open_trades", return_value=[]):
             response = client.get("/api/trades/open")
 
         assert response.status_code == 200
@@ -70,7 +70,7 @@ class TestOpenTradesEndpoint:
 
     def test_open_trades_api_returns_none(self, client):
         """Test response when API returns None."""
-        with patch('server.api.get_open_trades', return_value=None):
+        with patch("server.api.get_open_trades", return_value=None):
             response = client.get("/api/trades/open")
 
         assert response.status_code == 200
@@ -81,7 +81,7 @@ class TestOpenTradesEndpoint:
 
     def test_open_trades_exception_handling(self, client):
         """Test error handling when an exception occurs."""
-        with patch('server.api.get_open_trades', side_effect=Exception("Connection error")):
+        with patch("server.api.get_open_trades", side_effect=Exception("Connection error")):
             response = client.get("/api/trades/open")
 
         assert response.status_code == 200
@@ -115,7 +115,7 @@ class TestTradeHistoryEndpoint:
                     "PositionClosePrice": 1.1100,
                     "BalanceMovement": 50.0,
                     "Commission": -2.5,
-                    "Swap": -1.0
+                    "Swap": -1.0,
                 },
                 {
                     "Id": "record2",
@@ -129,12 +129,12 @@ class TestTradeHistoryEndpoint:
                     "TradeAmount": 5000,
                     "TradePrice": 1.2500,
                     "PositionClosePrice": 1.2450,
-                    "BalanceMovement": 25.0
-                }
-            ]
+                    "BalanceMovement": 25.0,
+                },
+            ],
         }
 
-        with patch('server.api.get_trade_history', return_value=mock_history):
+        with patch("server.api.get_trade_history", return_value=mock_history):
             response = client.get("/api/trades/history")
 
         assert response.status_code == 200
@@ -148,14 +148,9 @@ class TestTradeHistoryEndpoint:
 
     def test_trade_history_success_empty(self, client):
         """Test successful response with no trade history."""
-        mock_history = {
-            "IsLastReport": True,
-            "TotalReports": 0,
-            "LastId": None,
-            "Records": []
-        }
+        mock_history = {"IsLastReport": True, "TotalReports": 0, "LastId": None, "Records": []}
 
-        with patch('server.api.get_trade_history', return_value=mock_history):
+        with patch("server.api.get_trade_history", return_value=mock_history):
             response = client.get("/api/trades/history")
 
         assert response.status_code == 200
@@ -166,7 +161,7 @@ class TestTradeHistoryEndpoint:
 
     def test_trade_history_api_returns_none(self, client):
         """Test response when API returns None."""
-        with patch('server.api.get_trade_history', return_value=None):
+        with patch("server.api.get_trade_history", return_value=None):
             response = client.get("/api/trades/history")
 
         assert response.status_code == 200
@@ -190,12 +185,12 @@ class TestTradeHistoryEndpoint:
                     "TradeSide": "Buy",
                     "TradeType": "Market",
                     "TradeAmount": 10000,
-                    "TradePrice": 1.1050
+                    "TradePrice": 1.1050,
                 }
-            ]
+            ],
         }
 
-        with patch('server.api.get_trade_history', return_value=mock_history):
+        with patch("server.api.get_trade_history", return_value=mock_history):
             response = client.get(
                 "/api/trades/history?timestamp_from=1704067200000&timestamp_to=1704153600000"
             )
@@ -207,7 +202,7 @@ class TestTradeHistoryEndpoint:
 
     def test_trade_history_exception_handling(self, client):
         """Test error handling when an exception occurs."""
-        with patch('server.api.get_trade_history', side_effect=Exception("Connection error")):
+        with patch("server.api.get_trade_history", side_effect=Exception("Connection error")):
             response = client.get("/api/trades/history")
 
         assert response.status_code == 200
@@ -219,7 +214,7 @@ class TestTradeHistoryEndpoint:
     def test_trade_history_response_structure(self, client):
         """Test trade history response has correct structure."""
         mock_history = {"Records": []}
-        with patch('server.api.get_trade_history', return_value=mock_history):
+        with patch("server.api.get_trade_history", return_value=mock_history):
             response = client.get("/api/trades/history")
 
         assert response.status_code == 200
