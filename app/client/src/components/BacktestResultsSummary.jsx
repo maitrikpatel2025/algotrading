@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { cn } from '../lib/utils';
 import {
   CheckCircle,
@@ -8,14 +8,23 @@ import {
   Target,
   Scale,
   BarChart3,
+  List,
+  Download,
 } from 'lucide-react';
 import MetricCard from './MetricCard';
 import EquityCurveChart from './EquityCurveChart';
+import BacktestTradeList from './BacktestTradeList';
+import TradeFilterControls from './TradeFilterControls';
 import {
   METRIC_DEFINITIONS,
   getMetricTrend,
   formatMetricValue,
 } from '../app/metricDefinitions';
+import {
+  filterTrades,
+  sortTrades,
+  exportTradesToCSV,
+} from '../app/tradeUtils';
 
 /**
  * BacktestResultsSummary Component - Precision Swiss Design System
@@ -35,6 +44,22 @@ function BacktestResultsSummary({
   className,
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isTradeListExpanded, setIsTradeListExpanded] = useState(false);
+  const tradeListRef = useRef(null);
+
+  // Trade list state
+  const [filters, setFilters] = useState({
+    outcome: 'all',
+    direction: 'both',
+    startDate: '',
+    endDate: '',
+  });
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [selectedTradeId, setSelectedTradeId] = useState(null);
+  const [highlightedTrade, setHighlightedTrade] = useState(null);
 
   // Handle missing or incomplete results
   if (!results) {
@@ -44,6 +69,59 @@ function BacktestResultsSummary({
   // Helper to get metric value with default
   const getMetric = (key, defaultValue = 0) => {
     return results[key] ?? defaultValue;
+  };
+
+  // Get and process trades
+  const allTrades = results.trades || [];
+  const filteredTrades = filterTrades(allTrades, filters);
+  const sortedTrades = sortTrades(filteredTrades, sortColumn, sortDirection);
+  const displayedTrades = sortedTrades; // Pagination happens in BacktestTradeList
+
+  // Handle trade list interactions
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  const handleSort = (column, direction) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when page size changes
+  };
+
+  const handleTradeClick = (trade, tradeNumber) => {
+    // Toggle selection
+    if (selectedTradeId === tradeNumber) {
+      setSelectedTradeId(null);
+      setHighlightedTrade(null);
+    } else {
+      setSelectedTradeId(tradeNumber);
+      setHighlightedTrade({
+        ...trade,
+        tradeNumber,
+      });
+    }
+  };
+
+  const handleExportCSV = () => {
+    const backtestName = results.strategy_name || 'backtest';
+    exportTradesToCSV(allTrades, backtestName);
+  };
+
+  const handleTradeCountClick = () => {
+    setIsTradeListExpanded(true);
+    // Scroll to trade list section after a brief delay for expansion animation
+    setTimeout(() => {
+      tradeListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   // Helper to render a metric row
@@ -99,9 +177,14 @@ function BacktestResultsSummary({
             <h3 className="text-lg font-semibold text-neutral-900">
               Backtest Results
             </h3>
-            <p className="text-sm text-neutral-500">
+            <button
+              type="button"
+              onClick={handleTradeCountClick}
+              className="text-sm text-neutral-500 hover:text-primary hover:underline cursor-pointer transition-colors"
+              title="Click to view detailed trade list"
+            >
               {getMetric('total_trades')} trades completed
-            </p>
+            </button>
           </div>
         </div>
 
@@ -173,6 +256,7 @@ function BacktestResultsSummary({
               drawdownPeriods={results.drawdown_periods || []}
               initialBalance={initialBalance}
               height={300}
+              highlightedTrade={highlightedTrade}
             />
           </div>
 
@@ -250,6 +334,81 @@ function BacktestResultsSummary({
               </div>
             </div>
           </div>
+
+          {/* Trade List Section */}
+          {allTrades.length > 0 && (
+            <div
+              ref={tradeListRef}
+              className="bg-white border border-neutral-200 rounded-md"
+            >
+              {/* Trade List Header */}
+              <div
+                className="flex items-center justify-between p-4 border-b border-neutral-200 cursor-pointer hover:bg-neutral-50 transition-colors"
+                onClick={() => setIsTradeListExpanded(!isTradeListExpanded)}
+              >
+                <div className="flex items-center gap-3">
+                  <List className="h-4 w-4 text-neutral-500" />
+                  <h4 className="text-sm font-semibold text-neutral-900">
+                    Trade List
+                  </h4>
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary text-white">
+                    {allTrades.length}
+                  </span>
+                  {allTrades.length >= 100 && (
+                    <span className="text-xs text-warning">
+                      (Last 100 trades)
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {isTradeListExpanded && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportCSV();
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                    >
+                      <Download className="h-3 w-3" />
+                      Export CSV
+                    </button>
+                  )}
+                  {isTradeListExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-neutral-500" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-neutral-500" />
+                  )}
+                </div>
+              </div>
+
+              {/* Trade List Content */}
+              {isTradeListExpanded && (
+                <div className="p-4 space-y-4">
+                  {/* Filter Controls */}
+                  <TradeFilterControls
+                    filters={filters}
+                    onFilterChange={handleFilterChange}
+                  />
+
+                  {/* Trade Table */}
+                  <BacktestTradeList
+                    trades={displayedTrades}
+                    onTradeClick={handleTradeClick}
+                    selectedTradeId={selectedTradeId}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    currentPage={currentPage}
+                    pageSize={pageSize}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                    currency="$"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Final Balance */}
           <div className="flex items-center justify-between p-4 bg-neutral-100 rounded-md">

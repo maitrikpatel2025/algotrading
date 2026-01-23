@@ -23,6 +23,7 @@ function EquityCurveChart({
   drawdownPeriods = [],
   initialBalance = 10000,
   height = 400,
+  highlightedTrade = null,
   className,
 }) {
   const chartContainerRef = useRef(null);
@@ -146,30 +147,94 @@ function EquityCurveChart({
       buyHoldSeriesRef.current = buyHoldSeries;
     }
 
+    // Prepare markers array
+    const markers = [];
+
     // Add drawdown period markers if enabled
     if (showDrawdowns && drawdownPeriods && drawdownPeriods.length > 0) {
       drawdownPeriods.forEach((period) => {
         const startIndex = period.start_index;
-        const endIndex = period.end_index;
 
-        if (startIndex < equityData.length && endIndex < equityData.length) {
+        if (startIndex < equityData.length) {
           const startTime = equityData[startIndex].time;
-          const endTime = equityData[endIndex].time;
 
-          // Create markers at start and end
-          const markers = [
-            {
-              time: startTime,
-              position: 'belowBar',
-              color: '#ef4444',
-              shape: 'arrowDown',
-              text: `DD: ${period.max_drawdown_pct.toFixed(2)}%`,
-            },
-          ];
-
-          equitySeries.setMarkers(markers);
+          markers.push({
+            time: startTime,
+            position: 'belowBar',
+            color: '#ef4444',
+            shape: 'arrowDown',
+            text: `DD: ${period.max_drawdown_pct.toFixed(2)}%`,
+          });
         }
       });
+    }
+
+    // Add highlighted trade markers if a trade is selected
+    if (highlightedTrade) {
+      const { entry_time, exit_time, pnl } = highlightedTrade;
+      const isProfit = pnl >= 0;
+
+      // Find entry time in equity data
+      if (entry_time && equityCurveDates && equityCurveDates.length > 0) {
+        const entryTimestamp = new Date(entry_time).getTime();
+        let entryIndex = -1;
+        let closestDiff = Infinity;
+
+        equityCurveDates.forEach((dateStr, index) => {
+          const diff = Math.abs(new Date(dateStr).getTime() - entryTimestamp);
+          if (diff < closestDiff) {
+            closestDiff = diff;
+            entryIndex = index;
+          }
+        });
+
+        if (entryIndex >= 0 && entryIndex < equityData.length) {
+          markers.push({
+            time: equityData[entryIndex].time,
+            position: 'belowBar',
+            color: isProfit ? '#22c55e' : '#ef4444',
+            shape: 'arrowUp',
+            text: 'Entry',
+          });
+        }
+      }
+
+      // Find exit time in equity data
+      if (exit_time && equityCurveDates && equityCurveDates.length > 0) {
+        const exitTimestamp = new Date(exit_time).getTime();
+        let exitIndex = -1;
+        let closestDiff = Infinity;
+
+        equityCurveDates.forEach((dateStr, index) => {
+          const diff = Math.abs(new Date(dateStr).getTime() - exitTimestamp);
+          if (diff < closestDiff) {
+            closestDiff = diff;
+            exitIndex = index;
+          }
+        });
+
+        if (exitIndex >= 0 && exitIndex < equityData.length) {
+          markers.push({
+            time: equityData[exitIndex].time,
+            position: 'aboveBar',
+            color: isProfit ? '#22c55e' : '#ef4444',
+            shape: 'arrowDown',
+            text: `Exit: ${isProfit ? '+' : ''}$${pnl?.toFixed(2) || '0.00'}`,
+          });
+
+          // Scroll to the highlighted trade
+          setTimeout(() => {
+            if (chartRef.current) {
+              chartRef.current.timeScale().scrollToPosition(-5, true);
+            }
+          }, 100);
+        }
+      }
+    }
+
+    // Set all markers at once
+    if (markers.length > 0) {
+      equitySeries.setMarkers(markers);
     }
 
     // Fit content initially
@@ -291,7 +356,7 @@ function EquityCurveChart({
         chartRef.current = null;
       }
     };
-  }, [equityCurve, buyHoldCurve, equityCurveDates, tradeCountsPerCandle, drawdownPeriods, initialBalance, showDrawdowns, showBuyHold]);
+  }, [equityCurve, buyHoldCurve, equityCurveDates, tradeCountsPerCandle, drawdownPeriods, initialBalance, showDrawdowns, showBuyHold, highlightedTrade]);
 
   // Export PNG handler
   const handleExportPNG = () => {
