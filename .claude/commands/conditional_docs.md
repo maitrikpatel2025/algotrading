@@ -512,3 +512,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing format detection for list vs dictionary condition data
     - When working with StrategyCondition model or strategy persistence formats
     - When migrating condition data structures or handling mixed condition formats
+
+- app_docs/feature-60248bd3-backtest-configuration-components.md
+  - Conditions:
+    - When verifying backtest feature architecture or component naming
+    - When investigating references to BacktestConfigurationDialog (component doesn't exist - use BacktestConfiguration page instead)
+    - When looking for BacktestDashboard (component doesn't exist - use BacktestLibrary instead)
+    - When understanding navigation flow between BacktestLibrary and BacktestConfiguration
+    - When working with backtest page routes or URL structure
+    - When documenting backtest feature architecture decisions
+    - When troubleshooting confusion about backtest component naming or organization
