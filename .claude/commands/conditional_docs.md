@@ -500,3 +500,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting backtest failures during initialization or execution
     - When working with ISO format datetime parsing and timezone conversion
     - When implementing consistent timezone handling across datetime operations
+
+- app_docs/feature-f58bdd9c-backtest-conditions-format-fix.md
+  - Conditions:
+    - When troubleshooting "AttributeError: 'list' object has no attribute 'get'" errors in backtest execution
+    - When working with strategy conditions data structure in backtest_executor.py
+    - When implementing backward compatibility for legacy vs current condition formats
+    - When working with condition section types (long_entry, short_entry, long_exit, short_exit)
+    - When troubleshooting backtests failing immediately after loading strategy data
+    - When debugging condition extraction or filtering in _execute_backtest method
+    - When implementing format detection for list vs dictionary condition data
+    - When working with StrategyCondition model or strategy persistence formats
+    - When migrating condition data structures or handling mixed condition formats
