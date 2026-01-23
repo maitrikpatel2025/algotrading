@@ -1284,3 +1284,224 @@ class TestEnhancedEquityCurveData:
         assert len(summary.equity_curve_dates) == 3
         assert len(summary.trade_counts_per_candle) == 3
         assert len(summary.drawdown_periods) == 1
+
+
+class TestConditionFormatHandling:
+    """Test cases for handling both legacy dict and new list condition formats."""
+
+    def test_execute_backtest_with_legacy_dict_format(self, executor, mock_supabase):
+        """Test backtest executes successfully with old dictionary format."""
+        from unittest.mock import patch
+
+        # Mock the database responses for backtest and strategy lookups
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            # Backtest lookup
+            MagicMock(
+                data=[
+                    {
+                        "id": "backtest-1",
+                        "name": "Test Backtest",
+                        "strategy_id": "strategy-1",
+                        "start_date": "2025-01-01T00:00:00Z",
+                        "end_date": "2025-01-02T00:00:00Z",
+                        "initial_balance": 10000.0,
+                        "position_size_percent": 100.0,
+                        "fee_percent": 0.1,
+                    }
+                ]
+            ),
+            # Strategy lookup for validation
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": {
+                            "long_entry": [{"type": "indicator", "config": {}}],
+                            "short_entry": [],
+                            "long_exit": [],
+                            "short_exit": [],
+                        },
+                    }
+                ]
+            ),
+            # Strategy lookup in execution
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": {
+                            "long_entry": [{"type": "indicator", "config": {}}],
+                            "short_entry": [],
+                            "long_exit": [],
+                            "short_exit": [],
+                        },
+                    }
+                ]
+            ),
+        ]
+
+        # Mock _generate_simulated_candles to return empty candles (no actual processing)
+        with patch.object(executor, "_generate_simulated_candles", return_value=[]):
+            result = executor.start_backtest("backtest-1")
+
+            # Backtest should start successfully (legacy format should be handled)
+            assert result["success"] is True
+
+    def test_execute_backtest_with_new_list_format(self, executor, mock_supabase):
+        """Test backtest executes successfully with new list format (primary test for this bug fix)."""
+        from unittest.mock import patch
+
+        # Mock the database responses with NEW list format
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            # Backtest lookup
+            MagicMock(
+                data=[
+                    {
+                        "id": "backtest-1",
+                        "name": "Test Backtest",
+                        "strategy_id": "strategy-1",
+                        "start_date": "2025-01-01T00:00:00Z",
+                        "end_date": "2025-01-02T00:00:00Z",
+                        "initial_balance": 10000.0,
+                        "position_size_percent": 100.0,
+                        "fee_percent": 0.1,
+                    }
+                ]
+            ),
+            # Strategy lookup for validation
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": [
+                            {"section": "long_entry", "type": "indicator", "config": {}},
+                            {"section": "short_entry", "type": "indicator", "config": {}},
+                        ],
+                    }
+                ]
+            ),
+            # Strategy lookup in execution
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": [
+                            {"section": "long_entry", "type": "indicator", "config": {}},
+                            {"section": "short_entry", "type": "indicator", "config": {}},
+                        ],
+                    }
+                ]
+            ),
+        ]
+
+        # Mock _generate_simulated_candles to return empty candles
+        with patch.object(executor, "_generate_simulated_candles", return_value=[]):
+            result = executor.start_backtest("backtest-1")
+
+            # Backtest should start successfully with new list format
+            assert result["success"] is True
+
+    def test_execute_backtest_with_empty_conditions_list(self, executor, mock_supabase):
+        """Test graceful handling of empty conditions."""
+        from unittest.mock import patch
+
+        # Mock the database responses with empty conditions list
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            # Backtest lookup
+            MagicMock(
+                data=[
+                    {
+                        "id": "backtest-1",
+                        "name": "Test Backtest",
+                        "strategy_id": "strategy-1",
+                        "start_date": "2025-01-01T00:00:00Z",
+                        "end_date": "2025-01-02T00:00:00Z",
+                        "initial_balance": 10000.0,
+                        "position_size_percent": 100.0,
+                        "fee_percent": 0.1,
+                    }
+                ]
+            ),
+            # Strategy lookup for validation (empty conditions)
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": [],
+                    }
+                ]
+            ),
+        ]
+
+        result = executor.start_backtest("backtest-1")
+
+        # Should fail validation because there are no entry conditions
+        assert result["success"] is False
+        assert result["error"] == "validation_error"
+
+    def test_execute_backtest_with_mixed_section_types(self, executor, mock_supabase):
+        """Test all four section types are extracted correctly from list format."""
+        from unittest.mock import patch
+
+        # Mock the database responses with all four section types
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            # Backtest lookup
+            MagicMock(
+                data=[
+                    {
+                        "id": "backtest-1",
+                        "name": "Test Backtest",
+                        "strategy_id": "strategy-1",
+                        "start_date": "2025-01-01T00:00:00Z",
+                        "end_date": "2025-01-02T00:00:00Z",
+                        "initial_balance": 10000.0,
+                        "position_size_percent": 100.0,
+                        "fee_percent": 0.1,
+                    }
+                ]
+            ),
+            # Strategy lookup for validation
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": [
+                            {"section": "long_entry", "type": "indicator1", "config": {}},
+                            {"section": "long_entry", "type": "indicator2", "config": {}},
+                            {"section": "short_entry", "type": "indicator3", "config": {}},
+                            {"section": "long_exit", "type": "indicator4", "config": {}},
+                            {"section": "short_exit", "type": "indicator5", "config": {}},
+                        ],
+                    }
+                ]
+            ),
+            # Strategy lookup in execution
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": [
+                            {"section": "long_entry", "type": "indicator1", "config": {}},
+                            {"section": "long_entry", "type": "indicator2", "config": {}},
+                            {"section": "short_entry", "type": "indicator3", "config": {}},
+                            {"section": "long_exit", "type": "indicator4", "config": {}},
+                            {"section": "short_exit", "type": "indicator5", "config": {}},
+                        ],
+                    }
+                ]
+            ),
+        ]
+
+        # Mock _generate_simulated_candles to return empty candles
+        with patch.object(executor, "_generate_simulated_candles", return_value=[]):
+            result = executor.start_backtest("backtest-1")
+
+            # Backtest should start successfully with all section types
+            assert result["success"] is True
