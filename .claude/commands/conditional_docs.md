@@ -472,3 +472,19 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with drawdown identification algorithms in backtest_executor.py
     - When implementing crosshair handlers or custom chart tooltips
     - When working with chart responsiveness or resize behavior
+
+- app_docs/feature-50dfaeee-view-trade-list.md
+  - Conditions:
+    - When working with trade list display or backtest trade analysis
+    - When implementing or modifying BacktestTradeList or TradeFilterControls components
+    - When working with trade filtering (winners/losers, long/short, date range)
+    - When implementing sortable table columns or trade data sorting
+    - When working with trade pagination or page size controls
+    - When implementing CSV export functionality for trades
+    - When working with trade highlighting on equity curve chart
+    - When implementing click-to-highlight functionality for trades
+    - When troubleshooting trade list display or filtering issues
+    - When extending trade data processing utilities (tradeUtils.js)
+    - When working with trade formatting functions (formatTradeDuration, formatExitReason)
+    - When implementing trade data calculations (P/L percentage)
+    - When working with collapsible trade list sections in backtest results
