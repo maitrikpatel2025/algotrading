@@ -488,3 +488,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with trade formatting functions (formatTradeDuration, formatExitReason)
     - When implementing trade data calculations (P/L percentage)
     - When working with collapsible trade list sections in backtest results
+
+- app_docs/feature-4620e8ed-datetime-timezone-comparison-fix.md
+  - Conditions:
+    - When troubleshooting datetime timezone comparison errors in backtest execution
+    - When working with datetime parsing and timezone handling in backtest_executor.py
+    - When fixing "can't compare offset-naive and offset-aware datetimes" errors
+    - When implementing timezone normalization for datetime objects
+    - When working with date range validation or datetime comparisons in backtests
+    - When debugging candle generation loops or trade entry/exit time comparisons
+    - When troubleshooting backtest failures during initialization or execution
+    - When working with ISO format datetime parsing and timezone conversion
+    - When implementing consistent timezone handling across datetime operations
