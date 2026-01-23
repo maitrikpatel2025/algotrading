@@ -491,11 +491,22 @@ class BacktestExecutor:
             full_equity_curve = [initial_balance]
 
             # Get strategy conditions
-            conditions = strategy.get("conditions", {}) or {}
-            long_entry_conditions = conditions.get("long_entry", []) or []
-            short_entry_conditions = conditions.get("short_entry", []) or []
-            _long_exit_conditions = conditions.get("long_exit", []) or []  # noqa: F841
-            _short_exit_conditions = conditions.get("short_exit", []) or []  # noqa: F841
+            # Conditions can be a list of condition objects with 'section' field
+            # or a dict with 'long_entry'/'short_entry' keys
+            conditions = strategy.get("conditions", []) or []
+
+            if isinstance(conditions, list):
+                # New format: list of condition objects with 'section' field
+                long_entry_conditions = [c for c in conditions if c.get("section") == "long_entry"]
+                short_entry_conditions = [c for c in conditions if c.get("section") == "short_entry"]
+                _long_exit_conditions = [c for c in conditions if c.get("section") == "long_exit"]  # noqa: F841
+                _short_exit_conditions = [c for c in conditions if c.get("section") == "short_exit"]  # noqa: F841
+            else:
+                # Legacy format: dict with entry type keys
+                long_entry_conditions = conditions.get("long_entry", []) or []
+                short_entry_conditions = conditions.get("short_entry", []) or []
+                _long_exit_conditions = conditions.get("long_exit", []) or []  # noqa: F841
+                _short_exit_conditions = conditions.get("short_exit", []) or []  # noqa: F841
 
             # Process candles
             for i, candle in enumerate(candles):
