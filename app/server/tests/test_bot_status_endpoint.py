@@ -129,8 +129,7 @@ class TestBotStatusEndpoint:
     def test_bot_status_with_active_strategy(self, client, reset_tracker):
         """Test bot status includes active strategy details."""
         bot_status_tracker.set_running(
-            "Bollinger Bands Strategy",
-            "Mean reversion strategy using Bollinger Bands"
+            "Bollinger Bands Strategy", "Mean reversion strategy using Bollinger Bands"
         )
 
         response = client.get("/api/bot/status")

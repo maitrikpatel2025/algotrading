@@ -41,15 +41,18 @@ def executor():
 @pytest.fixture
 def mock_supabase():
     """Mock Supabase client for testing without database connection."""
-    with patch("core.backtest_executor.is_configured", return_value=True), \
-         patch("core.backtest_executor.get_supabase_client") as mock_client:
-
+    with (
+        patch("core.backtest_executor.is_configured", return_value=True),
+        patch("core.backtest_executor.get_supabase_client") as mock_client,
+    ):
         mock_db = MagicMock()
         mock_client.return_value = mock_db
 
         # Default mock responses
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
-        mock_db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
+        mock_db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [
+            {}
+        ]
 
         yield mock_db
 
@@ -93,8 +96,8 @@ class TestStrategyValidation:
                     "long_entry": [],
                     "short_entry": [],
                     "long_exit": [],
-                    "short_exit": []
-                }
+                    "short_exit": [],
+                },
             }
         ]
 
@@ -113,8 +116,8 @@ class TestStrategyValidation:
                     "long_entry": [{"type": "indicator", "config": {}}],
                     "short_entry": [],
                     "long_exit": [],
-                    "short_exit": []
-                }
+                    "short_exit": [],
+                },
             }
         ]
 
@@ -133,8 +136,8 @@ class TestStrategyValidation:
                     "long_entry": [],
                     "short_entry": [{"type": "indicator", "config": {}}],
                     "long_exit": [],
-                    "short_exit": []
-                }
+                    "short_exit": [],
+                },
             }
         ]
 
@@ -172,7 +175,7 @@ class TestStartBacktest:
                 "name": "Test Backtest",
                 "strategy_id": None,
                 "start_date": "2025-01-01T00:00:00Z",
-                "end_date": "2025-01-31T00:00:00Z"
+                "end_date": "2025-01-31T00:00:00Z",
             }
         ]
 
@@ -184,6 +187,7 @@ class TestStartBacktest:
 
     def test_start_backtest_invalid_strategy(self, executor, mock_supabase):
         """Test starting backtest fails when strategy validation fails."""
+
         # First call returns backtest, second call returns strategy with no conditions
         def mock_execute():
             mock = MagicMock()
@@ -192,19 +196,27 @@ class TestStartBacktest:
 
         mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
             # Backtest lookup
-            MagicMock(data=[{
-                "id": "backtest-1",
-                "name": "Test Backtest",
-                "strategy_id": "strategy-1",
-                "start_date": "2025-01-01T00:00:00Z",
-                "end_date": "2025-01-31T00:00:00Z"
-            }]),
+            MagicMock(
+                data=[
+                    {
+                        "id": "backtest-1",
+                        "name": "Test Backtest",
+                        "strategy_id": "strategy-1",
+                        "start_date": "2025-01-01T00:00:00Z",
+                        "end_date": "2025-01-31T00:00:00Z",
+                    }
+                ]
+            ),
             # Strategy lookup for validation
-            MagicMock(data=[{
-                "id": "strategy-1",
-                "name": "Test Strategy",
-                "conditions": {"long_entry": [], "short_entry": []}
-            }])
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "name": "Test Strategy",
+                        "conditions": {"long_entry": [], "short_entry": []},
+                    }
+                ]
+            ),
         ]
 
         result = executor.start_backtest("backtest-1")
@@ -217,23 +229,35 @@ class TestStartBacktest:
         # Set up mock to return valid data
         mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
             # Backtest lookup
-            MagicMock(data=[{
-                "id": "backtest-1",
-                "name": "Test Backtest",
-                "strategy_id": "strategy-1",
-                "start_date": "2025-01-01T00:00:00Z",
-                "end_date": "2025-01-02T00:00:00Z"
-            }]),
+            MagicMock(
+                data=[
+                    {
+                        "id": "backtest-1",
+                        "name": "Test Backtest",
+                        "strategy_id": "strategy-1",
+                        "start_date": "2025-01-01T00:00:00Z",
+                        "end_date": "2025-01-02T00:00:00Z",
+                    }
+                ]
+            ),
             # Strategy lookup
-            MagicMock(data=[{
-                "id": "strategy-1",
-                "conditions": {"long_entry": [{"type": "test"}], "short_entry": []}
-            }]),
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "conditions": {"long_entry": [{"type": "test"}], "short_entry": []},
+                    }
+                ]
+            ),
             # Strategy lookup in execution
-            MagicMock(data=[{
-                "id": "strategy-1",
-                "conditions": {"long_entry": [{"type": "test"}], "short_entry": []}
-            }])
+            MagicMock(
+                data=[
+                    {
+                        "id": "strategy-1",
+                        "conditions": {"long_entry": [{"type": "test"}], "short_entry": []},
+                    }
+                ]
+            ),
         ]
 
         # Manually add a running execution
@@ -241,7 +265,7 @@ class TestStartBacktest:
             backtest_id="backtest-1",
             thread=MagicMock(),
             cancel_event=threading.Event(),
-            status="running"
+            status="running",
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -268,7 +292,7 @@ class TestGetProgress:
             total_candles=1000,
             trade_count=5,
             started_at=datetime.now(timezone.utc),
-            current_date=datetime(2025, 1, 15, tzinfo=timezone.utc)
+            current_date=datetime(2025, 1, 15, tzinfo=timezone.utc),
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -301,7 +325,7 @@ class TestGetProgress:
                 "total_candles": 1000,
                 "trade_count": 15,
                 "started_at": "2025-01-01T10:00:00Z",
-                "current_date_processed": "2025-01-31T00:00:00Z"
+                "current_date_processed": "2025-01-31T00:00:00Z",
             }
         ]
 
@@ -333,7 +357,7 @@ class TestCancelBacktest:
             thread=mock_thread,
             cancel_event=cancel_event,
             status="running",
-            candles_processed=500
+            candles_processed=500,
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -354,7 +378,7 @@ class TestCancelBacktest:
             thread=mock_thread,
             cancel_event=cancel_event,
             status="running",
-            candles_processed=500
+            candles_processed=500,
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -369,7 +393,7 @@ class TestCancelBacktest:
             backtest_id="backtest-1",
             thread=MagicMock(),
             cancel_event=threading.Event(),
-            status="completed"
+            status="completed",
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -388,7 +412,7 @@ class TestIsRunning:
             backtest_id="backtest-1",
             thread=MagicMock(),
             cancel_event=threading.Event(),
-            status="running"
+            status="running",
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -404,7 +428,7 @@ class TestIsRunning:
             backtest_id="backtest-1",
             thread=MagicMock(),
             cancel_event=threading.Event(),
-            status="completed"
+            status="completed",
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -417,9 +441,7 @@ class TestBacktestExecution:
     def test_execution_default_values(self):
         """Test BacktestExecution has correct default values."""
         execution = BacktestExecution(
-            backtest_id="test-id",
-            thread=MagicMock(),
-            cancel_event=threading.Event()
+            backtest_id="test-id", thread=MagicMock(), cancel_event=threading.Event()
         )
 
         assert execution.progress_percentage == 0
@@ -442,7 +464,7 @@ class TestBacktestProgressModel:
             progress_percentage=50,
             candles_processed=500,
             total_candles=1000,
-            trade_count=5
+            trade_count=5,
         )
 
         assert progress.backtest_id == "test-id"
@@ -452,34 +474,20 @@ class TestBacktestProgressModel:
     def test_progress_percentage_bounds(self):
         """Test progress_percentage validation bounds."""
         # Valid bounds
-        progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            progress_percentage=0
-        )
+        progress = BacktestProgress(backtest_id="test-id", status="running", progress_percentage=0)
         assert progress.progress_percentage == 0
 
         progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            progress_percentage=100
+            backtest_id="test-id", status="running", progress_percentage=100
         )
         assert progress.progress_percentage == 100
 
         # Invalid - should raise validation error
         with pytest.raises(Exception):  # Pydantic ValidationError
-            BacktestProgress(
-                backtest_id="test-id",
-                status="running",
-                progress_percentage=101
-            )
+            BacktestProgress(backtest_id="test-id", status="running", progress_percentage=101)
 
         with pytest.raises(Exception):
-            BacktestProgress(
-                backtest_id="test-id",
-                status="running",
-                progress_percentage=-1
-            )
+            BacktestProgress(backtest_id="test-id", status="running", progress_percentage=-1)
 
 
 class TestLiveMetrics:
@@ -488,9 +496,7 @@ class TestLiveMetrics:
     def test_execution_default_metrics(self):
         """Test BacktestExecution has correct default metric values."""
         execution = BacktestExecution(
-            backtest_id="test-id",
-            thread=MagicMock(),
-            cancel_event=threading.Event()
+            backtest_id="test-id", thread=MagicMock(), cancel_event=threading.Event()
         )
 
         assert execution.current_pnl == 0.0
@@ -510,7 +516,7 @@ class TestLiveMetrics:
             running_win_rate=65.5,
             current_drawdown=2.5,
             equity_curve=[10000, 10050, 10100, 10150],
-            peak_equity=10200.0
+            peak_equity=10200.0,
         )
 
         assert progress.current_pnl == 150.50
@@ -521,11 +527,7 @@ class TestLiveMetrics:
 
     def test_progress_metrics_optional(self):
         """Test that live metrics are optional for backward compatibility."""
-        progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            progress_percentage=50
-        )
+        progress = BacktestProgress(backtest_id="test-id", status="running", progress_percentage=50)
 
         assert progress.current_pnl is None
         assert progress.running_win_rate is None
@@ -536,58 +538,30 @@ class TestLiveMetrics:
     def test_win_rate_bounds(self):
         """Test running_win_rate validation bounds."""
         # Valid bounds
-        progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            running_win_rate=0.0
-        )
+        progress = BacktestProgress(backtest_id="test-id", status="running", running_win_rate=0.0)
         assert progress.running_win_rate == 0.0
 
-        progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            running_win_rate=100.0
-        )
+        progress = BacktestProgress(backtest_id="test-id", status="running", running_win_rate=100.0)
         assert progress.running_win_rate == 100.0
 
         # Invalid - should raise validation error
         with pytest.raises(Exception):
-            BacktestProgress(
-                backtest_id="test-id",
-                status="running",
-                running_win_rate=101.0
-            )
+            BacktestProgress(backtest_id="test-id", status="running", running_win_rate=101.0)
 
         with pytest.raises(Exception):
-            BacktestProgress(
-                backtest_id="test-id",
-                status="running",
-                running_win_rate=-1.0
-            )
+            BacktestProgress(backtest_id="test-id", status="running", running_win_rate=-1.0)
 
     def test_drawdown_non_negative(self):
         """Test current_drawdown must be non-negative."""
-        progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            current_drawdown=0.0
-        )
+        progress = BacktestProgress(backtest_id="test-id", status="running", current_drawdown=0.0)
         assert progress.current_drawdown == 0.0
 
-        progress = BacktestProgress(
-            backtest_id="test-id",
-            status="running",
-            current_drawdown=50.0
-        )
+        progress = BacktestProgress(backtest_id="test-id", status="running", current_drawdown=50.0)
         assert progress.current_drawdown == 50.0
 
         # Invalid - should raise validation error
         with pytest.raises(Exception):
-            BacktestProgress(
-                backtest_id="test-id",
-                status="running",
-                current_drawdown=-5.0
-            )
+            BacktestProgress(backtest_id="test-id", status="running", current_drawdown=-5.0)
 
     def test_get_progress_includes_metrics(self, executor):
         """Test get_progress returns live metrics from running execution."""
@@ -606,7 +580,7 @@ class TestLiveMetrics:
             current_drawdown=1.5,
             equity_curve=[10000, 10100, 10200, 10150, 10250],
             peak_equity=10300.0,
-            initial_balance=10000.0
+            initial_balance=10000.0,
         )
         executor._running_backtests["backtest-1"] = execution
 
@@ -903,11 +877,31 @@ class TestStatisticsCalculations:
     def test_calculate_results_with_trades(self, executor):
         """Test _calculate_results with sample trades."""
         trades = [
-            {"pnl": 100.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"},
-            {"pnl": -50.0, "entry_time": "2025-01-02T10:00:00Z", "exit_time": "2025-01-02T11:00:00Z"},
-            {"pnl": 75.0, "entry_time": "2025-01-03T10:00:00Z", "exit_time": "2025-01-03T11:00:00Z"},
-            {"pnl": -25.0, "entry_time": "2025-01-04T10:00:00Z", "exit_time": "2025-01-04T11:00:00Z"},
-            {"pnl": 50.0, "entry_time": "2025-01-05T10:00:00Z", "exit_time": "2025-01-05T11:00:00Z"},
+            {
+                "pnl": 100.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },
+            {
+                "pnl": -50.0,
+                "entry_time": "2025-01-02T10:00:00Z",
+                "exit_time": "2025-01-02T11:00:00Z",
+            },
+            {
+                "pnl": 75.0,
+                "entry_time": "2025-01-03T10:00:00Z",
+                "exit_time": "2025-01-03T11:00:00Z",
+            },
+            {
+                "pnl": -25.0,
+                "entry_time": "2025-01-04T10:00:00Z",
+                "exit_time": "2025-01-04T11:00:00Z",
+            },
+            {
+                "pnl": 50.0,
+                "entry_time": "2025-01-05T10:00:00Z",
+                "exit_time": "2025-01-05T11:00:00Z",
+            },
         ]
 
         results = executor._calculate_results(
@@ -927,9 +921,21 @@ class TestStatisticsCalculations:
     def test_calculate_results_all_winners(self, executor):
         """Test _calculate_results with all winning trades."""
         trades = [
-            {"pnl": 100.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"},
-            {"pnl": 50.0, "entry_time": "2025-01-02T10:00:00Z", "exit_time": "2025-01-02T11:00:00Z"},
-            {"pnl": 75.0, "entry_time": "2025-01-03T10:00:00Z", "exit_time": "2025-01-03T11:00:00Z"},
+            {
+                "pnl": 100.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },
+            {
+                "pnl": 50.0,
+                "entry_time": "2025-01-02T10:00:00Z",
+                "exit_time": "2025-01-02T11:00:00Z",
+            },
+            {
+                "pnl": 75.0,
+                "entry_time": "2025-01-03T10:00:00Z",
+                "exit_time": "2025-01-03T11:00:00Z",
+            },
         ]
 
         results = executor._calculate_results(
@@ -946,9 +952,21 @@ class TestStatisticsCalculations:
     def test_calculate_results_all_losers(self, executor):
         """Test _calculate_results with all losing trades."""
         trades = [
-            {"pnl": -100.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"},
-            {"pnl": -50.0, "entry_time": "2025-01-02T10:00:00Z", "exit_time": "2025-01-02T11:00:00Z"},
-            {"pnl": -75.0, "entry_time": "2025-01-03T10:00:00Z", "exit_time": "2025-01-03T11:00:00Z"},
+            {
+                "pnl": -100.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },
+            {
+                "pnl": -50.0,
+                "entry_time": "2025-01-02T10:00:00Z",
+                "exit_time": "2025-01-02T11:00:00Z",
+            },
+            {
+                "pnl": -75.0,
+                "entry_time": "2025-01-03T10:00:00Z",
+                "exit_time": "2025-01-03T11:00:00Z",
+            },
         ]
 
         results = executor._calculate_results(
@@ -965,8 +983,16 @@ class TestStatisticsCalculations:
     def test_calculate_results_with_equity_curve(self, executor):
         """Test _calculate_results with provided equity curve."""
         trades = [
-            {"pnl": 100.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"},
-            {"pnl": -50.0, "entry_time": "2025-01-02T10:00:00Z", "exit_time": "2025-01-02T11:00:00Z"},
+            {
+                "pnl": 100.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },
+            {
+                "pnl": -50.0,
+                "entry_time": "2025-01-02T10:00:00Z",
+                "exit_time": "2025-01-02T11:00:00Z",
+            },
         ]
         equity_curve = [10000.0, 10100.0, 10050.0]
 
@@ -984,11 +1010,20 @@ class TestStatisticsCalculations:
         """Test _calculate_results with candles for buy-and-hold comparison."""
         from datetime import datetime, timezone
 
-        trades = [{"pnl": 500.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"}]
+        trades = [
+            {
+                "pnl": 500.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            }
+        ]
         candles = [
             {"time": datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc), "close": 100.0},
             {"time": datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc), "close": 102.0},
-            {"time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc), "close": 105.0},  # 5% buy-and-hold return
+            {
+                "time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+                "close": 105.0,
+            },  # 5% buy-and-hold return
         ]
 
         results = executor._calculate_results(
@@ -1084,13 +1119,16 @@ class TestEnhancedEquityCurveData:
             {"time": datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc), "close": 105.0},
         ]
 
-        trades = [{"pnl": 100.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"}]
+        trades = [
+            {
+                "pnl": 100.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            }
+        ]
 
         results = executor._calculate_results(
-            trades=trades,
-            initial_balance=10000.0,
-            final_balance=10100.0,
-            candles=candles
+            trades=trades, initial_balance=10000.0, final_balance=10100.0, candles=candles
         )
 
         assert results["equity_curve_dates"] is not None
@@ -1108,15 +1146,20 @@ class TestEnhancedEquityCurveData:
         ]
 
         trades = [
-            {"pnl": 50.0, "entry_time": "2025-01-01T10:00:00Z", "exit_time": "2025-01-01T11:00:00Z"},
-            {"pnl": 50.0, "entry_time": "2025-01-01T10:30:00Z", "exit_time": "2025-01-01T12:00:00Z"},
+            {
+                "pnl": 50.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },
+            {
+                "pnl": 50.0,
+                "entry_time": "2025-01-01T10:30:00Z",
+                "exit_time": "2025-01-01T12:00:00Z",
+            },
         ]
 
         results = executor._calculate_results(
-            trades=trades,
-            initial_balance=10000.0,
-            final_balance=10100.0,
-            candles=candles
+            trades=trades, initial_balance=10000.0, final_balance=10100.0, candles=candles
         )
 
         assert results["trade_counts_per_candle"] is not None
@@ -1182,19 +1225,26 @@ class TestEnhancedEquityCurveData:
         # Create equity curve with drawdown
         equity_curve = [10000, 10200, 9900]
 
-        trades = [{"pnl": -100.0, "entry_time": "2025-01-01T11:00:00Z", "exit_time": "2025-01-01T12:00:00Z"}]
+        trades = [
+            {
+                "pnl": -100.0,
+                "entry_time": "2025-01-01T11:00:00Z",
+                "exit_time": "2025-01-01T12:00:00Z",
+            }
+        ]
 
         results = executor._calculate_results(
             trades=trades,
             initial_balance=10000.0,
             final_balance=9900.0,
             equity_curve=equity_curve,
-            candles=candles
+            candles=candles,
         )
 
         assert results["drawdown_periods"] is not None
         # Verify it serializes to JSON properly
         import json
+
         json_str = json.dumps(results["drawdown_periods"])
         assert json_str is not None
 
@@ -1208,7 +1258,7 @@ class TestEnhancedEquityCurveData:
             equity_curve=[10000, 10500, 11000],
             equity_curve_dates=None,
             trade_counts_per_candle=None,
-            drawdown_periods=None
+            drawdown_periods=None,
         )
 
         assert summary.equity_curve_dates is None
@@ -1222,9 +1272,13 @@ class TestEnhancedEquityCurveData:
         summary = BacktestResultsSummary(
             total_trades=5,
             equity_curve=[10000, 10500, 11000],
-            equity_curve_dates=["2025-01-01T10:00:00Z", "2025-01-01T11:00:00Z", "2025-01-01T12:00:00Z"],
+            equity_curve_dates=[
+                "2025-01-01T10:00:00Z",
+                "2025-01-01T11:00:00Z",
+                "2025-01-01T12:00:00Z",
+            ],
             trade_counts_per_candle=[0, 1, 2],
-            drawdown_periods=[{"start_index": 1, "end_index": 2, "max_drawdown_pct": 5.0}]
+            drawdown_periods=[{"start_index": 1, "end_index": 2, "max_drawdown_pct": 5.0}],
         )
 
         assert len(summary.equity_curve_dates) == 3

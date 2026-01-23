@@ -39,8 +39,12 @@ def _backtest_to_db_row(backtest: BacktestConfig) -> dict:
         "end_date": backtest.end_date.isoformat() if backtest.end_date else None,
         "initial_balance": float(backtest.initial_balance),
         "currency": backtest.currency,
-        "position_sizing": backtest.position_sizing.model_dump() if backtest.position_sizing else {},
-        "risk_management": backtest.risk_management.model_dump() if backtest.risk_management else {},
+        "position_sizing": backtest.position_sizing.model_dump()
+        if backtest.position_sizing
+        else {},
+        "risk_management": backtest.risk_management.model_dump()
+        if backtest.risk_management
+        else {},
         "status": backtest.status,
         "results": backtest.results,
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -54,7 +58,9 @@ def _db_row_to_backtest(row: dict, strategy_name: Optional[str] = None) -> Backt
     try:
         # Deserialize position sizing
         pos_sizing_data = row.get("position_sizing", {}) or {}
-        position_sizing = PositionSizingConfig(**pos_sizing_data) if pos_sizing_data else PositionSizingConfig()
+        position_sizing = (
+            PositionSizingConfig(**pos_sizing_data) if pos_sizing_data else PositionSizingConfig()
+        )
 
         # Deserialize risk management
         risk_mgmt_data = row.get("risk_management", {}) or {}
@@ -111,16 +117,13 @@ def _deserialize_risk_management(data: dict) -> RiskManagementConfig:
         pc_data = data.get("partial_closes", {}) or {}
         levels_data = pc_data.get("levels", []) or []
         levels = [PartialCloseLevel(**level) for level in levels_data]
-        partial_closes = PartialClosesConfig(
-            enabled=pc_data.get("enabled", False),
-            levels=levels
-        )
+        partial_closes = PartialClosesConfig(enabled=pc_data.get("enabled", False), levels=levels)
 
         return RiskManagementConfig(
             stop_loss=stop_loss,
             take_profit=take_profit,
             trailing_stop=trailing_stop,
-            partial_closes=partial_closes
+            partial_closes=partial_closes,
         )
     except Exception as e:
         logger.warning(f"Failed to deserialize risk management: {e}")
@@ -262,30 +265,21 @@ def list_backtests() -> Tuple[bool, List[BacktestListItem], Optional[str]]:
 
     try:
         # Fetch all backtests
-        result = (
-            client.table("backtests")
-            .select("*")
-            .order("updated_at", desc=True)
-            .execute()
-        )
+        result = client.table("backtests").select("*").order("updated_at", desc=True).execute()
 
         if not result.data:
             return True, [], None
 
         # Get unique strategy IDs
-        strategy_ids = list(set(
-            row.get("strategy_id") for row in result.data
-            if row.get("strategy_id")
-        ))
+        strategy_ids = list(
+            set(row.get("strategy_id") for row in result.data if row.get("strategy_id"))
+        )
 
         # Fetch strategy names in bulk
         strategy_names = {}
         if strategy_ids:
             strategies_result = (
-                client.table("strategies")
-                .select("id, name")
-                .in_("id", strategy_ids)
-                .execute()
+                client.table("strategies").select("id, name").in_("id", strategy_ids).execute()
             )
             if strategies_result.data:
                 strategy_names = {s["id"]: s["name"] for s in strategies_result.data}
@@ -367,7 +361,9 @@ def _generate_copy_name(original_name: str, existing_names: List[str]) -> str:
     return f"{original_name} - Copy ({max_num + 1})"
 
 
-def duplicate_backtest(backtest_id: str) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+def duplicate_backtest(
+    backtest_id: str,
+) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
     """
     Duplicate a backtest by ID.
 

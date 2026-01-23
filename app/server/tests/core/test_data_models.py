@@ -4,7 +4,6 @@ Tests for Pydantic Data Models
 Unit tests for the data models module.
 """
 
-
 from core.data_models import (
     ErrorResponse,
     HeadlineItem,
@@ -28,10 +27,7 @@ class TestHealthCheckResponse:
 
     def test_health_check_ok_status(self):
         """Test creating a healthy response."""
-        response = HealthCheckResponse(
-            status="ok",
-            uptime_seconds=100.5
-        )
+        response = HealthCheckResponse(status="ok", uptime_seconds=100.5)
 
         assert response.status == "ok"
         assert response.uptime_seconds == 100.5
@@ -39,10 +35,7 @@ class TestHealthCheckResponse:
 
     def test_health_check_error_status(self):
         """Test creating an error response."""
-        response = HealthCheckResponse(
-            status="error",
-            database_connected=False
-        )
+        response = HealthCheckResponse(status="error", database_connected=False)
 
         assert response.status == "error"
         assert response.database_connected is False
@@ -61,8 +54,7 @@ class TestHeadlinesModels:
     def test_headline_item_creation(self):
         """Test creating a headline item."""
         item = HeadlineItem(
-            headline="USD rises on strong jobs data",
-            link="https://example.com/article"
+            headline="USD rises on strong jobs data", link="https://example.com/article"
         )
 
         assert item.headline == "USD rises on strong jobs data"
@@ -75,10 +67,7 @@ class TestHeadlinesModels:
             HeadlineItem(headline="News 2", link="http://link2.com"),
         ]
 
-        response = HeadlinesResponse(
-            headlines=items,
-            count=2
-        )
+        response = HeadlinesResponse(headlines=items, count=2)
 
         assert len(response.headlines) == 2
         assert response.count == 2
@@ -86,11 +75,7 @@ class TestHeadlinesModels:
 
     def test_headlines_response_with_error(self):
         """Test headlines response with error."""
-        response = HeadlinesResponse(
-            headlines=[],
-            count=0,
-            error="Failed to fetch"
-        )
+        response = HeadlinesResponse(headlines=[], count=0, error="Failed to fetch")
 
         assert response.error == "Failed to fetch"
         assert len(response.headlines) == 0
@@ -118,10 +103,7 @@ class TestTradingOptionsResponse:
             OptionItem(key="D", text="D", value="D"),
         ]
 
-        response = TradingOptionsResponse(
-            pairs=pairs,
-            granularities=granularities
-        )
+        response = TradingOptionsResponse(pairs=pairs, granularities=granularities)
 
         assert len(response.pairs) == 2
         assert len(response.granularities) == 2
@@ -138,7 +120,7 @@ class TestPriceDataResponse:
             mid_h=[1.1010, 1.1015],
             mid_l=[1.0990, 1.0995],
             mid_c=[1.1005, 1.1010],
-            candle_count=2
+            candle_count=2,
         )
 
         assert len(response.time) == 2
@@ -159,11 +141,7 @@ class TestTradeModels:
     def test_trade_request_buy(self):
         """Test creating a buy trade request."""
         request = TradeRequest(
-            pair="EURUSD",
-            amount=10000,
-            direction="buy",
-            stop_loss=1.0950,
-            take_profit=1.1050
+            pair="EURUSD", amount=10000, direction="buy", stop_loss=1.0950, take_profit=1.1050
         )
 
         assert request.pair == "EURUSD"
@@ -172,11 +150,7 @@ class TestTradeModels:
 
     def test_trade_request_sell(self):
         """Test creating a sell trade request."""
-        request = TradeRequest(
-            pair="GBPUSD",
-            amount=5000,
-            direction="sell"
-        )
+        request = TradeRequest(pair="GBPUSD", amount=5000, direction="sell")
 
         assert request.direction == "sell"
         assert request.stop_loss is None
@@ -184,11 +158,7 @@ class TestTradeModels:
 
     def test_trade_response_success(self):
         """Test successful trade response."""
-        response = TradeResponse(
-            trade_id=12345,
-            success=True,
-            message="Trade placed successfully"
-        )
+        response = TradeResponse(trade_id=12345, success=True, message="Trade placed successfully")
 
         assert response.success is True
         assert response.trade_id == 12345
@@ -196,9 +166,7 @@ class TestTradeModels:
     def test_trade_response_failure(self):
         """Test failed trade response."""
         response = TradeResponse(
-            success=False,
-            message="Trade rejected",
-            error="Insufficient margin"
+            success=False, message="Trade rejected", error="Insufficient margin"
         )
 
         assert response.success is False
@@ -210,10 +178,7 @@ class TestErrorResponse:
 
     def test_error_response_creation(self):
         """Test creating an error response."""
-        response = ErrorResponse(
-            detail="Resource not found",
-            error_code="NOT_FOUND"
-        )
+        response = ErrorResponse(detail="Resource not found", error_code="NOT_FOUND")
 
         assert response.detail == "Resource not found"
         assert response.error_code == "NOT_FOUND"
@@ -233,7 +198,7 @@ class TestOpenTradesModels:
             unrealized_pl=25.50,
             margin_used=100.0,
             stop_loss=1.1000,
-            take_profit=1.1100
+            take_profit=1.1100,
         )
 
         assert trade.id == 12345
@@ -253,7 +218,7 @@ class TestOpenTradesModels:
             price=1.2500,
             initial_amount=-5000,
             unrealized_pl=-15.25,
-            margin_used=50.0
+            margin_used=50.0,
         )
 
         assert trade.id == 12346
@@ -270,7 +235,7 @@ class TestOpenTradesModels:
                 price=1.1050,
                 initial_amount=10000,
                 unrealized_pl=25.50,
-                margin_used=100.0
+                margin_used=100.0,
             ),
             TradeInfo(
                 id=2,
@@ -278,14 +243,11 @@ class TestOpenTradesModels:
                 price=1.2500,
                 initial_amount=-5000,
                 unrealized_pl=-10.0,
-                margin_used=50.0
+                margin_used=50.0,
             ),
         ]
 
-        response = OpenTradesResponse(
-            trades=trades,
-            count=2
-        )
+        response = OpenTradesResponse(trades=trades, count=2)
 
         assert len(response.trades) == 2
         assert response.count == 2
@@ -293,10 +255,7 @@ class TestOpenTradesModels:
 
     def test_open_trades_response_empty(self):
         """Test empty open trades response."""
-        response = OpenTradesResponse(
-            trades=[],
-            count=0
-        )
+        response = OpenTradesResponse(trades=[], count=0)
 
         assert len(response.trades) == 0
         assert response.count == 0
@@ -304,11 +263,7 @@ class TestOpenTradesModels:
 
     def test_open_trades_response_with_error(self):
         """Test open trades response with error."""
-        response = OpenTradesResponse(
-            trades=[],
-            count=0,
-            error="Failed to fetch open trades"
-        )
+        response = OpenTradesResponse(trades=[], count=0, error="Failed to fetch open trades")
 
         assert response.error == "Failed to fetch open trades"
         assert len(response.trades) == 0
@@ -329,7 +284,7 @@ class TestTradeHistoryModels:
             entry_price=1.1050,
             exit_price=1.1100,
             realized_pl=50.0,
-            closed_at=datetime(2024, 1, 15, 10, 30, 0)
+            closed_at=datetime(2024, 1, 15, 10, 30, 0),
         )
 
         assert trade.id == 12345
@@ -344,11 +299,7 @@ class TestTradeHistoryModels:
     def test_trade_history_item_minimal(self):
         """Test creating trade history item with minimal data."""
         trade = TradeHistoryItem(
-            id=12346,
-            instrument="GBPUSD",
-            side="Sell",
-            amount=5000,
-            entry_price=1.2500
+            id=12346, instrument="GBPUSD", side="Sell", amount=5000, entry_price=1.2500
         )
 
         assert trade.id == 12346
@@ -366,7 +317,7 @@ class TestTradeHistoryModels:
                 amount=10000,
                 entry_price=1.1050,
                 exit_price=1.1100,
-                realized_pl=50.0
+                realized_pl=50.0,
             ),
             TradeHistoryItem(
                 id=2,
@@ -375,14 +326,11 @@ class TestTradeHistoryModels:
                 amount=5000,
                 entry_price=1.2500,
                 exit_price=1.2450,
-                realized_pl=25.0
+                realized_pl=25.0,
             ),
         ]
 
-        response = TradeHistoryResponse(
-            trades=trades,
-            count=2
-        )
+        response = TradeHistoryResponse(trades=trades, count=2)
 
         assert len(response.trades) == 2
         assert response.count == 2
@@ -392,9 +340,7 @@ class TestTradeHistoryModels:
     def test_trade_history_response_empty_with_message(self):
         """Test empty trade history response with message."""
         response = TradeHistoryResponse(
-            trades=[],
-            count=0,
-            message="Trade history is not available from the current API."
+            trades=[], count=0, message="Trade history is not available from the current API."
         )
 
         assert len(response.trades) == 0
@@ -404,11 +350,7 @@ class TestTradeHistoryModels:
 
     def test_trade_history_response_with_error(self):
         """Test trade history response with error."""
-        response = TradeHistoryResponse(
-            trades=[],
-            count=0,
-            error="Failed to fetch trade history"
-        )
+        response = TradeHistoryResponse(trades=[], count=0, error="Failed to fetch trade history")
 
         assert response.error == "Failed to fetch trade history"
         assert len(response.trades) == 0
@@ -419,30 +361,21 @@ class TestStrategyConfig:
 
     def test_strategy_config_candle_count_as_int(self):
         """Test that candle_count accepts integer values."""
-        config = StrategyConfig(
-            name="Test Strategy",
-            candle_count=100
-        )
+        config = StrategyConfig(name="Test Strategy", candle_count=100)
 
         assert config.name == "Test Strategy"
         assert config.candle_count == 100
 
     def test_strategy_config_candle_count_as_str(self):
         """Test that candle_count accepts string values."""
-        config = StrategyConfig(
-            name="Test Strategy",
-            candle_count="100"
-        )
+        config = StrategyConfig(name="Test Strategy", candle_count="100")
 
         assert config.name == "Test Strategy"
         assert config.candle_count == "100"
 
     def test_strategy_config_candle_count_as_none(self):
         """Test that candle_count accepts None values."""
-        config = StrategyConfig(
-            name="Test Strategy",
-            candle_count=None
-        )
+        config = StrategyConfig(name="Test Strategy", candle_count=None)
 
         assert config.name == "Test Strategy"
         assert config.candle_count is None

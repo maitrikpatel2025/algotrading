@@ -23,10 +23,10 @@ from models.open_trade import OpenTrade
 logger = logging.getLogger(__name__)
 
 LABEL_MAP = {
-    'Open': 'o',
-    'High': 'h',
-    'Low': 'l',
-    'Close': 'c',
+    "Open": "o",
+    "High": "h",
+    "Low": "l",
+    "Close": "c",
 }
 
 THROTTLE_TIME = 0.3
@@ -69,17 +69,31 @@ class OpenFxApi:
 
         # Determine base price based on pair (realistic starting prices)
         pair_base_prices = {
-            'EUR_USD': 1.0850, 'GBP_USD': 1.2650, 'USD_JPY': 149.50,
-            'USD_CHF': 0.8850, 'AUD_USD': 0.6550, 'USD_CAD': 1.3650,
-            'NZD_USD': 0.6150, 'EUR_GBP': 0.8580, 'EUR_JPY': 162.20,
-            'GBP_JPY': 189.10, 'AUD_CAD': 0.8950, 'EUR_CAD': 1.4820,
+            "EUR_USD": 1.0850,
+            "GBP_USD": 1.2650,
+            "USD_JPY": 149.50,
+            "USD_CHF": 0.8850,
+            "AUD_USD": 0.6550,
+            "USD_CAD": 1.3650,
+            "NZD_USD": 0.6150,
+            "EUR_GBP": 0.8580,
+            "EUR_JPY": 162.20,
+            "GBP_JPY": 189.10,
+            "AUD_CAD": 0.8950,
+            "EUR_CAD": 1.4820,
         }
         base_price = pair_base_prices.get(pair_name, 1.0000)
 
         # Determine time interval based on granularity
         granularity_seconds = {
-            'M1': 60, 'M5': 300, 'M15': 900, 'M30': 1800,
-            'H1': 3600, 'H4': 14400, 'D': 86400, 'W1': 604800
+            "M1": 60,
+            "M5": 300,
+            "M15": 900,
+            "M30": 1800,
+            "H1": 3600,
+            "H4": 14400,
+            "D": 86400,
+            "W1": 604800,
         }
         interval = granularity_seconds.get(granularity, 3600)
 
@@ -111,22 +125,16 @@ class OpenFxApi:
 
             current_price = close_price
 
-        return {
-            'time': times,
-            'mid_o': mid_o,
-            'mid_h': mid_h,
-            'mid_l': mid_l,
-            'mid_c': mid_c
-        }
+        return {"time": times, "mid_o": mid_o, "mid_h": mid_h, "mid_l": mid_l, "mid_c": mid_c}
 
     def _make_request(
         self,
         url: str,
-        verb: str = 'get',
+        verb: str = "get",
         code: int = 200,
         params: Optional[Dict] = None,
         data: Optional[Dict] = None,
-        headers: Optional[Dict] = None
+        headers: Optional[Dict] = None,
     ) -> Tuple[bool, Any]:
         """
         Make an HTTP request to the API.
@@ -152,16 +160,24 @@ class OpenFxApi:
             response = None
 
             if verb == "get":
-                response = self.session.get(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
+                response = self.session.get(
+                    full_url, params=params, data=data, headers=headers, timeout=(5, 10)
+                )
             elif verb == "post":
-                response = self.session.post(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
+                response = self.session.post(
+                    full_url, params=params, data=data, headers=headers, timeout=(5, 10)
+                )
             elif verb == "put":
-                response = self.session.put(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
+                response = self.session.put(
+                    full_url, params=params, data=data, headers=headers, timeout=(5, 10)
+                )
             elif verb == "delete":
-                response = self.session.delete(full_url, params=params, data=data, headers=headers, timeout=(5, 10))
+                response = self.session.delete(
+                    full_url, params=params, data=data, headers=headers, timeout=(5, 10)
+                )
 
             if response is None:
-                return False, {'error': 'verb not found'}
+                return False, {"error": "verb not found"}
 
             if response.status_code == code:
                 return True, response.json()
@@ -169,7 +185,7 @@ class OpenFxApi:
                 return False, response.json()
 
         except Exception as error:
-            return False, {'Exception': str(error)}
+            return False, {"Exception": str(error)}
 
     # =========================================================================
     # Account Operations
@@ -190,7 +206,7 @@ class OpenFxApi:
             logger.error(f"get_account_summary(): {data}")
             return None
 
-    def get_account_instruments(self, status_group: str = 'Forex') -> Optional[List[Dict]]:
+    def get_account_instruments(self, status_group: str = "Forex") -> Optional[List[Dict]]:
         """
         Get available trading instruments.
 
@@ -208,8 +224,7 @@ class OpenFxApi:
 
         # Filter to forex pairs with 6-character symbols
         target_inst = [
-            x for x in symbol_data
-            if x['StatusGroupId'] == status_group and len(x['Symbol']) == 6
+            x for x in symbol_data if x["StatusGroupId"] == status_group and len(x["Symbol"]) == 6
         ]
 
         ok, history_symbols = self._make_request("quotehistory/symbols")
@@ -217,7 +232,7 @@ class OpenFxApi:
         if not ok:
             return target_inst
 
-        return [x for x in target_inst if x['Symbol'] in history_symbols]
+        return [x for x in target_inst if x["Symbol"] in history_symbols]
 
     # =========================================================================
     # Candle/Price Data Operations
@@ -228,7 +243,7 @@ class OpenFxApi:
         pair_name: str,
         count: int = -10,
         granularity: str = "H1",
-        ts_from: Optional[int] = None
+        ts_from: Optional[int] = None,
     ) -> Tuple[bool, Optional[List]]:
         """
         Fetch candlestick data for a pair.
@@ -245,7 +260,7 @@ class OpenFxApi:
         if ts_from is None:
             ts_from = int(pd.Timestamp(dt.datetime.utcnow()).timestamp() * 1000)
 
-        params = {'timestamp': ts_from, 'count': count if count >= 0 else count + 1}
+        params = {"timestamp": ts_from, "count": count if count >= 0 else count + 1}
 
         base_url = f"quotehistory/{pair_name}/{granularity}/bars/"
 
@@ -259,7 +274,7 @@ class OpenFxApi:
 
     def _get_price_dict(self, price_label: str, item: Dict) -> Dict:
         """Convert a candle item to price dictionary."""
-        data = {'time': pd.to_datetime(item['Timestamp'], unit='ms')}
+        data = {"time": pd.to_datetime(item["Timestamp"], unit="ms")}
         for ohlc_key, ohlc_val in LABEL_MAP.items():
             data[f"{price_label}_{ohlc_val}"] = item[ohlc_key]
         return data
@@ -269,7 +284,7 @@ class OpenFxApi:
         pair_name: str,
         count: int = -10,
         granularity: str = "H1",
-        date_from: Optional[dt.datetime] = None
+        date_from: Optional[dt.datetime] = None,
     ) -> Optional[pd.DataFrame]:
         """
         Get candlestick data as a DataFrame.
@@ -287,7 +302,9 @@ class OpenFxApi:
         if date_from is not None:
             ts_from = int(pd.Timestamp(date_from).timestamp() * 1000)
 
-        ok, data = self.fetch_candles(pair_name, count=count, granularity=granularity, ts_from=ts_from)
+        ok, data = self.fetch_candles(
+            pair_name, count=count, granularity=granularity, ts_from=ts_from
+        )
 
         if not ok:
             return None
@@ -306,21 +323,20 @@ class OpenFxApi:
         if len(ask_bars) == 0 or len(bid_bars) == 0:
             return pd.DataFrame()
 
-        available_to = pd.to_datetime(data_bid['AvailableTo'], unit='ms')
+        available_to = pd.to_datetime(data_bid["AvailableTo"], unit="ms")
 
-        bids = [self._get_price_dict('bid', item) for item in bid_bars]
-        asks = [self._get_price_dict('ask', item) for item in ask_bars]
+        bids = [self._get_price_dict("bid", item) for item in bid_bars]
+        asks = [self._get_price_dict("ask", item) for item in ask_bars]
 
         df_bid = pd.DataFrame.from_dict(bids)
         df_ask = pd.DataFrame.from_dict(asks)
-        df_merged = pd.merge(left=df_bid, right=df_ask, on='time')
+        df_merged = pd.merge(left=df_bid, right=df_ask, on="time")
 
         # Calculate mid prices
-        for suffix in ['_o', '_h', '_l', '_c']:
-            df_merged[f'mid{suffix}'] = (
-                (df_merged[f'ask{suffix}'] - df_merged[f'bid{suffix}']) / 2
-                + df_merged[f'bid{suffix}']
-            )
+        for suffix in ["_o", "_h", "_l", "_c"]:
+            df_merged[f"mid{suffix}"] = (
+                df_merged[f"ask{suffix}"] - df_merged[f"bid{suffix}"]
+            ) / 2 + df_merged[f"bid{suffix}"]
 
         # Remove incomplete candle
         if count < 0 and df_merged.shape[0] > 0 and df_merged.iloc[-1].time == available_to:
@@ -364,27 +380,33 @@ class OpenFxApi:
             logger.info(f"Using mock data for {original_pair}/{granularity} (USE_MOCK_DATA=true)")
             return self._generate_mock_candles(original_pair, granularity, count)
 
-        pair_name = pair_name.replace('_', '')
+        pair_name = pair_name.replace("_", "")
 
         try:
             df = self.get_candles_df(pair_name, granularity=granularity, count=count * -1)
 
             if df is None:
-                logger.warning(f"API unavailable for {original_pair}/{granularity} - falling back to mock data")
+                logger.warning(
+                    f"API unavailable for {original_pair}/{granularity} - falling back to mock data"
+                )
                 return self._generate_mock_candles(original_pair, granularity, count)
 
             if df.shape[0] == 0:
-                logger.warning(f"No candle data returned for {original_pair}/{granularity} - falling back to mock data")
+                logger.warning(
+                    f"No candle data returned for {original_pair}/{granularity} - falling back to mock data"
+                )
                 return self._generate_mock_candles(original_pair, granularity, count)
 
-            cols = ['time', 'mid_o', 'mid_h', 'mid_l', 'mid_c']
+            cols = ["time", "mid_o", "mid_h", "mid_l", "mid_c"]
             df = df[cols].copy()
-            df['time'] = df.time.dt.strftime("%y-%m-%d %H:%M")
+            df["time"] = df.time.dt.strftime("%y-%m-%d %H:%M")
 
-            return df.to_dict(orient='list')
+            return df.to_dict(orient="list")
 
         except Exception as e:
-            logger.error(f"Error in web_api_candles for {original_pair}/{granularity}: {e} - falling back to mock data")
+            logger.error(
+                f"Error in web_api_candles for {original_pair}/{granularity}: {e} - falling back to mock data"
+            )
             return self._generate_mock_candles(original_pair, granularity, count)
 
     # =========================================================================
@@ -397,7 +419,7 @@ class OpenFxApi:
         amount: int,
         direction: int,
         stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None
+        take_profit: Optional[float] = None,
     ) -> Optional[int]:
         """
         Place a market trade.
@@ -419,27 +441,22 @@ class OpenFxApi:
             logger.error(f"Instrument not found: {pair_name}")
             return None
 
-        data = {
-            "Type": "Market",
-            "Symbol": pair_name,
-            "Amount": amount,
-            "Side": dir_str
-        }
+        data = {"Type": "Market", "Symbol": pair_name, "Amount": amount, "Side": dir_str}
 
         if stop_loss is not None:
-            data['StopLoss'] = round(stop_loss, instrument.displayPrecision)
+            data["StopLoss"] = round(stop_loss, instrument.displayPrecision)
 
         if take_profit is not None:
-            data['TakeProfit'] = round(take_profit, instrument.displayPrecision)
+            data["TakeProfit"] = round(take_profit, instrument.displayPrecision)
 
         logger.info(f"Place Trade: {data}")
 
         ok, response = self._make_request("trade", verb="post", data=data)
 
-        if ok and response.get('RemainingAmount', 0) != 0:
-            trade = self.get_open_trade(response['Id'])
+        if ok and response.get("RemainingAmount", 0) != 0:
+            trade = self.get_open_trade(response["Id"])
             if trade is not None:
-                return response['Id']
+                return response["Id"]
 
         return None
 
@@ -455,7 +472,7 @@ class OpenFxApi:
         """
         ok, response = self._make_request(f"trade/{trade_id}")
 
-        if ok and 'Id' in response:
+        if ok and "Id" in response:
             return OpenTrade(response)
 
         return None
@@ -475,10 +492,7 @@ class OpenFxApi:
         return None
 
     def get_trade_history(
-        self,
-        timestamp_from: int,
-        timestamp_to: int,
-        request_page_size: int = 1000
+        self, timestamp_from: int, timestamp_to: int, request_page_size: int = 1000
     ) -> Optional[Dict]:
         """
         Get account trade history.
@@ -498,7 +512,7 @@ class OpenFxApi:
             "SkipCancelOrder": False,
             "RequestDirection": "Forward",
             "RequestPageSize": request_page_size,
-            "RequestLastId": None
+            "RequestLastId": None,
         }
 
         ok, response = self._make_request("tradehistory", verb="post", data=request_body)
@@ -519,10 +533,7 @@ class OpenFxApi:
         Returns:
             True on success, False on failure
         """
-        params = {
-            "trade.type": "Close",
-            "trade.id": trade_id
-        }
+        params = {"trade.type": "Close", "trade.id": trade_id}
 
         ok, _ = self._make_request("trade", verb="delete", params=params)
 
@@ -564,14 +575,11 @@ class OpenFxApi:
         Returns:
             Dictionary of symbol -> pip value or None on error
         """
-        params = {
-            'targetCurrency': 'EUR',
-            'symbols': ' '.join(instruments_list)
-        }
+        params = {"targetCurrency": "EUR", "symbols": " ".join(instruments_list)}
 
         ok, response = self._make_request("pipsvalue", params=params)
 
         if ok:
-            return {x['Symbol']: x['Value'] for x in response}
+            return {x["Symbol"]: x["Value"] for x in response}
 
         return None

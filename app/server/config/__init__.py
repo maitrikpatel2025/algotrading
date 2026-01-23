@@ -1,4 +1,5 @@
 """Configuration module."""
+
 from .settings import (
     API_DEBUG as API_DEBUG,
 )

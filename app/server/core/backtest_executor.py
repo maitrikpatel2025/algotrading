@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BacktestExecution:
     """Tracks a running backtest execution."""
+
     backtest_id: str
     thread: threading.Thread
     cancel_event: Event
@@ -122,7 +123,10 @@ class BacktestExecutor:
                 short_entry = conditions.get("short_entry", []) or []
 
             if not long_entry and not short_entry:
-                return False, "Strategy must have at least one entry condition (long_entry or short_entry)"
+                return (
+                    False,
+                    "Strategy must have at least one entry condition (long_entry or short_entry)",
+                )
 
             return True, None
 
@@ -149,7 +153,7 @@ class BacktestExecutor:
                     return {
                         "success": False,
                         "message": "Backtest is already running",
-                        "error": "conflict"
+                        "error": "conflict",
                     }
 
             # Validate backtest exists
@@ -157,7 +161,7 @@ class BacktestExecutor:
                 return {
                     "success": False,
                     "message": "Database not configured",
-                    "error": "configuration_error"
+                    "error": "configuration_error",
                 }
 
             client = get_supabase_client()
@@ -165,7 +169,7 @@ class BacktestExecutor:
                 return {
                     "success": False,
                     "message": "Failed to connect to database",
-                    "error": "connection_error"
+                    "error": "connection_error",
                 }
 
             try:
@@ -176,7 +180,7 @@ class BacktestExecutor:
                     return {
                         "success": False,
                         "message": f"Backtest not found: {backtest_id}",
-                        "error": "not_found"
+                        "error": "not_found",
                     }
 
                 backtest = result.data[0]
@@ -189,13 +193,13 @@ class BacktestExecutor:
                         return {
                             "success": False,
                             "message": validation_error,
-                            "error": "validation_error"
+                            "error": "validation_error",
                         }
                 else:
                     return {
                         "success": False,
                         "message": "Backtest has no linked strategy",
-                        "error": "validation_error"
+                        "error": "validation_error",
                     }
 
                 # Create execution tracker
@@ -206,7 +210,7 @@ class BacktestExecutor:
                     cancel_event=cancel_event,
                     keep_partial_on_cancel=keep_partial_on_cancel,
                     status="pending",
-                    started_at=datetime.now(timezone.utc)
+                    started_at=datetime.now(timezone.utc),
                 )
 
                 # Create and start the execution thread
@@ -214,7 +218,7 @@ class BacktestExecutor:
                     target=self._execute_backtest,
                     args=(backtest_id, cancel_event, backtest),
                     daemon=True,
-                    name=f"backtest-{backtest_id[:8]}"
+                    name=f"backtest-{backtest_id[:8]}",
                 )
                 execution.thread = thread
 
@@ -222,25 +226,23 @@ class BacktestExecutor:
                 self._running_backtests[backtest_id] = execution
 
                 # Update database status to running
-                self._update_backtest_status(backtest_id, "running", started_at=datetime.now(timezone.utc))
+                self._update_backtest_status(
+                    backtest_id, "running", started_at=datetime.now(timezone.utc)
+                )
 
                 # Start the thread
                 thread.start()
 
                 logger.info(f"[BACKTEST_EXECUTOR] Started backtest {backtest_id}")
 
-                return {
-                    "success": True,
-                    "message": "Backtest started successfully",
-                    "error": None
-                }
+                return {"success": True, "message": "Backtest started successfully", "error": None}
 
             except Exception as e:
                 logger.error(f"[BACKTEST_EXECUTOR] Error starting backtest {backtest_id}: {e}")
                 return {
                     "success": False,
                     "message": f"Failed to start backtest: {str(e)}",
-                    "error": "internal_error"
+                    "error": "internal_error",
                 }
 
     def get_progress(self, backtest_id: str) -> Optional[BacktestProgress]:
@@ -262,7 +264,11 @@ class BacktestExecutor:
                 if execution.progress_percentage > 0 and execution.started_at:
                     elapsed = (datetime.now(timezone.utc) - execution.started_at).total_seconds()
                     if execution.progress_percentage < 100:
-                        estimated_seconds = elapsed * (100 - execution.progress_percentage) / execution.progress_percentage
+                        estimated_seconds = (
+                            elapsed
+                            * (100 - execution.progress_percentage)
+                            / execution.progress_percentage
+                        )
 
                 return BacktestProgress(
                     backtest_id=backtest_id,
@@ -280,7 +286,7 @@ class BacktestExecutor:
                     running_win_rate=execution.running_win_rate,
                     current_drawdown=execution.current_drawdown,
                     equity_curve=execution.equity_curve if execution.equity_curve else None,
-                    peak_equity=execution.peak_equity if execution.peak_equity > 0 else None
+                    peak_equity=execution.peak_equity if execution.peak_equity > 0 else None,
                 )
 
         # Check database for completed/failed backtests
@@ -288,16 +294,23 @@ class BacktestExecutor:
             client = get_supabase_client()
             if client:
                 try:
-                    result = client.table("backtests").select(
-                        "id, status, progress_percentage, current_date_processed, "
-                        "candles_processed, total_candles, trade_count, started_at, error_message"
-                    ).eq("id", backtest_id).execute()
+                    result = (
+                        client.table("backtests")
+                        .select(
+                            "id, status, progress_percentage, current_date_processed, "
+                            "candles_processed, total_candles, trade_count, started_at, error_message"
+                        )
+                        .eq("id", backtest_id)
+                        .execute()
+                    )
 
                     if result.data and len(result.data) > 0:
                         row = result.data[0]
                         current_date = row.get("current_date_processed")
                         if isinstance(current_date, str):
-                            current_date = datetime.fromisoformat(current_date.replace("Z", "+00:00"))
+                            current_date = datetime.fromisoformat(
+                                current_date.replace("Z", "+00:00")
+                            )
 
                         started_at = row.get("started_at")
                         if isinstance(started_at, str):
@@ -313,7 +326,7 @@ class BacktestExecutor:
                             trade_count=row.get("trade_count", 0),
                             estimated_seconds_remaining=None,
                             error_message=row.get("error_message"),
-                            started_at=started_at
+                            started_at=started_at,
                         )
                 except Exception as e:
                     logger.error(f"[BACKTEST_EXECUTOR] Error getting progress from DB: {e}")
@@ -337,7 +350,7 @@ class BacktestExecutor:
                     "success": False,
                     "message": "Backtest is not running",
                     "partial_results_saved": False,
-                    "error": "not_running"
+                    "error": "not_running",
                 }
 
             execution = self._running_backtests[backtest_id]
@@ -347,7 +360,7 @@ class BacktestExecutor:
                     "success": False,
                     "message": f"Backtest cannot be cancelled (status: {execution.status})",
                     "partial_results_saved": False,
-                    "error": "invalid_state"
+                    "error": "invalid_state",
                 }
 
             # Set the keep partial flag
@@ -370,16 +383,21 @@ class BacktestExecutor:
 
         return {
             "success": True,
-            "message": "Backtest cancelled" + (" with partial results saved" if partial_saved else ""),
+            "message": "Backtest cancelled"
+            + (" with partial results saved" if partial_saved else ""),
             "partial_results_saved": partial_saved,
-            "error": None
+            "error": None,
         }
 
     def is_running(self, backtest_id: str) -> bool:
         """Check if a backtest is currently running."""
         with self._executions_lock:
             if backtest_id in self._running_backtests:
-                return self._running_backtests[backtest_id].status in ["running", "pending", "cancelling"]
+                return self._running_backtests[backtest_id].status in [
+                    "running",
+                    "pending",
+                    "cancelling",
+                ]
         return False
 
     def _execute_backtest(self, backtest_id: str, cancel_event: Event, backtest_data: dict):
@@ -427,6 +445,14 @@ class BacktestExecutor:
             if isinstance(end_date, str):
                 end_date = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
 
+            # Normalize to timezone-naive for consistent comparisons
+            if start_date.tzinfo is not None:
+                start_date = start_date.replace(tzinfo=None)
+            if end_date.tzinfo is not None:
+                end_date = end_date.replace(tzinfo=None)
+
+            logger.debug(f"[BACKTEST_EXECUTOR] Normalized dates - start_date: {start_date} (tzinfo: {start_date.tzinfo}), end_date: {end_date} (tzinfo: {end_date.tzinfo})")
+
             # Simulate fetching historical data
             # In a real implementation, this would fetch from a data provider
             # For now, we'll simulate with generated candles
@@ -442,7 +468,7 @@ class BacktestExecutor:
                 progress_percentage=0,
                 total_candles=total_candles,
                 candles_processed=0,
-                trade_count=0
+                trade_count=0,
             )
 
             # Initialize trading state
@@ -476,7 +502,9 @@ class BacktestExecutor:
                 # Check for cancellation frequently
                 if i % self.CANCEL_CHECK_INTERVAL == 0:
                     if cancel_event.is_set():
-                        logger.info(f"[BACKTEST_EXECUTOR] Backtest {backtest_id} cancelled at candle {i}")
+                        logger.info(
+                            f"[BACKTEST_EXECUTOR] Backtest {backtest_id} cancelled at candle {i}"
+                        )
                         self._handle_cancellation(backtest_id, execution, trades)
                         return
 
@@ -493,7 +521,7 @@ class BacktestExecutor:
                             "type": "long",
                             "entry_price": candle_close,
                             "entry_time": candle_time,
-                            "size": self._calculate_position_size(balance, position_sizing)
+                            "size": self._calculate_position_size(balance, position_sizing),
                         }
                     elif short_entry_conditions and self._evaluate_entry(candle, "short"):
                         # Open short position
@@ -501,7 +529,7 @@ class BacktestExecutor:
                             "type": "short",
                             "entry_price": candle_close,
                             "entry_time": candle_time,
-                            "size": self._calculate_position_size(balance, position_sizing)
+                            "size": self._calculate_position_size(balance, position_sizing),
                         }
                 else:
                     # Check exit conditions (simplified simulation)
@@ -517,11 +545,15 @@ class BacktestExecutor:
                         trade = {
                             "type": current_position["type"],
                             "entry_price": current_position["entry_price"],
-                            "entry_time": current_position["entry_time"].isoformat() if hasattr(current_position["entry_time"], "isoformat") else current_position["entry_time"],
+                            "entry_time": current_position["entry_time"].isoformat()
+                            if hasattr(current_position["entry_time"], "isoformat")
+                            else current_position["entry_time"],
                             "exit_price": candle_close,
-                            "exit_time": candle_time.isoformat() if hasattr(candle_time, "isoformat") else candle_time,
+                            "exit_time": candle_time.isoformat()
+                            if hasattr(candle_time, "isoformat")
+                            else candle_time,
                             "pnl": pnl,
-                            "exit_reason": exit_reason
+                            "exit_reason": exit_reason,
                         }
                         trades.append(trade)
                         trade_count += 1
@@ -536,12 +568,20 @@ class BacktestExecutor:
                             # Calculate cumulative P/L
                             execution.current_pnl = round(balance - initial_balance, 2)
                             # Calculate win rate
-                            execution.running_win_rate = round((winning_trades / trade_count) * 100, 1) if trade_count > 0 else 0.0
+                            execution.running_win_rate = (
+                                round((winning_trades / trade_count) * 100, 1)
+                                if trade_count > 0
+                                else 0.0
+                            )
                             # Update peak equity and drawdown
                             if balance > execution.peak_equity:
                                 execution.peak_equity = balance
                             if execution.peak_equity > 0:
-                                execution.current_drawdown = round(((execution.peak_equity - balance) / execution.peak_equity) * 100, 2)
+                                execution.current_drawdown = round(
+                                    ((execution.peak_equity - balance) / execution.peak_equity)
+                                    * 100,
+                                    2,
+                                )
 
                         # Add to full equity curve for final stats
                         full_equity_curve.append(round(balance, 2))
@@ -564,11 +604,13 @@ class BacktestExecutor:
                         progress_percentage=progress_pct,
                         candles_processed=i + 1,
                         trade_count=trade_count,
-                        current_date=candle_time
+                        current_date=candle_time,
                     )
 
             # Backtest completed
-            logger.info(f"[BACKTEST_EXECUTOR] Backtest {backtest_id} completed with {trade_count} trades")
+            logger.info(
+                f"[BACKTEST_EXECUTOR] Backtest {backtest_id} completed with {trade_count} trades"
+            )
 
             # Calculate final results with full equity curve and candles for buy-hold comparison
             results = self._calculate_results(
@@ -576,7 +618,7 @@ class BacktestExecutor:
                 initial_balance=initial_balance,
                 final_balance=balance,
                 equity_curve=full_equity_curve,
-                candles=candles
+                candles=candles,
             )
 
             # Update database
@@ -587,7 +629,9 @@ class BacktestExecutor:
                 execution.progress_percentage = 100
 
         except Exception as e:
+            import traceback
             logger.error(f"[BACKTEST_EXECUTOR] Error executing backtest {backtest_id}: {e}")
+            logger.error(f"[BACKTEST_EXECUTOR] Full traceback:\n{traceback.format_exc()}")
 
             with self._executions_lock:
                 if execution:
@@ -608,19 +652,15 @@ class BacktestExecutor:
             cleanup_thread.start()
 
     def _generate_simulated_candles(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        timeframe: str
+        self, start_date: datetime, end_date: datetime, timeframe: str
     ) -> List[Dict[str, Any]]:
         """Generate simulated candles for backtesting."""
         import random
 
+        logger.debug(f"[BACKTEST_EXECUTOR] Generating candles - start_date: {start_date} (tzinfo: {start_date.tzinfo}), end_date: {end_date} (tzinfo: {end_date.tzinfo})")
+
         # Map timeframe to minutes
-        tf_minutes = {
-            "M1": 1, "M5": 5, "M15": 15, "M30": 30,
-            "H1": 60, "H4": 240, "D": 1440
-        }
+        tf_minutes = {"M1": 1, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240, "D": 1440}
         minutes = tf_minutes.get(timeframe, 60)
 
         candles = []
@@ -628,6 +668,8 @@ class BacktestExecutor:
         price = 1.1000  # Starting price for simulation
 
         while current_time <= end_date:
+            if len(candles) == 0:  # Log only first candle
+                logger.debug(f"[BACKTEST_EXECUTOR] First candle - current_time: {current_time} (tzinfo: {current_time.tzinfo})")
             # Generate random OHLC data
             change = random.uniform(-0.002, 0.002)
             high_extra = random.uniform(0, 0.001)
@@ -638,20 +680,22 @@ class BacktestExecutor:
             high_price = max(open_price, close_price) + high_extra
             low_price = min(open_price, close_price) - low_extra
 
-            candles.append({
-                "time": current_time,
-                "open": open_price,
-                "high": high_price,
-                "low": low_price,
-                "close": close_price,
-                "volume": random.randint(100, 10000)
-            })
+            candles.append(
+                {
+                    "time": current_time,
+                    "open": open_price,
+                    "high": high_price,
+                    "low": low_price,
+                    "close": close_price,
+                    "volume": random.randint(100, 10000),
+                }
+            )
 
             price = close_price
-            current_time = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
 
             # Move to next candle
             from datetime import timedelta
+
             current_time += timedelta(minutes=minutes)
 
         return candles
@@ -661,13 +705,11 @@ class BacktestExecutor:
         # In a real implementation, this would evaluate the actual strategy conditions
         # For simulation, we use a simple probability-based approach
         import random
+
         return random.random() < 0.02  # 2% chance of entry signal per candle
 
     def _check_exit_conditions(
-        self,
-        position: dict,
-        candle: dict,
-        risk_management: dict
+        self, position: dict, candle: dict, risk_management: dict
     ) -> tuple[bool, str]:
         """Check if exit conditions are met."""
         import random
@@ -741,7 +783,9 @@ class BacktestExecutor:
         pnl = price_change * size * 10000  # Assuming forex with pip value
         return round(pnl, 2)
 
-    def _calculate_sharpe_ratio(self, daily_returns: List[float], risk_free_rate: float = 0.0) -> Optional[float]:
+    def _calculate_sharpe_ratio(
+        self, daily_returns: List[float], risk_free_rate: float = 0.0
+    ) -> Optional[float]:
         """
         Calculate annualized Sharpe Ratio.
 
@@ -770,7 +814,9 @@ class BacktestExecutor:
 
         return round(annualized_sharpe, 2)
 
-    def _calculate_sortino_ratio(self, daily_returns: List[float], risk_free_rate: float = 0.0) -> Optional[float]:
+    def _calculate_sortino_ratio(
+        self, daily_returns: List[float], risk_free_rate: float = 0.0
+    ) -> Optional[float]:
         """
         Calculate annualized Sortino Ratio (uses only downside deviation).
 
@@ -793,7 +839,7 @@ class BacktestExecutor:
             # No negative returns means infinite Sortino (very good), but we cap it
             return None
 
-        downside_variance = sum(r ** 2 for r in negative_returns) / len(daily_returns)
+        downside_variance = sum(r**2 for r in negative_returns) / len(daily_returns)
         downside_deviation = math.sqrt(downside_variance) if downside_variance > 0 else 0
 
         if downside_deviation == 0:
@@ -861,11 +907,13 @@ class BacktestExecutor:
                 # New peak reached
                 if in_drawdown and max_drawdown_in_period > 0.01:  # Only record if > 0.01%
                     # End of drawdown period
-                    drawdown_periods.append({
-                        "start_index": drawdown_start,
-                        "end_index": i - 1,
-                        "max_drawdown_pct": round(max_drawdown_in_period, 2)
-                    })
+                    drawdown_periods.append(
+                        {
+                            "start_index": drawdown_start,
+                            "end_index": i - 1,
+                            "max_drawdown_pct": round(max_drawdown_in_period, 2),
+                        }
+                    )
                 peak = equity
                 peak_index = i
                 in_drawdown = False
@@ -884,11 +932,13 @@ class BacktestExecutor:
 
         # Handle case where we end in a drawdown
         if in_drawdown and max_drawdown_in_period > 0.01:
-            drawdown_periods.append({
-                "start_index": drawdown_start,
-                "end_index": len(equity_curve) - 1,
-                "max_drawdown_pct": round(max_drawdown_in_period, 2)
-            })
+            drawdown_periods.append(
+                {
+                    "start_index": drawdown_start,
+                    "end_index": len(equity_curve) - 1,
+                    "max_drawdown_pct": round(max_drawdown_in_period, 2),
+                }
+            )
 
         return drawdown_periods
 
@@ -925,9 +975,7 @@ class BacktestExecutor:
         return round(expectancy, 2)
 
     def _calculate_buy_hold_return(
-        self,
-        candles: List[Dict[str, Any]],
-        initial_balance: float
+        self, candles: List[Dict[str, Any]], initial_balance: float
     ) -> tuple[float, List[float]]:
         """
         Calculate buy-and-hold benchmark return.
@@ -981,8 +1029,14 @@ class BacktestExecutor:
                     # Parse times if they're strings
                     if isinstance(entry_time, str):
                         entry_time = datetime.fromisoformat(entry_time.replace("Z", "+00:00"))
+                        # Normalize to timezone-naive for consistent comparisons
+                        if entry_time.tzinfo is not None:
+                            entry_time = entry_time.replace(tzinfo=None)
                     if isinstance(exit_time, str):
                         exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+                        # Normalize to timezone-naive for consistent comparisons
+                        if exit_time.tzinfo is not None:
+                            exit_time = exit_time.replace(tzinfo=None)
 
                     # Ensure both are datetime objects
                     if hasattr(entry_time, "timestamp") and hasattr(exit_time, "timestamp"):
@@ -1004,7 +1058,7 @@ class BacktestExecutor:
         initial_balance: float,
         final_balance: float,
         equity_curve: Optional[List[float]] = None,
-        candles: Optional[List[Dict[str, Any]]] = None
+        candles: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Calculate comprehensive backtest results summary."""
         # Handle empty trades case
@@ -1013,7 +1067,9 @@ class BacktestExecutor:
             equity_curve_dates = []
             if candles:
                 equity_curve_dates = [
-                    candle["time"].isoformat() if hasattr(candle["time"], "isoformat") else candle["time"]
+                    candle["time"].isoformat()
+                    if hasattr(candle["time"], "isoformat")
+                    else candle["time"]
                     for candle in candles
                 ]
 
@@ -1045,7 +1101,7 @@ class BacktestExecutor:
                 equity_curve_dates=equity_curve_dates if equity_curve_dates else None,
                 trade_counts_per_candle=[0] * len(candles) if candles else None,
                 drawdown_periods=None,
-                trades=[]
+                trades=[],
             ).model_dump()
 
         # Categorize trades
@@ -1104,7 +1160,9 @@ class BacktestExecutor:
         if len(equity_curve) >= 2:
             for i in range(1, len(equity_curve)):
                 if equity_curve[i - 1] > 0:
-                    daily_return = (equity_curve[i] - equity_curve[i - 1]) / equity_curve[i - 1] * 100
+                    daily_return = (
+                        (equity_curve[i] - equity_curve[i - 1]) / equity_curve[i - 1] * 100
+                    )
                     daily_returns.append(daily_return)
 
         # Calculate Sharpe and Sortino ratios
@@ -1115,7 +1173,9 @@ class BacktestExecutor:
         buy_hold_return = 0.0
         buy_hold_curve = [initial_balance]
         if candles and len(candles) >= 2:
-            buy_hold_return, buy_hold_curve = self._calculate_buy_hold_return(candles, initial_balance)
+            buy_hold_return, buy_hold_curve = self._calculate_buy_hold_return(
+                candles, initial_balance
+            )
 
         # Calculate strategy vs benchmark
         strategy_vs_benchmark = roi - buy_hold_return
@@ -1124,7 +1184,9 @@ class BacktestExecutor:
         equity_curve_dates = []
         if candles:
             equity_curve_dates = [
-                candle["time"].isoformat() if hasattr(candle["time"], "isoformat") else candle["time"]
+                candle["time"].isoformat()
+                if hasattr(candle["time"], "isoformat")
+                else candle["time"]
                 for candle in candles
             ]
 
@@ -1139,17 +1201,33 @@ class BacktestExecutor:
                     if isinstance(exit_time, str):
                         try:
                             exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+                            # Normalize to timezone-naive for consistent comparisons with candle times
+                            if exit_time.tzinfo is not None:
+                                exit_time = exit_time.replace(tzinfo=None)
                         except (ValueError, TypeError):
                             continue
+                    elif isinstance(exit_time, datetime):
+                        # Also normalize datetime objects that might have timezone info
+                        if exit_time.tzinfo is not None:
+                            exit_time = exit_time.replace(tzinfo=None)
 
                     # Find the closest candle index
                     for i, candle in enumerate(candles):
                         candle_time = candle["time"]
                         if isinstance(candle_time, str):
                             try:
-                                candle_time = datetime.fromisoformat(candle_time.replace("Z", "+00:00"))
+                                candle_time = datetime.fromisoformat(
+                                    candle_time.replace("Z", "+00:00")
+                                )
+                                # Normalize to timezone-naive for consistent comparisons
+                                if candle_time.tzinfo is not None:
+                                    candle_time = candle_time.replace(tzinfo=None)
                             except (ValueError, TypeError):
                                 continue
+                        elif isinstance(candle_time, datetime):
+                            # Also normalize datetime objects that might have timezone info
+                            if candle_time.tzinfo is not None:
+                                candle_time = candle_time.replace(tzinfo=None)
 
                         # Check if trade exit is at or before this candle
                         if hasattr(exit_time, "timestamp") and hasattr(candle_time, "timestamp"):
@@ -1189,12 +1267,14 @@ class BacktestExecutor:
             equity_curve_dates=equity_curve_dates if equity_curve_dates else None,
             trade_counts_per_candle=trade_counts_per_candle if trade_counts_per_candle else None,
             drawdown_periods=drawdown_periods if drawdown_periods else None,
-            trades=trades[-100:]  # Keep last 100 trades for detail view
+            trades=trades[-100:],  # Keep last 100 trades for detail view
         )
 
         return results.model_dump()
 
-    def _handle_cancellation(self, backtest_id: str, execution: BacktestExecution, trades: List[Dict]):
+    def _handle_cancellation(
+        self, backtest_id: str, execution: BacktestExecution, trades: List[Dict]
+    ):
         """Handle backtest cancellation."""
         if execution.keep_partial_on_cancel and trades:
             # Save partial results
@@ -1203,7 +1283,7 @@ class BacktestExecutor:
                 "candles_processed": execution.candles_processed,
                 "total_candles": execution.total_candles,
                 "trades": trades,
-                "trade_count": len(trades)
+                "trade_count": len(trades),
             }
             self._save_partial_results(backtest_id, partial_results)
 
@@ -1219,7 +1299,7 @@ class BacktestExecutor:
         status: str,
         started_at: Optional[datetime] = None,
         completed_at: Optional[datetime] = None,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
     ):
         """Update backtest status in database."""
         if not is_configured():
@@ -1255,7 +1335,7 @@ class BacktestExecutor:
         candles_processed: int = 0,
         total_candles: Optional[int] = None,
         trade_count: int = 0,
-        current_date: Optional[datetime] = None
+        current_date: Optional[datetime] = None,
     ):
         """Update backtest progress in database."""
         if not is_configured():
@@ -1269,13 +1349,15 @@ class BacktestExecutor:
             update_data = {
                 "progress_percentage": progress_percentage,
                 "candles_processed": candles_processed,
-                "trade_count": trade_count
+                "trade_count": trade_count,
             }
 
             if total_candles is not None:
                 update_data["total_candles"] = total_candles
             if current_date:
-                update_data["current_date_processed"] = current_date.isoformat() if hasattr(current_date, "isoformat") else current_date
+                update_data["current_date_processed"] = (
+                    current_date.isoformat() if hasattr(current_date, "isoformat") else current_date
+                )
 
             client.table("backtests").update(update_data).eq("id", backtest_id).execute()
 
@@ -1292,12 +1374,14 @@ class BacktestExecutor:
             return
 
         try:
-            client.table("backtests").update({
-                "status": "completed",
-                "progress_percentage": 100,
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-                "results": results
-            }).eq("id", backtest_id).execute()
+            client.table("backtests").update(
+                {
+                    "status": "completed",
+                    "progress_percentage": 100,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "results": results,
+                }
+            ).eq("id", backtest_id).execute()
 
         except Exception as e:
             logger.error(f"[BACKTEST_EXECUTOR] Error completing backtest: {e}")
@@ -1312,9 +1396,9 @@ class BacktestExecutor:
             return
 
         try:
-            client.table("backtests").update({
-                "partial_results": partial_results
-            }).eq("id", backtest_id).execute()
+            client.table("backtests").update({"partial_results": partial_results}).eq(
+                "id", backtest_id
+            ).execute()
 
         except Exception as e:
             logger.error(f"[BACKTEST_EXECUTOR] Error saving partial results: {e}")
