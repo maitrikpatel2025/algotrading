@@ -581,3 +581,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with drawdown duration analysis
     - When extending BacktestResultsSummary with new risk metrics
     - When troubleshooting risk analytics calculations in backtest_executor.py
+
+- app_docs/feature-96de4387-compare-backtest-results.md
+  - Conditions:
+    - When working with backtest comparison or side-by-side analysis
+    - When implementing or modifying BacktestComparison, ComparisonMetricsTable, ComparisonEquityCurve, ComparisonStatistics, ComparisonNotesEditor, or ComparisonExportDialog components
+    - When working with multi-select mode in BacktestLibrary
+    - When working with /api/backtests/compare or /api/backtests/compare/export endpoints
+    - When implementing statistical significance testing for backtests
+    - When working with comparison_service.py or bootstrap resampling
+    - When implementing best value highlighting for metrics
+    - When troubleshooting comparison export or notes persistence issues
+    - When extending backtest comparison with new metrics or visualizations
