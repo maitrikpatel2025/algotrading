@@ -293,7 +293,6 @@ def calculate_statistical_significance(
             continue
 
         best_bt = backtests[best_idx]
-        best_value = values[best_idx]
 
         # Perform statistical test if we have trade data
         p_value = None
