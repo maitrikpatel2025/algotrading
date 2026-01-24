@@ -24,6 +24,7 @@ import { cn } from '../lib/utils';
 import endPoints from '../app/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Toast from '../components/Toast';
+import BacktestConfigurationDialog from '../components/BacktestConfigurationDialog';
 
 /**
  * BacktestLibrary Page
@@ -81,6 +82,11 @@ function BacktestLibrary() {
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false });
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
+  // Configuration dialog state
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [editingBacktest, setEditingBacktest] = useState(null);
+  const [strategies, setStrategies] = useState([]);
+
   // Load backtests
   const loadBacktests = useCallback(async () => {
     try {
@@ -95,9 +101,22 @@ function BacktestLibrary() {
     }
   }, []);
 
+  // Load strategies for configuration dialog
+  const loadStrategies = useCallback(async () => {
+    try {
+      const result = await endPoints.listStrategiesExtended();
+      if (result.success) {
+        setStrategies(result.strategies || []);
+      }
+    } catch (error) {
+      console.error('Error loading strategies:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadBacktests();
-  }, [loadBacktests]);
+    loadStrategies();
+  }, [loadBacktests, loadStrategies]);
 
   // Poll for updates if any backtest is running
   useEffect(() => {
@@ -122,11 +141,20 @@ function BacktestLibrary() {
 
   // Navigation handlers
   const handleNewBacktest = () => {
-    navigate('/backtests/new');
+    setEditingBacktest(null);
+    setConfigDialogOpen(true);
   };
 
   const handleEditBacktest = (id) => {
-    navigate(`/backtests/${id}/edit`);
+    // When clicking a backtest card, navigate to dashboard
+    navigate(`/backtests/${id}`);
+  };
+
+  const handleEditConfiguration = (backtest, e) => {
+    if (e) e.stopPropagation();
+    setEditingBacktest(backtest);
+    setConfigDialogOpen(true);
+    setOpenMenuId(null);
   };
 
   // Backtest actions
@@ -177,6 +205,44 @@ function BacktestLibrary() {
       showToast('Failed to delete backtest', 'error');
     }
     setConfirmDialog({ isOpen: false });
+  };
+
+  // Handle save configuration from dialog
+  const handleSaveConfig = async (backtestData) => {
+    try {
+      const result = await endPoints.saveBacktest(backtestData);
+
+      if (result.success) {
+        showToast('Backtest saved');
+        setConfigDialogOpen(false);
+        loadBacktests();
+      } else {
+        showToast(result.error || 'Failed to save backtest', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving backtest:', error);
+      showToast('Failed to save backtest', 'error');
+    }
+  };
+
+  // Handle save and run from dialog
+  const handleSaveAndRun = async (backtestData) => {
+    try {
+      const result = await endPoints.saveBacktest(backtestData);
+
+      if (result.success) {
+        showToast('Backtest saved');
+        setConfigDialogOpen(false);
+        // Navigate to dashboard page
+        const backtestId = result.backtest?.id || backtestData.id;
+        navigate(`/backtests/${backtestId}`);
+      } else {
+        showToast(result.error || 'Failed to save backtest', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving backtest:', error);
+      showToast('Failed to save backtest', 'error');
+    }
   };
 
   // Filter and sort backtests
@@ -375,11 +441,11 @@ function BacktestLibrary() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button
-                              onClick={() => handleEditBacktest(backtest.id)}
+                              onClick={(e) => handleEditConfiguration(backtest, e)}
                               className="w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2"
                             >
                               <Edit2 className="h-4 w-4" />
-                              Edit
+                              Edit Configuration
                             </button>
                             <button
                               onClick={() => handleDuplicate(backtest)}
@@ -509,6 +575,16 @@ function BacktestLibrary() {
             onClose={() => setToast({ ...toast, show: false })}
           />
         )}
+
+        {/* Configuration Dialog */}
+        <BacktestConfigurationDialog
+          isOpen={configDialogOpen}
+          onClose={() => setConfigDialogOpen(false)}
+          onSave={handleSaveConfig}
+          onSaveAndRun={handleSaveAndRun}
+          editingBacktest={editingBacktest}
+          strategies={strategies}
+        />
       </div>
     </div>
   );

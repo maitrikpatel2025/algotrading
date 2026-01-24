@@ -6,7 +6,7 @@ import Monitor from './pages/Monitor';
 import Strategy from './pages/Strategy';
 import StrategyLibrary from './pages/StrategyLibrary';
 import BacktestLibrary from './pages/BacktestLibrary';
-import BacktestConfiguration from './pages/BacktestConfiguration';
+import BacktestDashboard from './pages/BacktestDashboard';
 import Account from './pages/Account';
 
 /**
@@ -17,10 +17,9 @@ import Account from './pages/Account';
  */
 function AppLayout({ children }) {
   const location = useLocation();
-  // Hide footer on builder/configuration pages for more workspace
+  // Hide footer on builder pages for more workspace
+  // Backtest configuration is now in dialogs, so only hide footer for strategy builder
   const isBuilderPage = (location.pathname.includes('/strategies/') &&
-    (location.pathname.includes('/edit') || location.pathname.includes('/new'))) ||
-    (location.pathname.includes('/backtests/') &&
     (location.pathname.includes('/edit') || location.pathname.includes('/new')));
 
   return (
@@ -46,10 +45,9 @@ function App() {
           <Route path="/strategies/:id/edit" element={<Strategy />} />
           {/* Legacy route redirect */}
           <Route path="/strategy" element={<Navigate to="/strategies" replace />} />
-          {/* Backtests - Library and Configuration */}
+          {/* Backtests - Library and Dashboard */}
           <Route path="/backtests" element={<BacktestLibrary />} />
-          <Route path="/backtests/new" element={<BacktestConfiguration />} />
-          <Route path="/backtests/:id/edit" element={<BacktestConfiguration />} />
+          <Route path="/backtests/:id" element={<BacktestDashboard />} />
           {/* Other pages */}
           <Route path="/monitor" element={<Monitor />} />
           <Route path="/account" element={<Account />} />
