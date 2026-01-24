@@ -593,3 +593,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing best value highlighting for metrics
     - When troubleshooting comparison export or notes persistence issues
     - When extending backtest comparison with new metrics or visualizations
+
+- app_docs/feature-7d5b1074-backtest-validation-service.md
+  - Conditions:
+    - When working with backtest configuration validation or input validation
+    - When implementing or modifying backtest_validation.py service
+    - When working with real-time validation feedback in backtest configuration UI
+    - When implementing validation API endpoints for backtests
+    - When working with risk warnings or high-risk setting detection
+    - When implementing data availability checks for backtests
+    - When calculating estimated backtest execution duration
+    - When validating date ranges, stop loss/take profit settings, or leverage limits
+    - When troubleshooting backtest configuration validation errors or warnings
+    - When extending validation rules or adding new validation functions
