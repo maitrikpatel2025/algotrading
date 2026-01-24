@@ -5,10 +5,7 @@ Tests for Backtest Validation Service
 
 from datetime import datetime, timedelta
 
-import pytest
-
 from core.backtest_validation import (
-    ValidationResult,
     calculate_estimated_duration,
     check_data_availability,
     get_risk_warnings,
@@ -237,7 +234,8 @@ def test_validate_configuration_valid():
 
 def test_validate_configuration_invalid_balance():
     """Test validation rejects invalid balance."""
-    config = BacktestConfig(
+    # Use model_construct to bypass Pydantic validation and test the validation service
+    config = BacktestConfig.model_construct(
         name="Test",
         start_date=datetime(2024, 1, 1),
         end_date=datetime(2024, 12, 31),
@@ -245,6 +243,7 @@ def test_validate_configuration_invalid_balance():
         risk_management=RiskManagementConfig(
             stop_loss=StopLossConfig(type="fixed_pips", value=20)
         ),
+        position_sizing=PositionSizingConfig(),
     )
     result = validate_configuration(config)
     assert result.valid is False

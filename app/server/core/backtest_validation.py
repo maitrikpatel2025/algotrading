@@ -194,7 +194,8 @@ def calculate_estimated_duration(
         # Add base overhead (5 seconds for setup and teardown)
         estimated_seconds += 5
 
-        return int(estimated_seconds)
+        # Ensure we return at least 6 seconds to avoid edge cases
+        return max(6, int(estimated_seconds))
     except Exception as e:
         logger.error(f"Failed to estimate duration: {e}")
         return None
