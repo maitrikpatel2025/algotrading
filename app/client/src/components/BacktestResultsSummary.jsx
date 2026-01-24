@@ -10,9 +10,11 @@ import {
   BarChart3,
   List,
   Download,
+  Crosshair,
 } from 'lucide-react';
 import MetricCard from './MetricCard';
 import EquityCurveChart from './EquityCurveChart';
+import PriceChart from './PriceChart';
 import BacktestTradeList from './BacktestTradeList';
 import TradeFilterControls from './TradeFilterControls';
 import {
@@ -39,12 +41,15 @@ import {
  */
 function BacktestResultsSummary({
   results,
+  backtest = null,
+  priceData = null,
   initialBalance = 10000,
   onClose,
   className,
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isTradeListExpanded, setIsTradeListExpanded] = useState(false);
+  const [showTradesOnChart, setShowTradesOnChart] = useState(false);
   const tradeListRef = useRef(null);
 
   // Trade list state
@@ -107,7 +112,31 @@ function BacktestResultsSummary({
       setHighlightedTrade({
         ...trade,
         tradeNumber,
+        id: trade.id || `trade-${tradeNumber}`,
       });
+    }
+  };
+
+  const handleTradeMarkerClickFromChart = (trade) => {
+    // Find the trade number (index + 1) from the trade ID
+    const tradeIndex = allTrades.findIndex(t => t.id === trade.id || t === trade);
+    const tradeNumber = tradeIndex >= 0 ? tradeIndex + 1 : null;
+
+    if (tradeNumber) {
+      setSelectedTradeId(tradeNumber);
+      setHighlightedTrade({
+        ...trade,
+        tradeNumber,
+        id: trade.id || `trade-${tradeNumber}`,
+      });
+
+      // Expand trade list if collapsed
+      setIsTradeListExpanded(true);
+
+      // Scroll to trade in list after expansion
+      setTimeout(() => {
+        tradeListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   };
 
@@ -259,6 +288,54 @@ function BacktestResultsSummary({
               highlightedTrade={highlightedTrade}
             />
           </div>
+
+          {/* Price Chart with Trade Markers */}
+          {priceData && backtest && (
+            <div className="bg-white border border-neutral-200 rounded-md p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Crosshair className="h-4 w-4 text-neutral-500" />
+                  <h4 className="text-sm font-semibold text-neutral-900">
+                    Price Chart
+                  </h4>
+                  <span className="text-xs text-neutral-500">
+                    {backtest.pair} • {backtest.timeframe}
+                  </span>
+                </div>
+
+                {/* Show Trades Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={showTradesOnChart}
+                    onChange={(e) => setShowTradesOnChart(e.target.checked)}
+                    className="w-4 h-4 rounded border-neutral-300 text-primary focus:ring-primary focus:ring-offset-0 transition-colors"
+                  />
+                  <span className="text-sm text-neutral-700 group-hover:text-neutral-900 transition-colors">
+                    Show Trades on Chart
+                  </span>
+                  <Target className="h-3.5 w-3.5 text-neutral-500 group-hover:text-primary transition-colors" />
+                </label>
+              </div>
+
+              <PriceChart
+                priceData={priceData}
+                selectedPair={backtest.pair}
+                selectedGranularity={backtest.timeframe}
+                selectedCount={priceData?.time?.length || 100}
+                chartType="candlestick"
+                showVolume={false}
+                loading={false}
+                activeIndicators={[]}
+                activePatterns={[]}
+                drawings={[]}
+                trades={showTradesOnChart ? displayedTrades : []}
+                showTrades={showTradesOnChart}
+                onTradeMarkerClick={handleTradeMarkerClickFromChart}
+                highlightedTradeId={highlightedTrade?.id}
+              />
+            </div>
+          )}
 
           {/* Two Column Stats Grid */}
           <div className="grid md:grid-cols-2 gap-6">

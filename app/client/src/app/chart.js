@@ -692,6 +692,234 @@ function createPatternMarkers(mainSeries, chartData, patterns) {
 }
 
 /**
+ * Create trade markers for entry and exit points
+ * @param {Object} mainSeries - Lightweight Charts main series instance
+ * @param {Object} chartData - Chart data with time, OHLC arrays
+ * @param {Array} trades - Array of trade objects
+ * @param {Function} onTradeClick - Optional callback when marker is clicked
+ * @param {string} highlightedTradeId - Optional trade ID to highlight
+ */
+function createTradeMarkers(mainSeries, chartData, trades, onTradeClick = null, highlightedTradeId = null) {
+  // Edge case: No trades or empty array
+  if (!trades || trades.length === 0) {
+    console.log('createTradeMarkers: No trades to display');
+    return;
+  }
+
+  // Edge case: No chart data
+  if (!chartData || !chartData.time || chartData.time.length === 0) {
+    console.warn('createTradeMarkers: No chart data available');
+    return;
+  }
+
+  console.log(`createTradeMarkers called with ${trades.length} trades`);
+
+  // Performance optimization: Limit to 200 markers (100 trades) to prevent slowdown
+  const MAX_TRADES = 100;
+  let tradesToRender = trades;
+
+  if (trades.length > MAX_TRADES) {
+    console.warn(`createTradeMarkers: ${trades.length} trades exceed limit of ${MAX_TRADES}. Showing first ${MAX_TRADES} trades. Apply filters to see specific trades.`);
+    tradesToRender = trades.slice(0, MAX_TRADES);
+  }
+
+  const markers = [];
+  const chartStartTime = parseTimeToUnix(chartData.time[0]);
+  const chartEndTime = parseTimeToUnix(chartData.time[chartData.time.length - 1]);
+
+  tradesToRender.forEach((trade, index) => {
+    // Edge case: Skip trades with missing required data
+    if (!trade.entry_time || !trade.exit_time || !trade.type) {
+      console.warn(`Trade ${index + 1} missing required fields:`, trade);
+      return;
+    }
+
+    const tradeEntryTime = parseTimeToUnix(trade.entry_time);
+    const tradeExitTime = parseTimeToUnix(trade.exit_time);
+
+    // Edge case: Skip trades outside chart time range
+    if (tradeExitTime < chartStartTime || tradeEntryTime > chartEndTime) {
+      console.warn(`Trade ${index + 1} outside chart time range`);
+      return;
+    }
+
+    const isHighlighted = highlightedTradeId && trade.id === highlightedTradeId;
+
+    // Create entry marker
+    const entryIdx = chartData.time.findIndex(t => {
+      const chartTime = parseTimeToUnix(t);
+      // Increased tolerance to 300 seconds (5 minutes) for better matching
+      return Math.abs(chartTime - tradeEntryTime) < 300;
+    });
+
+    if (entryIdx >= 0 && entryIdx < chartData.time.length) {
+      const entryTimestamp = parseTimeToUnix(chartData.time[entryIdx]);
+      if (!isNaN(entryTimestamp)) {
+        const isLong = trade.type.toLowerCase() === 'long';
+        const entryColor = isLong ? CHART_COLORS.bullish : CHART_COLORS.bearish;
+        const entryPrice = trade.entry_price !== undefined && trade.entry_price !== null
+          ? `$${trade.entry_price.toFixed(5)}`
+          : 'N/A';
+
+        markers.push({
+          time: entryTimestamp,
+          position: isLong ? 'belowBar' : 'aboveBar',
+          color: entryColor,
+          shape: isLong ? 'arrowUp' : 'arrowDown',
+          text: `${trade.type} @ ${entryPrice}`,
+          size: isHighlighted ? 1.5 : 1,
+          id: `${trade.id || `trade-${index}`}_entry`,
+        });
+      }
+    } else {
+      console.warn(`Entry time not found in chart data for trade ${index + 1}`);
+    }
+
+    // Create exit marker
+    const exitIdx = chartData.time.findIndex(t => {
+      const chartTime = parseTimeToUnix(t);
+      // Increased tolerance to 300 seconds (5 minutes) for better matching
+      return Math.abs(chartTime - tradeExitTime) < 300;
+    });
+
+    if (exitIdx >= 0 && exitIdx < chartData.time.length) {
+      const exitTimestamp = parseTimeToUnix(chartData.time[exitIdx]);
+      if (!isNaN(exitTimestamp)) {
+        const isLong = trade.type.toLowerCase() === 'long';
+        // Edge case: Handle null/undefined P/L
+        const pnl = trade.pnl !== undefined && trade.pnl !== null ? trade.pnl : 0;
+        const exitColor = pnl >= 0 ? CHART_COLORS.bullish : CHART_COLORS.bearish;
+        const exitReason = trade.exit_reason || 'Unknown';
+
+        // Format P/L with sign
+        const pnlText = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
+
+        markers.push({
+          time: exitTimestamp,
+          position: isLong ? 'aboveBar' : 'belowBar',
+          color: exitColor,
+          shape: isLong ? 'arrowDown' : 'arrowUp',
+          text: `${pnlText} (${exitReason})`,
+          size: isHighlighted ? 1.5 : 1,
+          id: `${trade.id || `trade-${index}`}_exit`,
+        });
+      }
+    } else {
+      console.warn(`Exit time not found in chart data for trade ${index + 1}`);
+    }
+  });
+
+  console.log(`Generated ${markers.length} trade markers for chart (from ${tradesToRender.length} trades)`);
+
+  if (markers.length > 0) {
+    // Sort markers by time
+    markers.sort((a, b) => a.time - b.time);
+
+    // Apply markers using createSeriesMarkers
+    createSeriesMarkers(mainSeries, markers);
+    console.log('Trade markers successfully set on chart');
+  } else {
+    console.warn('No markers were created from trades. Check that trade timestamps match chart data range.');
+  }
+}
+
+/**
+ * Create trade lines connecting entry to exit
+ * @param {Object} chart - Lightweight Charts instance
+ * @param {Array} trades - Array of trade objects
+ * @param {Object} chartData - Chart data with time arrays
+ * @returns {Array} Array of created line series for cleanup
+ */
+function createTradeLines(chart, trades, chartData) {
+  // Edge case: No trades or chart
+  if (!trades || trades.length === 0) {
+    console.log('createTradeLines: No trades to display');
+    return [];
+  }
+
+  if (!chartData || !chartData.time || chartData.time.length === 0) {
+    console.warn('createTradeLines: No chart data available');
+    return [];
+  }
+
+  // Performance optimization: Match marker limit (100 trades = 100 lines)
+  const MAX_TRADES = 100;
+  const tradesToRender = trades.length > MAX_TRADES ? trades.slice(0, MAX_TRADES) : trades;
+
+  const lineSeriesArray = [];
+
+  tradesToRender.forEach((trade, index) => {
+    // Edge case: Skip trades with missing required data
+    if (!trade.entry_time || !trade.exit_time) {
+      console.warn(`Trade ${index + 1} missing entry_time or exit_time`);
+      return;
+    }
+
+    // Edge case: Handle missing or invalid prices
+    if (trade.entry_price === undefined || trade.entry_price === null ||
+        trade.exit_price === undefined || trade.exit_price === null) {
+      console.warn(`Trade ${index + 1} missing entry_price or exit_price, skipping line`);
+      return;
+    }
+
+    const tradeEntryTime = parseTimeToUnix(trade.entry_time);
+    const tradeExitTime = parseTimeToUnix(trade.exit_time);
+
+    // Find timestamps for entry and exit
+    const entryIdx = chartData.time.findIndex(t => {
+      const chartTime = parseTimeToUnix(t);
+      // Increased tolerance to 300 seconds (5 minutes) for better matching
+      return Math.abs(chartTime - tradeEntryTime) < 300;
+    });
+
+    const exitIdx = chartData.time.findIndex(t => {
+      const chartTime = parseTimeToUnix(t);
+      // Increased tolerance to 300 seconds (5 minutes) for better matching
+      return Math.abs(chartTime - tradeExitTime) < 300;
+    });
+
+    if (entryIdx < 0 || exitIdx < 0) {
+      return;
+    }
+
+    const entryTimestamp = parseTimeToUnix(chartData.time[entryIdx]);
+    const exitTimestamp = parseTimeToUnix(chartData.time[exitIdx]);
+
+    if (isNaN(entryTimestamp) || isNaN(exitTimestamp)) {
+      return;
+    }
+
+    // Edge case: Handle null/undefined P/L
+    const pnl = trade.pnl !== undefined && trade.pnl !== null ? trade.pnl : 0;
+    const lineColor = pnl >= 0 ? CHART_COLORS.bullish : CHART_COLORS.bearish;
+
+    try {
+      // Create a line series for this trade
+      const tradeLine = chart.addSeries(LineSeries, {
+        color: lineColor,
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+
+      // Set the line data (two points: entry and exit)
+      tradeLine.setData([
+        { time: entryTimestamp, value: trade.entry_price },
+        { time: exitTimestamp, value: trade.exit_price },
+      ]);
+
+      lineSeriesArray.push(tradeLine);
+    } catch (error) {
+      console.error(`Error creating line for trade ${index + 1}:`, error);
+    }
+  });
+
+  console.log(`Created ${lineSeriesArray.length} trade lines (from ${tradesToRender.length} trades)`);
+  return lineSeriesArray;
+}
+
+/**
  * Create drawing price lines for horizontal lines
  */
 function createDrawings(mainSeries, drawings, conditionDrawingIds = []) {
@@ -728,9 +956,9 @@ function createDrawings(mainSeries, drawings, conditionDrawingIds = []) {
 }
 
 /**
- * Draw the chart with support for multiple chart types, volume, indicators, patterns, and drawings
+ * Draw the chart with support for multiple chart types, volume, indicators, patterns, drawings, and trades
  */
-export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = [], drawings = [], conditionDrawingIds = []) {
+export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = [], drawings = [], conditionDrawingIds = [], trades = [], showTrades = false, onTradeClick = null, highlightedTradeId = null) {
   const container = document.getElementById(divName);
   if (!container) {
     console.error(`Chart container ${divName} not found`);
@@ -892,6 +1120,15 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
   if (activePatterns && activePatterns.length > 0) {
     console.log(`Rendering ${activePatterns.length} pattern(s) on chart`);
     createPatternMarkers(mainSeries, chartData, activePatterns);
+  }
+
+  // Add trade markers and lines
+  if (showTrades && trades && trades.length > 0) {
+    console.log(`Rendering ${trades.length} trade(s) on chart`);
+    createTradeMarkers(mainSeries, chartData, trades, onTradeClick, highlightedTradeId);
+    const tradeLines = createTradeLines(chart, trades, chartData);
+    // Store trade lines for potential cleanup
+    chartSeries.tradeLines = tradeLines;
   }
 
   // Add drawings (horizontal lines)

@@ -359,3 +359,69 @@ export function calculateTotalPages(totalTrades, pageSize) {
   if (pageSize === 0 || totalTrades === 0) return 1;
   return Math.ceil(totalTrades / pageSize);
 }
+
+/**
+ * Find the closest time index in chart data for a target timestamp
+ * Used to map trade timestamps to chart candle indices for marker placement
+ * @param {Array} chartTimes - Array of chart timestamps (Unix seconds or ISO strings)
+ * @param {string} targetTime - ISO date string target time
+ * @returns {number} Index of closest time in array, or -1 if no valid match
+ */
+export function findClosestTimeIndex(chartTimes, targetTime) {
+  if (!chartTimes || !Array.isArray(chartTimes) || chartTimes.length === 0) {
+    return -1;
+  }
+
+  if (!targetTime) {
+    return -1;
+  }
+
+  try {
+    // Convert target to Unix timestamp (seconds)
+    const targetTimestamp = new Date(targetTime).getTime() / 1000;
+
+    if (isNaN(targetTimestamp)) {
+      return -1;
+    }
+
+    let closestIndex = -1;
+    let smallestDiff = Infinity;
+
+    for (let i = 0; i < chartTimes.length; i++) {
+      const chartTime = chartTimes[i];
+
+      // Convert chart time to Unix timestamp if it's not already
+      let chartTimestamp;
+      if (typeof chartTime === 'string') {
+        chartTimestamp = new Date(chartTime).getTime() / 1000;
+      } else if (typeof chartTime === 'object' && chartTime.time !== undefined) {
+        // Handle lightweight-charts data format {time: ..., value: ...}
+        chartTimestamp = typeof chartTime.time === 'string'
+          ? new Date(chartTime.time).getTime() / 1000
+          : chartTime.time;
+      } else {
+        // Assume it's already a Unix timestamp
+        chartTimestamp = chartTime;
+      }
+
+      const diff = Math.abs(chartTimestamp - targetTimestamp);
+
+      if (diff < smallestDiff) {
+        smallestDiff = diff;
+        closestIndex = i;
+      }
+    }
+
+    // Only return index if within reasonable threshold (1 day = 86400 seconds)
+    // This prevents matching to times that are too far away
+    const MAX_THRESHOLD = 86400;
+    if (smallestDiff <= MAX_THRESHOLD) {
+      return closestIndex;
+    }
+
+    return -1;
+  } catch (error) {
+    console.warn('findClosestTimeIndex error:', error);
+    return -1;
+  }
+}
