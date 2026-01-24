@@ -12,6 +12,7 @@ So that I can evaluate which strategy variation performs best
 
 - At least 2 completed backtests exist in the library with results
 - If not available, create and run backtests before testing comparison
+- At least one strategy must exist in the database for creating new backtests
 
 ## Test Steps
 
@@ -25,27 +26,66 @@ So that I can evaluate which strategy variation performs best
 7. **Verify** page header shows "Backtests"
 8. **Verify** backtests are displayed in the library
 
+### Data Setup: Ensure 2+ Completed Backtests Exist
+
+> **Note:** These steps ensure the prerequisite of having at least 2 completed backtests is met before testing the comparison feature.
+
+9. Count the number of completed backtests in the library (look for cards without "pending" or "running" status indicators)
+10. Take a screenshot showing the current backtest count
+11. If fewer than 2 completed backtests exist, perform the following data setup:
+
+    **Create First Additional Backtest (if needed):**
+    - Click "New Backtest" or "+" button in the header
+    - Wait for the backtest configuration dialog to appear
+    - Take a screenshot of the dialog
+    - Enter a name: "E2E Test Backtest 1"
+    - Select an available strategy from the dropdown
+    - Set a date range (e.g., last 30 days or any valid range)
+    - Set initial balance to a reasonable value (e.g., 10000)
+    - Click "Save and Run" or "Run Backtest" button
+    - Wait for the backtest to start running
+    - Take a screenshot showing backtest is running
+    - Wait for backtest to complete (status changes to completed) - this may take 30-60 seconds
+    - Take a screenshot showing backtest completed
+
+12. If still fewer than 2 completed backtests exist after step 11:
+
+    **Create Second Additional Backtest (if needed):**
+    - Click "New Backtest" or "+" button in the header
+    - Wait for the backtest configuration dialog to appear
+    - Enter a name: "E2E Test Backtest 2"
+    - Select an available strategy from the dropdown (can be same or different)
+    - Set a different date range from the first backtest
+    - Set initial balance to a reasonable value (e.g., 10000)
+    - Click "Save and Run" or "Run Backtest" button
+    - Wait for the backtest to complete
+    - Take a screenshot showing second backtest completed
+
+13. **Verify** at least 2 completed backtests now exist in the library
+14. Take a screenshot showing the library with 2+ completed backtests
+15. **CRITICAL:** If the "Select for Compare" button is still not visible after data setup, fail the test with message: "Prerequisite not met: Need at least 2 completed backtests to test comparison feature. Ensure strategies exist in the database for creating backtests."
+
 ### Multi-Select Mode Testing
 
-9. **Verify** "Select for Compare" button is visible in the header
-10. Click "Select for Compare" button
-11. Take a screenshot showing selection mode activated
-12. **Verify** selection mode is active (checkboxes visible on completed backtest cards)
-13. **Verify** "Cancel" button is visible to exit selection mode
-14. **Verify** selection count shows "0 selected"
+16. **Verify** "Select for Compare" button is visible in the header
+17. Click "Select for Compare" button
+18. Take a screenshot showing selection mode activated
+19. **Verify** selection mode is active (checkboxes visible on completed backtest cards)
+20. **Verify** "Cancel" button is visible to exit selection mode
+21. **Verify** selection count shows "0 selected"
 
-15. Click on a completed backtest card to select it
-16. **Verify** checkbox becomes checked
-17. **Verify** selection count updates to "1 selected"
-18. **Verify** "Compare Selected" button is disabled (need 2-4)
-19. Take a screenshot showing one backtest selected
+22. Click on a completed backtest card to select it
+23. **Verify** checkbox becomes checked
+24. **Verify** selection count updates to "1 selected"
+25. **Verify** "Compare Selected" button is disabled (need 2-4)
+26. Take a screenshot showing one backtest selected
 
-20. Select a second completed backtest
-21. **Verify** selection count updates to "2 selected"
-22. **Verify** "Compare Selected" button becomes enabled
-23. Take a screenshot showing two backtests selected with compare button enabled
+27. Select a second completed backtest
+28. **Verify** selection count updates to "2 selected"
+29. **Verify** "Compare Selected" button becomes enabled
+30. Take a screenshot showing two backtests selected with compare button enabled
 
-24. If more than 4 completed backtests exist:
+31. If more than 4 completed backtests exist:
     - Select a third backtest
     - **Verify** selection count updates to "3 selected"
     - Select a fourth backtest
@@ -57,22 +97,22 @@ So that I can evaluate which strategy variation performs best
     - Deselect one backtest to have 4 selected
     - Take a screenshot showing 4 selected
 
-25. With 2-4 backtests selected, click "Compare Selected" button
-26. Wait for navigation
-27. Take a screenshot of the comparison page loading
-28. **Verify** URL changed to `/backtests/compare?ids=id1,id2,...`
+32. With 2-4 backtests selected, click "Compare Selected" button
+33. Wait for navigation
+34. Take a screenshot of the comparison page loading
+35. **Verify** URL changed to `/backtests/compare?ids=id1,id2,...`
 
 ### Comparison Page Header Testing
 
-29. **Verify** comparison page header is visible with backtest names
-30. **Verify** "Back to Library" button is present
-31. Take a screenshot of the comparison page header
+36. **Verify** comparison page header is visible with backtest names
+37. **Verify** "Back to Library" button is present
+38. Take a screenshot of the comparison page header
 
 ### Comparison Metrics Table Testing
 
-32. Locate the Comparison Metrics Table section
-33. **Verify** table header shows each backtest name as column
-34. **Verify** metrics rows include:
+39. Locate the Comparison Metrics Table section
+40. **Verify** table header shows each backtest name as column
+41. **Verify** metrics rows include:
     - Total Net Profit
     - ROI
     - Final Balance
@@ -82,129 +122,129 @@ So that I can evaluate which strategy variation performs best
     - Sharpe Ratio
     - Sortino Ratio
     - Max Drawdown
-35. Take a screenshot of the metrics table
+42. Take a screenshot of the metrics table
 
-36. **Verify** best value in each row is highlighted (green background/bold)
-37. **Verify** highlighting logic is correct:
+43. **Verify** best value in each row is highlighted (green background/bold)
+44. **Verify** highlighting logic is correct:
     - Higher is better: ROI, Win Rate, Profit Factor, Sharpe Ratio
     - Lower is better: Max Drawdown
-38. Take a screenshot showing best value highlighting
+45. Take a screenshot showing best value highlighting
 
-39. Hover over a metric name
-40. **Verify** tooltip shows metric description
-41. Take a screenshot showing metric tooltip
+46. Hover over a metric name
+47. **Verify** tooltip shows metric description
+48. Take a screenshot showing metric tooltip
 
 ### Comparison Equity Curve Testing
 
-42. Locate the Comparison Equity Curves section
-43. **Verify** chart container is visible
-44. **Verify** legend shows all backtest names with distinct colors:
+49. Locate the Comparison Equity Curves section
+50. **Verify** chart container is visible
+51. **Verify** legend shows all backtest names with distinct colors:
     - Backtest 1: Blue (#3b82f6)
     - Backtest 2: Orange (#f97316)
     - Backtest 3: Purple (#8b5cf6) if applicable
     - Backtest 4: Green (#22c55e) if applicable
-45. Take a screenshot of the equity curves chart
+52. Take a screenshot of the equity curves chart
 
-46. **Verify** chart supports zoom (mouse wheel)
-47. **Verify** chart supports pan (click and drag)
-48. Hover over the chart
-49. **Verify** crosshair tooltip shows date and balance for each backtest
-50. Take a screenshot showing crosshair tooltip with all values
+53. **Verify** chart supports zoom (mouse wheel)
+54. **Verify** chart supports pan (click and drag)
+55. Hover over the chart
+56. **Verify** crosshair tooltip shows date and balance for each backtest
+57. Take a screenshot showing crosshair tooltip with all values
 
-51. Locate show/hide toggle buttons for each backtest
-52. Click to hide one backtest's curve
-53. **Verify** that backtest's curve is no longer visible on chart
-54. Click to show it again
-55. **Verify** curve reappears
-56. Take a screenshot showing toggle functionality
+58. Locate show/hide toggle buttons for each backtest
+59. Click to hide one backtest's curve
+60. **Verify** that backtest's curve is no longer visible on chart
+61. Click to show it again
+62. **Verify** curve reappears
+63. Take a screenshot showing toggle functionality
 
-57. Locate "Normalize" toggle if present
-58. Click to enable normalized view (percentage return)
-59. **Verify** Y-axis changes to show percentage return starting at 0%
-60. Take a screenshot showing normalized view
+64. Locate "Normalize" toggle if present
+65. Click to enable normalized view (percentage return)
+66. **Verify** Y-axis changes to show percentage return starting at 0%
+67. Take a screenshot showing normalized view
 
 ### Statistical Significance Testing
 
-61. Locate the Statistical Significance section
-62. **Verify** section header "Statistical Significance" is visible
-63. **Verify** for each key metric with significant difference:
+68. Locate the Statistical Significance section
+69. **Verify** section header "Statistical Significance" is visible
+70. **Verify** for each key metric with significant difference:
     - Metric name is displayed
     - P-value is shown
     - Significance indicator (green checkmark or yellow warning)
     - Interpretation text is displayed
-64. Take a screenshot of statistical significance section
+71. Take a screenshot of statistical significance section
 
-65. Locate "Methodology" expandable section
-66. Click to expand
-67. **Verify** explanation of statistical tests is visible
-68. Take a screenshot of methodology explanation
+72. Locate "Methodology" expandable section
+73. Click to expand
+74. **Verify** explanation of statistical tests is visible
+75. Take a screenshot of methodology explanation
 
 ### Comparison Notes Editor Testing
 
-69. Locate the Comparison Notes Editor section
-70. **Verify** section header "Comparison Notes" is visible
-71. **Verify** textarea for notes is present
-72. **Verify** character counter is visible (shows X/2000)
-73. Take a screenshot of notes editor
+76. Locate the Comparison Notes Editor section
+77. **Verify** section header "Comparison Notes" is visible
+78. **Verify** textarea for notes is present
+79. **Verify** character counter is visible (shows X/2000)
+80. Take a screenshot of notes editor
 
-74. Enter text in the notes textarea: "Test comparison notes for E2E testing"
-75. **Verify** character counter updates
-76. Wait 3 seconds for auto-save debounce
-77. Take a screenshot showing notes entered
+81. Enter text in the notes textarea: "Test comparison notes for E2E testing"
+82. **Verify** character counter updates
+83. Wait 3 seconds for auto-save debounce
+84. Take a screenshot showing notes entered
 
-78. Refresh the page
-79. **Verify** notes are still present (persisted in localStorage)
-80. Take a screenshot showing notes persistence
+85. Refresh the page
+86. **Verify** notes are still present (persisted in localStorage)
+87. Take a screenshot showing notes persistence
 
 ### Export Functionality Testing
 
-81. Locate the Export button(s)
-82. **Verify** export options include CSV, JSON, PDF
-83. Take a screenshot showing export options
+88. Locate the Export button(s)
+89. **Verify** export options include CSV, JSON, PDF
+90. Take a screenshot showing export options
 
-84. Click on CSV export button
-85. **Verify** file download is triggered OR export dialog opens
-86. If dialog opens:
+91. Click on CSV export button
+92. **Verify** file download is triggered OR export dialog opens
+93. If dialog opens:
     - **Verify** format selection (CSV, JSON, PDF) is present
     - **Verify** "Include comparison notes" checkbox is present
     - **Verify** preview of export content is shown
-87. Take a screenshot of export dialog or download confirmation
+94. Take a screenshot of export dialog or download confirmation
 
-88. Click on JSON export
-89. **Verify** JSON export is triggered
-90. Take a screenshot
+95. Click on JSON export
+96. **Verify** JSON export is triggered
+97. Take a screenshot
 
-91. Click on PDF export
-92. **Verify** PDF export is triggered
-93. Take a screenshot
+98. Click on PDF export
+99. **Verify** PDF export is triggered
+100. Take a screenshot
 
 ### Navigation and Error Handling Testing
 
-94. Click "Back to Library" button
-95. **Verify** navigation returns to `/backtests`
-96. **Verify** selection mode is no longer active
-97. Take a screenshot of library after returning
+101. Click "Back to Library" button
+102. **Verify** navigation returns to `/backtests`
+103. **Verify** selection mode is no longer active
+104. Take a screenshot of library after returning
 
-98. Navigate directly to `/backtests/compare` without query params
-99. **Verify** error state is shown OR redirect to library
-100. Take a screenshot of error handling
+105. Navigate directly to `/backtests/compare` without query params
+106. **Verify** error state is shown OR redirect to library
+107. Take a screenshot of error handling
 
-101. Navigate to `/backtests/compare?ids=invalid-id-1,invalid-id-2`
-102. **Verify** appropriate error message is shown for invalid IDs
-103. Take a screenshot of invalid ID error handling
+108. Navigate to `/backtests/compare?ids=invalid-id-1,invalid-id-2`
+109. **Verify** appropriate error message is shown for invalid IDs
+110. Take a screenshot of invalid ID error handling
 
 ### Edge Case Testing
 
-104. Navigate back to library
-105. Enter selection mode
-106. Select a pending (not completed) backtest if one exists
-107. **Verify** pending backtests cannot be selected OR show appropriate message
-108. Take a screenshot
+111. Navigate back to library
+112. Enter selection mode
+113. Select a pending (not completed) backtest if one exists
+114. **Verify** pending backtests cannot be selected OR show appropriate message
+115. Take a screenshot
 
-109. If only one completed backtest exists:
+116. If only one completed backtest exists:
     - **Verify** cannot compare with only 1 backtest
     - **Verify** helpful message is shown
-110. Take a screenshot of single backtest case
+117. Take a screenshot of single backtest case
 
 ## Success Criteria
 
