@@ -58,6 +58,11 @@ function PriceChart({
   conditions = [],
   drawingError = null,
   onDrawingErrorClear,
+  // Trade props
+  trades = [],
+  showTrades = false,
+  onTradeMarkerClick = null,
+  highlightedTradeId = null,
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
@@ -94,6 +99,13 @@ function PriceChart({
     }
   }, []);
 
+  // Trade marker click handler
+  const handleTradeMarkerClick = useCallback((trade) => {
+    if (onTradeMarkerClick && trade) {
+      onTradeMarkerClick(trade);
+    }
+  }, [onTradeMarkerClick]);
+
   // Draw chart and set up zoom event listener
   useEffect(() => {
     if (priceData && !loading) {
@@ -112,7 +124,7 @@ function PriceChart({
         }
       }
 
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns, drawings, conditionDrawingIds);
+      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns, drawings, conditionDrawingIds, trades, showTrades, handleTradeMarkerClick, highlightedTradeId);
 
       // Get chart element reference
       const chartElement = document.getElementById('chartDiv');
@@ -153,7 +165,7 @@ function PriceChart({
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode, drawings, conditionDrawingIds]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode, drawings, conditionDrawingIds, trades, showTrades, handleTradeMarkerClick, highlightedTradeId]);
 
   // Keyboard navigation with focus management
   useEffect(() => {
