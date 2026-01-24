@@ -49,7 +49,9 @@ const response = (resp) => resp.data;
 const requests = {
     get: (url) => axios.get(url).then(response),
     post: (url, data) => axios.post(url, data).then(response),
-    delete: (url) => axios.delete(url).then(response)
+    put: (url, data) => axios.put(url, data).then(response),
+    delete: (url) => axios.delete(url).then(response),
+    download: (url) => axios.get(url, { responseType: 'blob' })
 }
 
 const endPoints = {
@@ -92,7 +94,48 @@ const endPoints = {
         requests.post(`/backtests/${id}/run`, { keep_partial_on_cancel: keepPartialOnCancel }),
     getBacktestProgress: (id) => requests.get(`/backtests/${id}/progress`),
     cancelBacktest: (id, keepPartialResults = false) =>
-        requests.post(`/backtests/${id}/cancel`, { keep_partial_results: keepPartialResults })
+        requests.post(`/backtests/${id}/cancel`, { keep_partial_results: keepPartialResults }),
+    // Backtest notes and export endpoints
+    updateBacktestNotes: (id, notes) => requests.put(`/backtests/${id}/notes`, { notes }),
+    exportBacktestCSV: async (id) => {
+        const response = await requests.download(`/backtests/${id}/export/csv`);
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = response.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] || `backtest_${id}.csv`;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    },
+    exportBacktestJSON: async (id) => {
+        const response = await requests.download(`/backtests/${id}/export/json`);
+        const blob = new Blob([response.data], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = response.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] || `backtest_${id}.json`;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    },
+    exportBacktestPDF: async (id) => {
+        const response = await requests.download(`/backtests/${id}/export/pdf`);
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = response.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] || `backtest_${id}.pdf`;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    }
 }
 
 export default endPoints;

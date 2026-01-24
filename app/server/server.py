@@ -1403,6 +1403,222 @@ async def cancel_backtest(backtest_id: str, request: CancelBacktestRequest = Non
         )
 
 
+@app.put(
+    "/api/backtests/{backtest_id}/notes",
+    summary="Update backtest notes",
+    tags=["Backtest Management"],
+)
+async def update_backtest_notes(backtest_id: str, request: dict):
+    """
+    Update notes for a backtest.
+
+    Args:
+        backtest_id: The backtest ID to update
+        request: JSON body with 'notes' field
+
+    Returns:
+        Updated backtest configuration
+    """
+    try:
+        logger.info(f"[BACKTEST] Update notes for backtest ID: {backtest_id}")
+
+        notes = request.get("notes", "")
+
+        success, backtest, error = backtest_service.update_notes(backtest_id, notes)
+
+        if success and backtest:
+            logger.info(f"[SUCCESS] Notes updated for backtest: {backtest_id}")
+            return LoadBacktestResponse(success=True, backtest=backtest)
+        else:
+            logger.warning(f"[WARNING] Failed to update notes: {error}")
+            return LoadBacktestResponse(success=False, error=error)
+
+    except Exception as e:
+        logger.error(f"[ERROR] Update notes failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return LoadBacktestResponse(success=False, error=str(e))
+
+
+@app.get(
+    "/api/backtests/{backtest_id}/export/csv",
+    summary="Export backtest results as CSV",
+    tags=["Backtest Export"],
+)
+async def export_backtest_csv(backtest_id: str):
+    """
+    Export backtest results as CSV file.
+
+    Args:
+        backtest_id: The backtest ID to export
+
+    Returns:
+        CSV file download
+    """
+    try:
+        logger.info(f"[BACKTEST] Export CSV for backtest ID: {backtest_id}")
+
+        # Get backtest and results
+        success, backtest, results_dict, error = backtest_service.get_backtest_with_results(
+            backtest_id
+        )
+
+        if not success or not backtest:
+            raise HTTPException(status_code=404, detail=error or "Backtest not found")
+
+        if not results_dict:
+            raise HTTPException(status_code=400, detail="Backtest has no results to export")
+
+        # Parse results into BacktestResultsSummary
+        from core.data_models import BacktestResultsSummary
+        from utils.export_generators import generate_csv_export
+
+        results = BacktestResultsSummary(**results_dict)
+
+        # Generate CSV
+        csv_content = generate_csv_export(results, backtest)
+
+        # Return as downloadable file
+        from fastapi.responses import Response
+
+        filename = f"{backtest.name.replace(' ', '_')}.csv"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "text/csv",
+        }
+
+        logger.info(f"[SUCCESS] CSV export generated for backtest: {backtest_id}")
+        return Response(content=csv_content, headers=headers, media_type="text/csv")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] CSV export failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/backtests/{backtest_id}/export/json",
+    summary="Export backtest results as JSON",
+    tags=["Backtest Export"],
+)
+async def export_backtest_json(backtest_id: str):
+    """
+    Export backtest results as JSON file.
+
+    Args:
+        backtest_id: The backtest ID to export
+
+    Returns:
+        JSON file download
+    """
+    try:
+        logger.info(f"[BACKTEST] Export JSON for backtest ID: {backtest_id}")
+
+        # Get backtest and results
+        success, backtest, results_dict, error = backtest_service.get_backtest_with_results(
+            backtest_id
+        )
+
+        if not success or not backtest:
+            raise HTTPException(status_code=404, detail=error or "Backtest not found")
+
+        if not results_dict:
+            raise HTTPException(status_code=400, detail="Backtest has no results to export")
+
+        # Parse results into BacktestResultsSummary
+        from core.data_models import BacktestResultsSummary
+        from utils.export_generators import generate_json_export
+
+        results = BacktestResultsSummary(**results_dict)
+
+        # Generate JSON
+        json_content = generate_json_export(results, backtest)
+
+        # Return as downloadable file
+        import json
+
+        from fastapi.responses import Response
+
+        filename = f"{backtest.name.replace(' ', '_')}.json"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/json",
+        }
+
+        logger.info(f"[SUCCESS] JSON export generated for backtest: {backtest_id}")
+        return Response(
+            content=json.dumps(json_content, indent=2),
+            headers=headers,
+            media_type="application/json",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] JSON export failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/backtests/{backtest_id}/export/pdf",
+    summary="Export backtest results as PDF",
+    tags=["Backtest Export"],
+)
+async def export_backtest_pdf(backtest_id: str):
+    """
+    Export backtest results as PDF file.
+
+    Args:
+        backtest_id: The backtest ID to export
+
+    Returns:
+        PDF file download
+    """
+    try:
+        logger.info(f"[BACKTEST] Export PDF for backtest ID: {backtest_id}")
+
+        # Get backtest and results
+        success, backtest, results_dict, error = backtest_service.get_backtest_with_results(
+            backtest_id
+        )
+
+        if not success or not backtest:
+            raise HTTPException(status_code=404, detail=error or "Backtest not found")
+
+        if not results_dict:
+            raise HTTPException(status_code=400, detail="Backtest has no results to export")
+
+        # Parse results into BacktestResultsSummary
+        from core.data_models import BacktestResultsSummary
+        from utils.export_generators import generate_pdf_export
+
+        results = BacktestResultsSummary(**results_dict)
+
+        # Generate PDF
+        pdf_bytes = generate_pdf_export(results, backtest)
+
+        # Return as downloadable file
+        from fastapi.responses import Response
+
+        filename = f"{backtest.name.replace(' ', '_')}.pdf"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/pdf",
+        }
+
+        logger.info(f"[SUCCESS] PDF export generated for backtest: {backtest_id}")
+        return Response(content=pdf_bytes, headers=headers, media_type="application/pdf")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] PDF export failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # Entry Point
 # =============================================================================
