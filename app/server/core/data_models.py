@@ -974,3 +974,21 @@ class BacktestResultsSummary(BaseModel):
 
     # Trade list for detailed view
     trades: List[Dict[str, Any]] = Field(default=[], description="List of all trades")
+
+    # Time period performance metrics
+    monthly_performance: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Monthly performance breakdown: [{month: 'YYYY-MM', trades: int, win_rate: float, net_pnl: float, is_best: bool, is_worst: bool}]",
+    )
+    day_of_week_performance: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Day of week performance: [{day: 0-6, day_name: str, trades: int, win_rate: float, net_pnl: float, is_best: bool, is_worst: bool}]",
+    )
+    hourly_performance: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Hourly performance: [{hour: 0-23, trades: int, win_rate: float, net_pnl: float, is_best: bool, is_worst: bool}]",
+    )
+    day_hour_heatmap: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Day-hour heatmap data: [{day: 0-6, hour: 0-23, net_pnl: float, trades: int}]",
+    )

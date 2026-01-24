@@ -19,6 +19,7 @@ import BacktestTradeList from './BacktestTradeList';
 import TradeFilterControls from './TradeFilterControls';
 import BacktestNotesEditor from './BacktestNotesEditor';
 import BacktestExportDialog from './BacktestExportDialog';
+import PerformanceByTimePeriod from './PerformanceByTimePeriod';
 import {
   METRIC_DEFINITIONS,
   getMetricTrend,
@@ -461,6 +462,16 @@ function BacktestResultsSummary({
               </div>
             </div>
           </div>
+
+          {/* Performance by Time Period */}
+          <PerformanceByTimePeriod
+            monthlyPerformance={results.monthly_performance}
+            dayOfWeekPerformance={results.day_of_week_performance}
+            hourlyPerformance={results.hourly_performance}
+            dayHourHeatmap={results.day_hour_heatmap}
+            backtestName={results.strategy_name || 'backtest'}
+            currency="$"
+          />
 
           {/* Backtest Notes Editor */}
           {backtest && (

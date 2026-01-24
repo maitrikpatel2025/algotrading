@@ -169,7 +169,53 @@ def generate_csv_export(
     writer.writerow(["Notes", backtest_config.notes or "N/A"])
     writer.writerow([])
 
-    # Section 5: Trade List
+    # Section 5: Time Period Analysis - Monthly
+    if backtest_result.monthly_performance:
+        writer.writerow(["TIME PERIOD ANALYSIS - MONTHLY"])
+        writer.writerow(["Month", "# Trades", "Win Rate (%)", "Net P/L", "Is Best", "Is Worst"])
+        for row in backtest_result.monthly_performance:
+            writer.writerow([
+                row.get("month", ""),
+                row.get("trades", 0),
+                f"{row.get('win_rate', 0):.1f}",
+                format_currency(row.get("net_pnl", 0), backtest_config.currency),
+                "Yes" if row.get("is_best") else "No",
+                "Yes" if row.get("is_worst") else "No",
+            ])
+        writer.writerow([])
+
+    # Section 6: Time Period Analysis - Day of Week
+    if backtest_result.day_of_week_performance:
+        writer.writerow(["TIME PERIOD ANALYSIS - DAY OF WEEK"])
+        writer.writerow(["Day", "Day Name", "# Trades", "Win Rate (%)", "Net P/L", "Is Best", "Is Worst"])
+        for row in backtest_result.day_of_week_performance:
+            writer.writerow([
+                row.get("day", ""),
+                row.get("day_name", ""),
+                row.get("trades", 0),
+                f"{row.get('win_rate', 0):.1f}",
+                format_currency(row.get("net_pnl", 0), backtest_config.currency),
+                "Yes" if row.get("is_best") else "No",
+                "Yes" if row.get("is_worst") else "No",
+            ])
+        writer.writerow([])
+
+    # Section 7: Time Period Analysis - Hourly
+    if backtest_result.hourly_performance:
+        writer.writerow(["TIME PERIOD ANALYSIS - HOURLY"])
+        writer.writerow(["Hour", "# Trades", "Win Rate (%)", "Net P/L", "Is Best", "Is Worst"])
+        for row in backtest_result.hourly_performance:
+            writer.writerow([
+                f"{row.get('hour', 0):02d}:00",
+                row.get("trades", 0),
+                f"{row.get('win_rate', 0):.1f}",
+                format_currency(row.get("net_pnl", 0), backtest_config.currency),
+                "Yes" if row.get("is_best") else "No",
+                "Yes" if row.get("is_worst") else "No",
+            ])
+        writer.writerow([])
+
+    # Section 8: Trade List
     if backtest_result.trades:
         writer.writerow(["TRADE LIST"])
         # Get headers from first trade
@@ -282,6 +328,12 @@ def generate_json_export(
                 "equity_curve": backtest_result.equity_curve,
                 "buy_hold_curve": backtest_result.buy_hold_curve,
                 "equity_curve_dates": backtest_result.equity_curve_dates,
+            },
+            "time_period_analysis": {
+                "monthly_performance": backtest_result.monthly_performance,
+                "day_of_week_performance": backtest_result.day_of_week_performance,
+                "hourly_performance": backtest_result.hourly_performance,
+                "day_hour_heatmap": backtest_result.day_hour_heatmap,
             },
         },
         "trades": backtest_result.trades,

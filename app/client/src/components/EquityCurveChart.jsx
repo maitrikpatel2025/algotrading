@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart } from 'lightweight-charts';
+import { createChart, AreaSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
 import { Download, Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -109,7 +109,7 @@ function EquityCurveChart({
     const finalEquity = equityCurve[equityCurve.length - 1];
     const isProfit = finalEquity >= initialBalance;
 
-    const equitySeries = chart.addSeries('Area', {
+    const equitySeries = chart.addSeries(AreaSeries, {
       topColor: isProfit ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)',
       bottomColor: isProfit ? 'rgba(34, 197, 94, 0.02)' : 'rgba(239, 68, 68, 0.02)',
       lineColor: isProfit ? '#22c55e' : '#ef4444',
@@ -134,7 +134,7 @@ function EquityCurveChart({
         return { time, value };
       });
 
-      const buyHoldSeries = chart.addSeries('Line', {
+      const buyHoldSeries = chart.addSeries(LineSeries, {
         color: '#9ca3af',
         lineWidth: 2,
         lineStyle: 2, // Dashed
@@ -232,9 +232,9 @@ function EquityCurveChart({
       }
     }
 
-    // Set all markers at once using setMarkers (v5 API)
+    // Set all markers at once using createSeriesMarkers (v5 API)
     if (markers.length > 0) {
-      equitySeries.setMarkers(markers);
+      createSeriesMarkers(equitySeries, markers);
     }
 
     // Fit content initially

@@ -551,3 +551,13 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting export file downloads or content-type headers
     - When implementing auto-save functionality for backtest notes
     - When extending backtest results with persistent annotations
+
+- app_docs/feature-6499043a-view-performance-by-time-period.md
+  - Conditions:
+    - When working with time-based performance analysis or temporal trading patterns
+    - When implementing or modifying PerformanceByTimePeriod, MonthlyPerformanceTable, DayOfWeekHeatmap, or HourlyPerformanceChart components
+    - When working with monthly, daily, or hourly trade aggregation
+    - When implementing heatmap visualizations for trading data
+    - When working with best/worst period highlighting in backtest results
+    - When extending backtest results with time period metrics
+    - When troubleshooting time period calculations or _calculate_time_period_metrics method

@@ -425,3 +425,240 @@ export function findClosestTimeIndex(chartTimes, targetTime) {
     return -1;
   }
 }
+
+/**
+ * Day of week names array (Monday = 0, Sunday = 6)
+ */
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/**
+ * Short day of week names
+ */
+const DAY_NAMES_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/**
+ * Get day name from day index (0-6)
+ * @param {number} dayIndex - Day of week (0=Monday, 6=Sunday)
+ * @param {boolean} short - Use short format
+ * @returns {string} Day name
+ */
+export function getDayName(dayIndex, short = false) {
+  if (dayIndex < 0 || dayIndex > 6) return 'Unknown';
+  return short ? DAY_NAMES_SHORT[dayIndex] : DAY_NAMES[dayIndex];
+}
+
+/**
+ * Format month string (YYYY-MM) to readable format
+ * @param {string} monthStr - Month string in YYYY-MM format
+ * @returns {string} Formatted month (e.g., "Jan 2024")
+ */
+export function formatMonthLabel(monthStr) {
+  if (!monthStr || typeof monthStr !== 'string') return 'N/A';
+
+  try {
+    const [year, month] = monthStr.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthIndex = parseInt(month, 10) - 1;
+
+    if (monthIndex < 0 || monthIndex > 11) return monthStr;
+
+    return `${monthNames[monthIndex]} ${year}`;
+  } catch (error) {
+    return monthStr;
+  }
+}
+
+/**
+ * Get color for P/L value based on min/max range
+ * Returns HSL color string with green for profit, red for loss
+ * @param {number} pnl - Profit/loss value
+ * @param {number} minPnl - Minimum P/L in dataset
+ * @param {number} maxPnl - Maximum P/L in dataset
+ * @param {number} opacity - Color opacity (0-1)
+ * @returns {string} HSL color string
+ */
+export function getColorForPnL(pnl, minPnl, maxPnl, opacity = 1) {
+  // Handle edge cases
+  if (minPnl === maxPnl) {
+    if (pnl > 0) return `hsla(142, 71%, 45%, ${opacity})`; // Green
+    if (pnl < 0) return `hsla(0, 84%, 60%, ${opacity})`; // Red
+    return `hsla(220, 9%, 46%, ${opacity})`; // Neutral gray
+  }
+
+  if (pnl === 0) {
+    return `hsla(220, 9%, 46%, ${opacity})`; // Neutral gray
+  }
+
+  // Calculate intensity based on position in range
+  if (pnl > 0) {
+    // Green range: hue 142 (green), saturation and lightness based on intensity
+    const intensity = maxPnl > 0 ? Math.min(pnl / maxPnl, 1) : 0;
+    const saturation = 50 + intensity * 21; // 50-71%
+    const lightness = 60 - intensity * 15; // 60-45%
+    return `hsla(142, ${saturation}%, ${lightness}%, ${opacity})`;
+  } else {
+    // Red range: hue 0 (red), saturation and lightness based on intensity
+    const intensity = minPnl < 0 ? Math.min(Math.abs(pnl) / Math.abs(minPnl), 1) : 0;
+    const saturation = 60 + intensity * 24; // 60-84%
+    const lightness = 70 - intensity * 10; // 70-60%
+    return `hsla(0, ${saturation}%, ${lightness}%, ${opacity})`;
+  }
+}
+
+/**
+ * Get CSS class for P/L value highlighting
+ * @param {number} pnl - Profit/loss value
+ * @returns {string} CSS class name
+ */
+export function getPnLColorClass(pnl) {
+  if (pnl > 0) return 'text-green-500';
+  if (pnl < 0) return 'text-red-500';
+  return 'text-gray-500';
+}
+
+/**
+ * Export time period breakdown data to CSV
+ * @param {Array} monthlyData - Monthly performance data
+ * @param {Array} dayOfWeekData - Day of week performance data
+ * @param {Array} hourlyData - Hourly performance data
+ * @param {string} backtestName - Name for the CSV file
+ */
+export function exportTimePeriodDataToCSV(monthlyData, dayOfWeekData, hourlyData, backtestName = 'backtest') {
+  const lines = [];
+
+  // Monthly section
+  lines.push('TIME PERIOD ANALYSIS - MONTHLY');
+  lines.push('Month,# Trades,Win Rate (%),Net P/L ($),Is Best,Is Worst');
+
+  if (monthlyData && Array.isArray(monthlyData)) {
+    monthlyData.forEach(row => {
+      lines.push([
+        formatMonthLabel(row.month),
+        row.trades,
+        row.win_rate.toFixed(1),
+        row.net_pnl.toFixed(2),
+        row.is_best ? 'Yes' : 'No',
+        row.is_worst ? 'Yes' : 'No'
+      ].map(cell => escapeCSVCellInternal(cell)).join(','));
+    });
+  }
+
+  lines.push(''); // Empty line separator
+
+  // Day of week section
+  lines.push('TIME PERIOD ANALYSIS - DAY OF WEEK');
+  lines.push('Day,Day Name,# Trades,Win Rate (%),Net P/L ($),Is Best,Is Worst');
+
+  if (dayOfWeekData && Array.isArray(dayOfWeekData)) {
+    dayOfWeekData.forEach(row => {
+      lines.push([
+        row.day,
+        row.day_name,
+        row.trades,
+        row.win_rate.toFixed(1),
+        row.net_pnl.toFixed(2),
+        row.is_best ? 'Yes' : 'No',
+        row.is_worst ? 'Yes' : 'No'
+      ].map(cell => escapeCSVCellInternal(cell)).join(','));
+    });
+  }
+
+  lines.push(''); // Empty line separator
+
+  // Hourly section
+  lines.push('TIME PERIOD ANALYSIS - HOURLY');
+  lines.push('Hour,# Trades,Win Rate (%),Net P/L ($),Is Best,Is Worst');
+
+  if (hourlyData && Array.isArray(hourlyData)) {
+    hourlyData.forEach(row => {
+      lines.push([
+        `${row.hour}:00`,
+        row.trades,
+        row.win_rate.toFixed(1),
+        row.net_pnl.toFixed(2),
+        row.is_best ? 'Yes' : 'No',
+        row.is_worst ? 'Yes' : 'No'
+      ].map(cell => escapeCSVCellInternal(cell)).join(','));
+    });
+  }
+
+  const csvContent = lines.join('\n');
+
+  // Create blob and download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${sanitizeFilenameInternal(backtestName)}_time_period_analysis.csv`);
+  link.style.visibility = 'hidden';
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Internal CSV cell escape function
+ * @param {string|number} cell - Cell value
+ * @returns {string} Escaped cell value
+ */
+function escapeCSVCellInternal(cell) {
+  if (cell === null || cell === undefined) return '';
+
+  const cellStr = String(cell);
+
+  if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+    return `"${cellStr.replace(/"/g, '""')}"`;
+  }
+
+  return cellStr;
+}
+
+/**
+ * Internal filename sanitization function
+ * @param {string} filename - Original filename
+ * @returns {string} Sanitized filename
+ */
+function sanitizeFilenameInternal(filename) {
+  return filename
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .substring(0, 50);
+}
+
+/**
+ * Format hour for display (24-hour format with padding)
+ * @param {number} hour - Hour (0-23)
+ * @returns {string} Formatted hour (e.g., "09:00")
+ */
+export function formatHour(hour) {
+  if (hour < 0 || hour > 23) return 'N/A';
+  return `${hour.toString().padStart(2, '0')}:00`;
+}
+
+/**
+ * Calculate min and max P/L from a dataset
+ * @param {Array} data - Array of objects with net_pnl field
+ * @returns {Object} {minPnl, maxPnl}
+ */
+export function calculatePnLRange(data) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return { minPnl: 0, maxPnl: 0 };
+  }
+
+  const pnlValues = data
+    .filter(item => item && typeof item.net_pnl === 'number')
+    .map(item => item.net_pnl);
+
+  if (pnlValues.length === 0) {
+    return { minPnl: 0, maxPnl: 0 };
+  }
+
+  return {
+    minPnl: Math.min(...pnlValues),
+    maxPnl: Math.max(...pnlValues)
+  };
+}
