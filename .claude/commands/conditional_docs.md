@@ -512,3 +512,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing format detection for list vs dictionary condition data
     - When working with StrategyCondition model or strategy persistence formats
     - When migrating condition data structures or handling mixed condition formats
+
+- app_docs/feature-c3ba5521-backtest-config-dialog-ux.md
+  - Conditions:
+    - When working with backtest configuration UI or dialog-based UX patterns
+    - When implementing or modifying BacktestConfigurationDialog component
+    - When working with BacktestDashboard page or backtest execution dashboard
+    - When implementing or modifying BacktestLibrary dialog integration
+    - When working with backtest configuration workflows (new backtest, edit backtest)
+    - When troubleshooting backtest dialog state management or save handlers
+    - When implementing dialog-based configuration patterns for other features
+    - When working with backtest routing or navigation patterns
+    - When understanding the separation between configuration (dialog) and execution (dashboard) UX
