@@ -1,4 +1,4 @@
-import { createChart, ColorType, CrosshairMode, LineStyle, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries, createSeriesMarkers } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode, LineStyle, createSeriesMarkers } from 'lightweight-charts';
 import {
   calculateSMA,
   calculateEMA,
@@ -256,7 +256,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
       case 'sma': {
         const smaValues = calculateSMA(closes, params.period || 20);
         const smaData = convertToLineData(chartData, smaValues);
-        const smaSeries = chart.addSeries(LineSeries, {
+        const smaSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -271,7 +271,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
       case 'ema': {
         const emaValues = calculateEMA(closes, params.period || 20);
         const emaData = convertToLineData(chartData, emaValues);
-        const emaSeries = chart.addSeries(LineSeries, {
+        const emaSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -288,7 +288,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
 
         // Upper band
         const upperData = convertToLineData(chartData, bb.upper);
-        const upperSeries = chart.addSeries(LineSeries, {
+        const upperSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -300,7 +300,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
 
         // Middle band
         const middleData = convertToLineData(chartData, bb.middle);
-        const middleSeries = chart.addSeries(LineSeries, {
+        const middleSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -312,7 +312,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
 
         // Lower band
         const lowerData = convertToLineData(chartData, bb.lower);
-        const lowerSeries = chart.addSeries(LineSeries, {
+        const lowerSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -330,7 +330,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
 
         // Upper channel
         const upperData = convertToLineData(chartData, kc.upper);
-        const upperSeries = chart.addSeries(LineSeries, {
+        const upperSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -342,7 +342,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
 
         // Middle channel
         const middleData = convertToLineData(chartData, kc.middle);
-        const middleSeries = chart.addSeries(LineSeries, {
+        const middleSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -354,7 +354,7 @@ function createOverlayIndicators(chart, chartData, indicators) {
 
         // Lower channel
         const lowerData = convertToLineData(chartData, kc.lower);
-        const lowerSeries = chart.addSeries(LineSeries, {
+        const lowerSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -396,7 +396,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
       case 'rsi': {
         const rsiValues = calculateRSI(closes, params.period || 14);
         const rsiData = convertToLineData(chartData, rsiValues);
-        const rsiSeries = chart.addSeries(LineSeries, {
+        const rsiSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -435,7 +435,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
             }
           }
         }
-        const histSeries = chart.addSeries(HistogramSeries, {
+        const histSeries = chart.addHistogramSeries({
           priceScaleId: priceScaleId,
           lastValueVisible: false,
           priceLineVisible: false,
@@ -444,7 +444,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
 
         // MACD Line
         const macdData = convertToLineData(chartData, macd.macd);
-        const macdSeries = chart.addSeries(LineSeries, {
+        const macdSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -456,7 +456,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
 
         // Signal Line
         const signalData = convertToLineData(chartData, macd.signal);
-        const signalSeries = chart.addSeries(LineSeries, {
+        const signalSeries = chart.addLineSeries({
           color: '#EF4444',
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -476,7 +476,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
         const stoch = calculateStochastic(highs, lows, closes, params.kPeriod || 14, params.dPeriod || 3);
 
         const kData = convertToLineData(chartData, stoch.k);
-        const kSeries = chart.addSeries(LineSeries, {
+        const kSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -487,7 +487,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
         kSeries.setData(kData);
 
         const dData = convertToLineData(chartData, stoch.d);
-        const dSeries = chart.addSeries(LineSeries, {
+        const dSeries = chart.addLineSeries({
           color: '#EF4444',
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -507,7 +507,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
       case 'cci': {
         const cciValues = calculateCCI(highs, lows, closes, params.period || 20);
         const cciData = convertToLineData(chartData, cciValues);
-        const cciSeries = chart.addSeries(LineSeries, {
+        const cciSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -525,7 +525,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
       case 'williams_r': {
         const wrValues = calculateWilliamsR(highs, lows, closes, params.period || 14);
         const wrData = convertToLineData(chartData, wrValues);
-        const wrSeries = chart.addSeries(LineSeries, {
+        const wrSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -545,7 +545,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
         const adx = calculateADX(highs, lows, closes, params.period || 14);
 
         const adxData = convertToLineData(chartData, adx.adx);
-        const adxSeries = chart.addSeries(LineSeries, {
+        const adxSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -556,7 +556,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
         adxSeries.setData(adxData);
 
         const plusDIData = convertToLineData(chartData, adx.plusDI);
-        const plusDISeries = chart.addSeries(LineSeries, {
+        const plusDISeries = chart.addLineSeries({
           color: '#22C55E',
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -567,7 +567,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
         plusDISeries.setData(plusDIData);
 
         const minusDIData = convertToLineData(chartData, adx.minusDI);
-        const minusDISeries = chart.addSeries(LineSeries, {
+        const minusDISeries = chart.addLineSeries({
           color: '#EF4444',
           lineWidth: lineWidth * 0.67,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -586,7 +586,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
       case 'atr': {
         const atrValues = calculateATR(highs, lows, closes, params.period || 14);
         const atrData = convertToLineData(chartData, atrValues);
-        const atrSeries = chart.addSeries(LineSeries, {
+        const atrSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -604,7 +604,7 @@ function createSubchartIndicators(chart, chartData, indicators) {
       case 'obv': {
         const obvValues = calculateOBV(closes, chartData.volume, highs, lows);
         const obvData = convertToLineData(chartData, obvValues);
-        const obvSeries = chart.addSeries(LineSeries, {
+        const obvSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: lineWidth,
           lineStyle: isPreview ? LineStyle.Dashed : getLineStyle(indicator.lineStyle),
@@ -895,7 +895,7 @@ function createTradeLines(chart, trades, chartData) {
 
     try {
       // Create a line series for this trade
-      const tradeLine = chart.addSeries(LineSeries, {
+      const tradeLine = chart.addLineSeries({
         color: lineColor,
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
@@ -1033,7 +1033,7 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
   switch (chartType) {
     case 'ohlc':
       // Lightweight Charts uses candlestick with different styling for OHLC
-      mainSeries = chart.addSeries(CandlestickSeries, {
+      mainSeries = chart.addCandlestickSeries({
         upColor: 'transparent',
         downColor: 'transparent',
         borderUpColor: CHART_COLORS.bullish,
@@ -1044,7 +1044,7 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
       mainSeries.setData(ohlcData);
       break;
     case 'line':
-      mainSeries = chart.addSeries(LineSeries, {
+      mainSeries = chart.addLineSeries({
         color: CHART_COLORS.line,
         lineWidth: 2,
         lastValueVisible: true,
@@ -1055,7 +1055,7 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
       mainSeries.setData(lineData);
       break;
     case 'area':
-      mainSeries = chart.addSeries(AreaSeries, {
+      mainSeries = chart.addAreaSeries({
         topColor: CHART_COLORS.line,
         bottomColor: CHART_COLORS.areaFill,
         lineColor: CHART_COLORS.line,
@@ -1069,7 +1069,7 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
       break;
     case 'candlestick':
     default:
-      mainSeries = chart.addSeries(CandlestickSeries, {
+      mainSeries = chart.addCandlestickSeries({
         upColor: CHART_COLORS.bullish,
         downColor: CHART_COLORS.bearish,
         borderUpColor: CHART_COLORS.bullish,
@@ -1086,7 +1086,7 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
   // Add volume if enabled
   if (showVolume) {
     const volumeData = convertToVolumeData(chartData);
-    const volumeSeries = chart.addSeries(HistogramSeries, {
+    const volumeSeries = chart.addHistogramSeries({
       priceFormat: {
         type: 'volume',
       },
