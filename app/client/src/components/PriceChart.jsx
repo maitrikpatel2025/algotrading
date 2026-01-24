@@ -58,6 +58,11 @@ function PriceChart({
   conditions = [],
   drawingError = null,
   onDrawingErrorClear,
+  // Trade marker props
+  trades = null,
+  tradesVisible = true,
+  tradesFilter = 'all',
+  onTradeMarkerClick = null,
 }) {
   const chartRef = useRef(null);
   const [visibleCandleCount, setVisibleCandleCount] = useState(null);
@@ -112,7 +117,7 @@ function PriceChart({
         }
       }
 
-      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns, drawings, conditionDrawingIds);
+      drawChart(priceData, selectedPair, selectedGranularity, 'chartDiv', chartType, showVolume, indicatorsToRender, activePatterns, drawings, conditionDrawingIds, trades, tradesVisible, tradesFilter, onTradeMarkerClick);
 
       // Get chart element reference
       const chartElement = document.getElementById('chartDiv');
@@ -153,7 +158,7 @@ function PriceChart({
         };
       }
     }
-  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode, drawings, conditionDrawingIds]);
+  }, [priceData, selectedPair, selectedGranularity, chartType, showVolume, loading, activeIndicators, activePatterns, onIndicatorClick, previewIndicator, comparisonMode, drawings, conditionDrawingIds, trades, tradesVisible, tradesFilter, onTradeMarkerClick]);
 
   // Keyboard navigation with focus management
   useEffect(() => {

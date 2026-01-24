@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useImperativeHandle } from 'react';
 import { cn } from '../lib/utils';
 import {
   ChevronUp,
@@ -27,7 +27,7 @@ import {
  * - Pagination controls
  * - Empty state handling
  */
-function BacktestTradeList({
+const BacktestTradeList = React.forwardRef(function BacktestTradeList({
   trades = [],
   onTradeClick,
   selectedTradeId = null,
@@ -39,7 +39,24 @@ function BacktestTradeList({
   onPageChange,
   onPageSizeChange,
   currency = '$',
-}) {
+}, ref) {
+  // Refs for scrolling to specific trade rows
+  const tradeRowRefs = useRef({});
+
+  // Expose scrollToTrade method via ref
+  useImperativeHandle(ref, () => ({
+    scrollToTrade: (tradeNumber) => {
+      const rowElement = tradeRowRefs.current[tradeNumber];
+      if (rowElement) {
+        rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add temporary flash animation
+        rowElement.classList.add('animate-pulse');
+        setTimeout(() => {
+          rowElement.classList.remove('animate-pulse');
+        }, 1000);
+      }
+    },
+  }));
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -241,6 +258,11 @@ function BacktestTradeList({
               return (
                 <tr
                   key={trade.id || tradeNumber}
+                  ref={(el) => {
+                    if (el) {
+                      tradeRowRefs.current[tradeNumber] = el;
+                    }
+                  }}
                   onClick={() => onTradeClick?.(trade, tradeNumber)}
                   className={cn(
                     'border-b border-neutral-100 last:border-0 cursor-pointer transition-colors',
@@ -444,6 +466,6 @@ function BacktestTradeList({
       )}
     </div>
   );
-}
+});
 
 export default BacktestTradeList;

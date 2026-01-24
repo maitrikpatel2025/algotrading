@@ -10,11 +10,14 @@ import {
   BarChart3,
   List,
   Download,
+  LineChart,
 } from 'lucide-react';
 import MetricCard from './MetricCard';
 import EquityCurveChart from './EquityCurveChart';
 import BacktestTradeList from './BacktestTradeList';
 import TradeFilterControls from './TradeFilterControls';
+import PriceChart from './PriceChart';
+import TradeChartOverlay from './TradeChartOverlay';
 import {
   METRIC_DEFINITIONS,
   getMetricTrend,
@@ -46,6 +49,15 @@ function BacktestResultsSummary({
   const [isExpanded, setIsExpanded] = useState(true);
   const [isTradeListExpanded, setIsTradeListExpanded] = useState(false);
   const tradeListRef = useRef(null);
+  const backtestTradeListRef = useRef(null);
+
+  // Price chart view state
+  const [showPriceChartView, setShowPriceChartView] = useState(false);
+  const [priceChartData, setPriceChartData] = useState(null);
+  const [priceChartLoading, setPriceChartLoading] = useState(false);
+  const [priceChartError, setPriceChartError] = useState(null);
+  const [tradesVisible, setTradesVisible] = useState(true);
+  const [tradesFilter, setTradesFilter] = useState('all');
 
   // Trade list state
   const [filters, setFilters] = useState({
@@ -122,6 +134,68 @@ function BacktestResultsSummary({
     setTimeout(() => {
       tradeListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+  };
+
+  // Fetch price data for price chart view
+  const fetchPriceDataForBacktest = async () => {
+    if (!results.pair || !results.granularity || !results.start_date || !results.end_date) {
+      setPriceChartError('Missing backtest parameters for price data fetch');
+      return;
+    }
+
+    setPriceChartLoading(true);
+    setPriceChartError(null);
+
+    try {
+      const params = new URLSearchParams({
+        pair: results.pair,
+        granularity: results.granularity,
+        start_date: results.start_date,
+        end_date: results.end_date,
+      });
+
+      const response = await fetch(`/api/prices?${params}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch price data: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setPriceChartData(data);
+    } catch (error) {
+      console.error('Error fetching price data:', error);
+      setPriceChartError(error.message || 'Failed to load price data');
+    } finally {
+      setPriceChartLoading(false);
+    }
+  };
+
+  // Handle "View on Price Chart" button click
+  const handleViewOnPriceChart = () => {
+    setShowPriceChartView(true);
+    if (!priceChartData) {
+      fetchPriceDataForBacktest();
+    }
+  };
+
+  // Handle trade marker click - scroll to trade in list
+  const handleTradeMarkerClick = (trade, tradeNumber) => {
+    // Expand trade list if not expanded
+    if (!isTradeListExpanded) {
+      setIsTradeListExpanded(true);
+    }
+
+    // Highlight the trade
+    setSelectedTradeId(tradeNumber);
+    setHighlightedTrade({
+      ...trade,
+      tradeNumber,
+    });
+
+    // Scroll to trade in list using ref
+    if (backtestTradeListRef.current && backtestTradeListRef.current.scrollToTrade) {
+      backtestTradeListRef.current.scrollToTrade(tradeNumber);
+    }
   };
 
   // Helper to render a metric row
@@ -242,11 +316,23 @@ function BacktestResultsSummary({
 
           {/* Equity Curve Chart */}
           <div className="bg-white border border-neutral-200 rounded-md p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-4 w-4 text-neutral-500" />
-              <h4 className="text-sm font-semibold text-neutral-900">
-                Equity Curve
-              </h4>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-neutral-500" />
+                <h4 className="text-sm font-semibold text-neutral-900">
+                  Equity Curve
+                </h4>
+              </div>
+              {allTrades.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleViewOnPriceChart}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <LineChart className="h-4 w-4" />
+                  View on Price Chart
+                </button>
+              )}
             </div>
             <EquityCurveChart
               equityCurve={results.equity_curve || []}
@@ -259,6 +345,89 @@ function BacktestResultsSummary({
               highlightedTrade={highlightedTrade}
             />
           </div>
+
+          {/* Price Chart View with Trades */}
+          {showPriceChartView && (
+            <div className="bg-white border border-neutral-200 rounded-md p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <LineChart className="h-4 w-4 text-neutral-500" />
+                  <h4 className="text-sm font-semibold text-neutral-900">
+                    Price Chart with Trades
+                  </h4>
+                  <span className="text-xs text-muted-foreground">
+                    {results.pair} · {results.granularity}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPriceChartView(false)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Hide
+                </button>
+              </div>
+
+              {/* Trade Chart Overlay Controls */}
+              <TradeChartOverlay
+                trades={allTrades}
+                visible={tradesVisible}
+                filter={tradesFilter}
+                onVisibilityChange={setTradesVisible}
+                onFilterChange={setTradesFilter}
+              />
+
+              {/* Price Chart */}
+              {priceChartLoading && (
+                <div className="w-full min-h-[500px] flex items-center justify-center bg-muted/30 rounded-lg">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="relative">
+                      <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
+                      <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                    </div>
+                    <p className="text-muted-foreground font-medium">Loading price data...</p>
+                  </div>
+                </div>
+              )}
+
+              {priceChartError && (
+                <div className="w-full min-h-[500px] flex items-center justify-center bg-muted/30 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-destructive font-medium mb-2">Failed to load price data</p>
+                    <p className="text-sm text-muted-foreground">{priceChartError}</p>
+                    <button
+                      type="button"
+                      onClick={fetchPriceDataForBacktest}
+                      className="mt-4 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!priceChartLoading && !priceChartError && priceChartData && (
+                <PriceChart
+                  priceData={priceChartData}
+                  selectedPair={results.pair}
+                  selectedGranularity={results.granularity}
+                  chartType="candlestick"
+                  showVolume={false}
+                  loading={false}
+                  trades={allTrades}
+                  tradesVisible={tradesVisible}
+                  tradesFilter={tradesFilter}
+                  onTradeMarkerClick={handleTradeMarkerClick}
+                />
+              )}
+
+              {!priceChartLoading && !priceChartError && !priceChartData && (
+                <div className="w-full min-h-[500px] flex items-center justify-center bg-muted/30 rounded-lg">
+                  <p className="text-muted-foreground">No price data available</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Two Column Stats Grid */}
           <div className="grid md:grid-cols-2 gap-6">
@@ -393,6 +562,7 @@ function BacktestResultsSummary({
 
                   {/* Trade Table */}
                   <BacktestTradeList
+                    ref={backtestTradeListRef}
                     trades={displayedTrades}
                     onTradeClick={handleTradeClick}
                     selectedTradeId={selectedTradeId}

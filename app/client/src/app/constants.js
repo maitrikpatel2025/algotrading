@@ -296,3 +296,23 @@ export const STRATEGY_FILE_EXTENSION = '.json';
 
 // MIME type for strategy files
 export const STRATEGY_FILE_MIME_TYPE = 'application/json';
+
+// =============================================================================
+// TRADE MARKERS CONSTANTS - View trades on chart
+// =============================================================================
+
+// localStorage key for trade markers visibility
+export const TRADE_MARKERS_VISIBLE_KEY = 'forex_dash_trade_markers_visible';
+
+// localStorage key for trade markers filter
+export const TRADE_MARKERS_FILTER_KEY = 'forex_dash_trade_markers_filter';
+
+// Trade marker colors
+export const TRADE_MARKER_COLORS = {
+  LONG_ENTRY: '#22c55e',     // Green for long entry
+  SHORT_ENTRY: '#ef4444',    // Red for short entry
+  PROFITABLE_EXIT: '#22c55e', // Green for winning exit
+  LOSING_EXIT: '#ef4444',     // Red for losing exit
+  CONNECTING_LINE_WIN: '#22c55e',
+  CONNECTING_LINE_LOSS: '#ef4444',
+};

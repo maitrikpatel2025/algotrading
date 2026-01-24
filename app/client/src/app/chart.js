@@ -23,6 +23,12 @@ import {
   DRAWING_TOOLS,
   DRAWING_LINE_STYLES,
 } from './drawingTypes';
+import {
+  convertISOToUnixTimestamp,
+  findClosestCandleIndex,
+  createTradeMarker,
+} from './tradeMarkerUtils';
+import { filterTrades } from './tradeUtils';
 
 // Style guide colors for charts - exact hex values matching ui_style_guide.md
 const CHART_COLORS = {
@@ -692,6 +698,73 @@ function createPatternMarkers(mainSeries, chartData, patterns) {
 }
 
 /**
+ * Create trade markers for backtest trades
+ */
+function createTradeMarkers(mainSeries, chartData, trades, tradesFilter = 'all') {
+  if (!trades || trades.length === 0) return [];
+
+  console.log('createTradeMarkers called with', trades.length, 'trades, filter:', tradesFilter);
+
+  // Filter trades based on filter setting
+  const filteredTrades = filterTrades(trades, { outcome: tradesFilter });
+
+  console.log('Filtered to', filteredTrades.length, 'trades');
+
+  // Convert chart times to Unix timestamps for mapping
+  const candleTimes = chartData.time.map(t => parseTimeToUnix(t));
+
+  const markers = [];
+  const tradeMarkerData = []; // Store marker data for click handlers
+
+  filteredTrades.forEach((trade, index) => {
+    const tradeNumber = trades.indexOf(trade) + 1; // Original trade number
+
+    // Convert trade times to Unix timestamps
+    const entryTimestamp = convertISOToUnixTimestamp(trade.entry_time);
+    const exitTimestamp = convertISOToUnixTimestamp(trade.exit_time);
+
+    if (isNaN(entryTimestamp) || isNaN(exitTimestamp)) {
+      console.warn('Invalid trade timestamps for trade', tradeNumber);
+      return;
+    }
+
+    // Find closest candle for entry and exit
+    const entryIndex = findClosestCandleIndex(entryTimestamp, candleTimes);
+    const exitIndex = findClosestCandleIndex(exitTimestamp, candleTimes);
+
+    if (entryIndex === -1 || exitIndex === -1) {
+      console.warn('Could not find candles for trade', tradeNumber);
+      return;
+    }
+
+    const entryCandleTime = candleTimes[entryIndex];
+    const exitCandleTime = candleTimes[exitIndex];
+
+    // Create entry marker
+    const entryMarker = createTradeMarker(trade, entryCandleTime, true, tradeNumber);
+    markers.push(entryMarker);
+    tradeMarkerData.push(entryMarker);
+
+    // Create exit marker
+    const exitMarker = createTradeMarker(trade, exitCandleTime, false, tradeNumber);
+    markers.push(exitMarker);
+    tradeMarkerData.push(exitMarker);
+  });
+
+  console.log('Generated', markers.length, 'trade markers for chart');
+
+  if (markers.length > 0) {
+    // Sort markers by time
+    markers.sort((a, b) => a.time - b.time);
+    // In lightweight-charts v5, use createSeriesMarkers instead of setMarkers
+    createSeriesMarkers(mainSeries, markers);
+    console.log('Trade markers successfully set on chart');
+  }
+
+  return tradeMarkerData;
+}
+
+/**
  * Create drawing price lines for horizontal lines
  */
 function createDrawings(mainSeries, drawings, conditionDrawingIds = []) {
@@ -730,7 +803,7 @@ function createDrawings(mainSeries, drawings, conditionDrawingIds = []) {
 /**
  * Draw the chart with support for multiple chart types, volume, indicators, patterns, and drawings
  */
-export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = [], drawings = [], conditionDrawingIds = []) {
+export function drawChart(chartData, p, g, divName, chartType = 'candlestick', showVolume = false, activeIndicators = [], activePatterns = [], drawings = [], conditionDrawingIds = [], trades = null, tradesVisible = true, tradesFilter = 'all', onTradeMarkerClick = null) {
   const container = document.getElementById(divName);
   if (!container) {
     console.error(`Chart container ${divName} not found`);
@@ -892,6 +965,36 @@ export function drawChart(chartData, p, g, divName, chartType = 'candlestick', s
   if (activePatterns && activePatterns.length > 0) {
     console.log(`Rendering ${activePatterns.length} pattern(s) on chart`);
     createPatternMarkers(mainSeries, chartData, activePatterns);
+  }
+
+  // Add trade markers
+  let tradeMarkerData = [];
+  if (trades && trades.length > 0 && tradesVisible) {
+    console.log(`Rendering ${trades.length} trade(s) on chart`);
+    tradeMarkerData = createTradeMarkers(mainSeries, chartData, trades, tradesFilter);
+
+    // Store trade marker data for click handling
+    container._tradeMarkerData = tradeMarkerData;
+    container._onTradeMarkerClick = onTradeMarkerClick;
+
+    // Add click handler for trade markers
+    if (onTradeMarkerClick) {
+      chart.subscribeClick((param) => {
+        if (!param.point || !param.time) return;
+
+        // Find if a trade marker was clicked (within small time tolerance)
+        const clickedTime = param.time;
+        const tolerance = 1; // 1 second tolerance
+
+        const clickedMarker = tradeMarkerData.find(marker => {
+          return Math.abs(marker.time - clickedTime) <= tolerance;
+        });
+
+        if (clickedMarker) {
+          onTradeMarkerClick(clickedMarker.trade, clickedMarker.tradeNumber);
+        }
+      });
+    }
   }
 
   // Add drawings (horizontal lines)
