@@ -6,9 +6,8 @@ Functions for generating CSV, JSON, and PDF exports from backtest results.
 
 import csv
 import io
-import json
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -323,7 +322,7 @@ def generate_pdf_export(
     normal_style = styles["Normal"]
 
     # Page 1: Cover page
-    elements.append(Paragraph(f"Backtest Results", title_style))
+    elements.append(Paragraph("Backtest Results", title_style))
     elements.append(Spacer(1, 0.3 * inch))
     elements.append(Paragraph(f"<b>{backtest_config.name}</b>", heading_style))
     elements.append(Spacer(1, 0.2 * inch))
@@ -352,7 +351,6 @@ def generate_pdf_export(
 
     # Key metrics box
     currency = backtest_config.currency
-    roi_color = colors.green if backtest_result.return_on_investment >= 0 else colors.red
     key_metrics_data = [
         ["Key Performance Metrics", ""],
         [

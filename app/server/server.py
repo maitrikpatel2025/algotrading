@@ -34,10 +34,16 @@ from core.backtest_service import (
     get_backtest as service_get_backtest,
 )
 from core.backtest_service import (
+    get_backtest_with_results as service_get_backtest_with_results,
+)
+from core.backtest_service import (
     list_backtests as service_list_backtests,
 )
 from core.backtest_service import (
     save_backtest as service_save_backtest,
+)
+from core.backtest_service import (
+    update_notes as service_update_notes,
 )
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
@@ -1424,7 +1430,7 @@ async def update_backtest_notes(backtest_id: str, request: dict):
 
         notes = request.get("notes", "")
 
-        success, backtest, error = backtest_service.update_notes(backtest_id, notes)
+        success, backtest, error = service_update_notes(backtest_id, notes)
 
         if success and backtest:
             logger.info(f"[SUCCESS] Notes updated for backtest: {backtest_id}")
@@ -1458,7 +1464,7 @@ async def export_backtest_csv(backtest_id: str):
         logger.info(f"[BACKTEST] Export CSV for backtest ID: {backtest_id}")
 
         # Get backtest and results
-        success, backtest, results_dict, error = backtest_service.get_backtest_with_results(
+        success, backtest, results_dict, error = service_get_backtest_with_results(
             backtest_id
         )
 
@@ -1516,7 +1522,7 @@ async def export_backtest_json(backtest_id: str):
         logger.info(f"[BACKTEST] Export JSON for backtest ID: {backtest_id}")
 
         # Get backtest and results
-        success, backtest, results_dict, error = backtest_service.get_backtest_with_results(
+        success, backtest, results_dict, error = service_get_backtest_with_results(
             backtest_id
         )
 
@@ -1580,7 +1586,7 @@ async def export_backtest_pdf(backtest_id: str):
         logger.info(f"[BACKTEST] Export PDF for backtest ID: {backtest_id}")
 
         # Get backtest and results
-        success, backtest, results_dict, error = backtest_service.get_backtest_with_results(
+        success, backtest, results_dict, error = service_get_backtest_with_results(
             backtest_id
         )
 

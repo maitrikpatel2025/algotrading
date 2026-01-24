@@ -13,7 +13,6 @@ from typing import List, Optional, Tuple
 from core.data_models import (
     BacktestConfig,
     BacktestListItem,
-    BacktestResultsSummary,
     PartialCloseLevel,
     PartialClosesConfig,
     PositionSizingConfig,

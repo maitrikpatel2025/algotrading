@@ -4,14 +4,13 @@ Unit Tests for Export Generators
 Tests for CSV, JSON, and PDF export generation from backtest results.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
 from core.data_models import (
     BacktestConfig,
     BacktestResultsSummary,
-    PartialCloseLevel,
     PartialClosesConfig,
     PositionSizingConfig,
     RiskManagementConfig,
