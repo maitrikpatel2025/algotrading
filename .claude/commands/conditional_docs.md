@@ -561,3 +561,11 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with best/worst period highlighting in backtest results
     - When extending backtest results with time period metrics
     - When troubleshooting time period calculations or _calculate_time_period_metrics method
+
+- app_docs/bug-3c31b797-equitycurvechart-lightweight-charts-v5.md
+  - Conditions:
+    - When troubleshooting "chart.addAreaSeries is not a function" or "equitySeries.setMarkers is not a function" errors
+    - When working with lightweight-charts library version upgrades or migrations
+    - When implementing or modifying EquityCurveChart component
+    - When working with series creation or markers API in lightweight-charts
+    - When troubleshooting webpack cache issues causing stale code to be served
