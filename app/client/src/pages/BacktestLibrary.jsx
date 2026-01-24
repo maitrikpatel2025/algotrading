@@ -19,7 +19,10 @@ import {
   TrendingDown,
   Target,
   BarChart3,
-  Download
+  Download,
+  GitCompare,
+  X,
+  Check
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import endPoints from '../app/api';
@@ -31,7 +34,8 @@ import BacktestExportDialog from '../components/BacktestExportDialog';
 /**
  * BacktestLibrary Page
  *
- * Library view for managing backtests with filtering, sorting, and CRUD operations.
+ * Library view for managing backtests with filtering, sorting, CRUD operations,
+ * and multi-select mode for comparison.
  */
 
 const STATUS_CONFIG = {
@@ -93,6 +97,10 @@ function BacktestLibrary() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportingBacktest, setExportingBacktest] = useState(null);
   const [selectedExportFormat, setSelectedExportFormat] = useState('csv');
+
+  // Selection mode state for comparison
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedBacktests, setSelectedBacktests] = useState(new Set());
 
   // Load backtests
   const loadBacktests = useCallback(async () => {
@@ -261,6 +269,44 @@ function BacktestLibrary() {
     setOpenMenuId(null);
   };
 
+  // Selection mode handlers
+  const handleToggleSelectionMode = () => {
+    if (selectionMode) {
+      // Exit selection mode
+      setSelectionMode(false);
+      setSelectedBacktests(new Set());
+    } else {
+      // Enter selection mode
+      setSelectionMode(true);
+    }
+  };
+
+  const handleToggleSelect = (backtestId, e) => {
+    if (e) e.stopPropagation();
+    setSelectedBacktests(prev => {
+      const next = new Set(prev);
+      if (next.has(backtestId)) {
+        next.delete(backtestId);
+      } else {
+        next.add(backtestId);
+      }
+      return next;
+    });
+  };
+
+  const handleCompareSelected = () => {
+    const ids = Array.from(selectedBacktests);
+    if (ids.length >= 2 && ids.length <= 4) {
+      navigate(`/backtests/compare?ids=${ids.join(',')}`);
+    }
+  };
+
+  // Check if comparison is valid (2-4 completed backtests)
+  const completedBacktests = backtests.filter(b => b.status === 'completed');
+  const canEnterSelectionMode = completedBacktests.length >= 2;
+  const selectedCount = selectedBacktests.size;
+  const canCompare = selectedCount >= 2 && selectedCount <= 4;
+
   // Filter and sort backtests
   const filteredBacktests = backtests
     .filter(b => {
@@ -322,14 +368,77 @@ function BacktestLibrary() {
             <p className="body-sm mt-1">Manage your backtests</p>
           </div>
 
-          <button
-            onClick={handleNewBacktest}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            New Backtest
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Selection Mode Toggle */}
+            {selectionMode ? (
+              <>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-md">
+                  <span className="text-sm font-medium text-primary">
+                    {selectedCount} selected
+                  </span>
+                </div>
+                <button
+                  onClick={handleCompareSelected}
+                  disabled={!canCompare}
+                  className={cn(
+                    "btn flex items-center gap-2",
+                    canCompare
+                      ? "btn-primary"
+                      : "bg-neutral-200 text-neutral-500 cursor-not-allowed"
+                  )}
+                  title={!canCompare ? "Select 2-4 backtests to compare" : "Compare selected backtests"}
+                >
+                  <GitCompare className="h-4 w-4" />
+                  Compare Selected
+                </button>
+                <button
+                  onClick={handleToggleSelectionMode}
+                  className="btn btn-ghost flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {canEnterSelectionMode && (
+                  <button
+                    onClick={handleToggleSelectionMode}
+                    className="btn btn-secondary flex items-center gap-2"
+                    title="Select backtests to compare"
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    Select for Compare
+                  </button>
+                )}
+                <button
+                  onClick={handleNewBacktest}
+                  className="btn btn-primary flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Backtest
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Selection Mode Banner */}
+        {selectionMode && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <GitCompare className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium text-neutral-900">
+                  Selection Mode Active
+                </p>
+                <p className="text-xs text-neutral-500">
+                  Select 2-4 completed backtests to compare. Click on backtest cards to select them.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters Card */}
         <div className="card p-4">
@@ -418,18 +527,52 @@ function BacktestLibrary() {
             {filteredBacktests.map((backtest) => {
               const statusConfig = STATUS_CONFIG[backtest.status] || STATUS_CONFIG.pending;
               const StatusIcon = statusConfig.icon;
+              const isSelected = selectedBacktests.has(backtest.id);
+              const isCompleted = backtest.status === 'completed';
+              const isSelectableInSelectionMode = selectionMode && isCompleted;
 
               return (
                 <div
                   key={backtest.id}
-                  className="card group hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => handleEditBacktest(backtest.id)}
+                  className={cn(
+                    "card group transition-colors cursor-pointer relative",
+                    selectionMode && !isCompleted && "opacity-50 cursor-not-allowed",
+                    isSelected && "border-primary ring-2 ring-primary/20",
+                    !isSelected && !selectionMode && "hover:border-primary"
+                  )}
+                  onClick={() => {
+                    if (selectionMode) {
+                      if (isCompleted) {
+                        handleToggleSelect(backtest.id);
+                      }
+                    } else {
+                      handleEditBacktest(backtest.id);
+                    }
+                  }}
                 >
-                  <div className="p-4 space-y-3">
+                  {/* Selection Checkbox */}
+                  {selectionMode && isCompleted && (
+                    <div
+                      className={cn(
+                        "absolute top-3 left-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors z-10",
+                        isSelected
+                          ? "bg-primary border-primary"
+                          : "bg-white border-neutral-300 group-hover:border-primary"
+                      )}
+                      onClick={(e) => handleToggleSelect(backtest.id, e)}
+                    >
+                      {isSelected && <Check className="h-3 w-3 text-white" />}
+                    </div>
+                  )}
+
+                  <div className={cn("p-4 space-y-3", selectionMode && isCompleted && "pl-10")}>
                     {/* Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-neutral-900 truncate group-hover:text-primary transition-colors">
+                        <h3 className={cn(
+                          "font-semibold text-neutral-900 truncate transition-colors",
+                          !selectionMode && "group-hover:text-primary"
+                        )}>
                           {backtest.name}
                         </h3>
                         {backtest.strategy_name && (
@@ -439,48 +582,50 @@ function BacktestLibrary() {
                         )}
                       </div>
 
-                      {/* Menu */}
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === backtest.id ? null : backtest.id);
-                          }}
-                          className="p-1.5 rounded-md hover:bg-neutral-100 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <MoreVertical className="h-4 w-4 text-neutral-400" />
-                        </button>
-
-                        {openMenuId === backtest.id && (
-                          <div
-                            className="absolute right-0 top-8 z-50 bg-white border border-neutral-200 rounded-md shadow-elevated py-1 min-w-[140px]"
-                            onClick={(e) => e.stopPropagation()}
+                      {/* Menu - hidden in selection mode */}
+                      {!selectionMode && (
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === backtest.id ? null : backtest.id);
+                            }}
+                            className="p-1.5 rounded-md hover:bg-neutral-100 transition-colors opacity-0 group-hover:opacity-100"
                           >
-                            <button
-                              onClick={(e) => handleEditConfiguration(backtest, e)}
-                              className="w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2"
+                            <MoreVertical className="h-4 w-4 text-neutral-400" />
+                          </button>
+
+                          {openMenuId === backtest.id && (
+                            <div
+                              className="absolute right-0 top-8 z-50 bg-white border border-neutral-200 rounded-md shadow-elevated py-1 min-w-[140px]"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Edit2 className="h-4 w-4" />
-                              Edit Configuration
-                            </button>
-                            <button
-                              onClick={() => handleDuplicate(backtest)}
-                              className="w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2"
-                            >
-                              <Copy className="h-4 w-4" />
-                              Duplicate
-                            </button>
-                            <hr className="my-1 border-neutral-200" />
-                            <button
-                              onClick={() => handleDeleteClick(backtest)}
-                              className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger-light flex items-center gap-2"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                              <button
+                                onClick={(e) => handleEditConfiguration(backtest, e)}
+                                className="w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                                Edit Configuration
+                              </button>
+                              <button
+                                onClick={() => handleDuplicate(backtest)}
+                                className="w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2"
+                              >
+                                <Copy className="h-4 w-4" />
+                                Duplicate
+                              </button>
+                              <hr className="my-1 border-neutral-200" />
+                              <button
+                                onClick={() => handleDeleteClick(backtest)}
+                                className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger-light flex items-center gap-2"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Status Badge */}
@@ -541,36 +686,38 @@ function BacktestLibrary() {
                           </div>
                         </div>
 
-                        {/* Export Quick Actions */}
-                        <div className="flex items-center gap-1 pt-2 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => handleExportClick(backtest, 'csv', e)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
-                            title="Export as CSV"
-                          >
-                            <Download className="h-3 w-3" />
-                            CSV
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleExportClick(backtest, 'json', e)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
-                            title="Export as JSON"
-                          >
-                            <Download className="h-3 w-3" />
-                            JSON
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleExportClick(backtest, 'pdf', e)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
-                            title="Export as PDF"
-                          >
-                            <Download className="h-3 w-3" />
-                            PDF
-                          </button>
-                        </div>
+                        {/* Export Quick Actions - hidden in selection mode */}
+                        {!selectionMode && (
+                          <div className="flex items-center gap-1 pt-2 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleExportClick(backtest, 'csv', e)}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                              title="Export as CSV"
+                            >
+                              <Download className="h-3 w-3" />
+                              CSV
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleExportClick(backtest, 'json', e)}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                              title="Export as JSON"
+                            >
+                              <Download className="h-3 w-3" />
+                              JSON
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleExportClick(backtest, 'pdf', e)}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                              title="Export as PDF"
+                            >
+                              <Download className="h-3 w-3" />
+                              PDF
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
 

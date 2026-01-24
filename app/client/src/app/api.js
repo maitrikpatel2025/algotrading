@@ -135,6 +135,60 @@ const endPoints = {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
+    },
+    // Backtest comparison endpoints
+    compareBacktests: (backtestIds, notes = null) =>
+        requests.post("/backtests/compare", { backtest_ids: backtestIds, notes }),
+    exportComparisonCSV: async (backtestIds, notes = null, includeNotes = true) => {
+        const response = await axios.post(
+            `${axios.defaults.baseURL}/backtests/compare/export/csv`,
+            { backtest_ids: backtestIds, notes, include_notes: includeNotes },
+            { responseType: 'blob' }
+        );
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = response.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] || 'backtest_comparison.csv';
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    },
+    exportComparisonJSON: async (backtestIds, notes = null, includeNotes = true) => {
+        const response = await axios.post(
+            `${axios.defaults.baseURL}/backtests/compare/export/json`,
+            { backtest_ids: backtestIds, notes, include_notes: includeNotes },
+            { responseType: 'blob' }
+        );
+        const blob = new Blob([response.data], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = response.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] || 'backtest_comparison.json';
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    },
+    exportComparisonPDF: async (backtestIds, notes = null, includeNotes = true) => {
+        const response = await axios.post(
+            `${axios.defaults.baseURL}/backtests/compare/export/pdf`,
+            { backtest_ids: backtestIds, notes, include_notes: includeNotes },
+            { responseType: 'blob' }
+        );
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = response.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] || 'backtest_comparison.pdf';
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
     }
 }
 

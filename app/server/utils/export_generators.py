@@ -15,7 +15,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from core.data_models import BacktestConfig, BacktestResultsSummary
+from core.data_models import BacktestComparisonResult, BacktestConfig, BacktestResultsSummary
 
 
 def format_currency(value: float, currency: str = "USD") -> str:
@@ -582,6 +582,319 @@ def generate_pdf_export(
             )
         )
         elements.append(trade_table)
+
+    # Build PDF
+    doc.build(elements)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return pdf_bytes
+
+
+# =============================================================================
+# Comparison Export Functions
+# =============================================================================
+
+
+# Metrics display names for comparison exports
+COMPARISON_METRIC_NAMES = {
+    "total_net_profit": "Net P/L",
+    "return_on_investment": "ROI",
+    "final_balance": "Final Balance",
+    "total_trades": "Total Trades",
+    "winning_trades": "Winning Trades",
+    "losing_trades": "Losing Trades",
+    "win_rate": "Win Rate",
+    "profit_factor": "Profit Factor",
+    "average_win": "Avg Win",
+    "average_loss": "Avg Loss",
+    "win_loss_ratio": "Win/Loss Ratio",
+    "largest_win": "Largest Win",
+    "largest_loss": "Largest Loss",
+    "expectancy": "Expectancy",
+    "max_drawdown_dollars": "Max Drawdown ($)",
+    "max_drawdown_percent": "Max Drawdown (%)",
+    "recovery_factor": "Recovery Factor",
+    "sharpe_ratio": "Sharpe Ratio",
+    "sortino_ratio": "Sortino Ratio",
+    "average_trade_duration_minutes": "Avg Duration",
+}
+
+
+def generate_comparison_csv(comparison: BacktestComparisonResult) -> str:
+    """
+    Generate CSV export from backtest comparison.
+
+    Args:
+        comparison: BacktestComparisonResult with comparison data
+
+    Returns:
+        CSV string with comparison metrics
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow(["# Backtest Comparison Export"])
+    writer.writerow([f"# Generated: {datetime.now().isoformat()}"])
+    writer.writerow([f"# Backtests Compared: {len(comparison.backtests)}"])
+    writer.writerow([])
+
+    # Backtest info
+    writer.writerow(["BACKTESTS COMPARED"])
+    writer.writerow(["Name", "Strategy", "Pair", "Timeframe", "Date Range", "Initial Balance"])
+    for bt in comparison.backtests:
+        writer.writerow([
+            bt.name,
+            bt.strategy_name or "N/A",
+            bt.pair or "N/A",
+            bt.timeframe or "N/A",
+            f"{format_datetime(bt.start_date)} to {format_datetime(bt.end_date)}",
+            format_currency(bt.initial_balance, bt.currency),
+        ])
+    writer.writerow([])
+
+    # Metrics comparison
+    writer.writerow(["METRICS COMPARISON"])
+    header_row = ["Metric"] + [bt.name for bt in comparison.backtests] + ["Best"]
+    writer.writerow(header_row)
+
+    for metric_key, metric_values in comparison.metrics_comparison.items():
+        display_name = COMPARISON_METRIC_NAMES.get(metric_key, metric_key)
+        row = [display_name]
+        for mv in metric_values:
+            row.append(mv.formatted_value)
+
+        # Add best indicator
+        best_idx = comparison.best_values.get(metric_key)
+        if best_idx is not None and best_idx < len(comparison.backtests):
+            row.append(comparison.backtests[best_idx].name)
+        else:
+            row.append("--")
+
+        writer.writerow(row)
+    writer.writerow([])
+
+    # Statistical significance
+    if comparison.statistical_significance:
+        writer.writerow(["STATISTICAL SIGNIFICANCE"])
+        writer.writerow(["Metric", "P-Value", "Significant", "Interpretation"])
+        for stat in comparison.statistical_significance:
+            writer.writerow([
+                COMPARISON_METRIC_NAMES.get(stat.metric, stat.metric),
+                f"{stat.p_value:.4f}" if stat.p_value is not None else "N/A",
+                "Yes" if stat.is_significant else "No",
+                stat.interpretation,
+            ])
+        writer.writerow([])
+
+    # Notes
+    if comparison.notes:
+        writer.writerow(["COMPARISON NOTES"])
+        writer.writerow([comparison.notes])
+
+    return output.getvalue()
+
+
+def generate_comparison_json(comparison: BacktestComparisonResult) -> Dict[str, Any]:
+    """
+    Generate JSON export from backtest comparison.
+
+    Args:
+        comparison: BacktestComparisonResult with comparison data
+
+    Returns:
+        Dictionary with comparison data
+    """
+    return {
+        "metadata": {
+            "export_date": datetime.now().isoformat(),
+            "export_version": "1.0",
+            "backtests_compared": len(comparison.backtests),
+        },
+        "backtests": [
+            {
+                "id": bt.id,
+                "name": bt.name,
+                "strategy_name": bt.strategy_name,
+                "pair": bt.pair,
+                "timeframe": bt.timeframe,
+                "start_date": format_datetime(bt.start_date),
+                "end_date": format_datetime(bt.end_date),
+                "initial_balance": bt.initial_balance,
+                "currency": bt.currency,
+            }
+            for bt in comparison.backtests
+        ],
+        "metrics_comparison": {
+            metric_key: [
+                {
+                    "backtest_id": mv.backtest_id,
+                    "backtest_name": mv.backtest_name,
+                    "value": mv.value,
+                    "formatted_value": mv.formatted_value,
+                }
+                for mv in metric_values
+            ]
+            for metric_key, metric_values in comparison.metrics_comparison.items()
+        },
+        "best_values": comparison.best_values,
+        "statistical_significance": [
+            {
+                "metric": stat.metric,
+                "p_value": stat.p_value,
+                "is_significant": stat.is_significant,
+                "interpretation": stat.interpretation,
+                "best_backtest_id": stat.best_backtest_id,
+                "best_backtest_name": stat.best_backtest_name,
+            }
+            for stat in comparison.statistical_significance
+        ],
+        "notes": comparison.notes,
+    }
+
+
+def generate_comparison_pdf(comparison: BacktestComparisonResult) -> bytes:
+    """
+    Generate PDF export from backtest comparison.
+
+    Args:
+        comparison: BacktestComparisonResult with comparison data
+
+    Returns:
+        PDF bytes
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75 * inch, bottomMargin=0.75 * inch)
+
+    elements = []
+
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ComparisonTitle", parent=styles["Heading1"], fontSize=24, textColor=colors.HexColor("#1a1a1a")
+    )
+    heading_style = ParagraphStyle(
+        "ComparisonHeading",
+        parent=styles["Heading2"],
+        fontSize=16,
+        textColor=colors.HexColor("#2563eb"),
+        spaceAfter=12,
+    )
+    normal_style = styles["Normal"]
+
+    # Title
+    elements.append(Paragraph("Backtest Comparison Report", title_style))
+    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", normal_style))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    # Backtests compared
+    elements.append(Paragraph("Backtests Compared", heading_style))
+    bt_data = [["#", "Name", "Strategy", "Pair", "Period"]]
+    for i, bt in enumerate(comparison.backtests, 1):
+        bt_data.append([
+            str(i),
+            bt.name[:30] + "..." if len(bt.name) > 30 else bt.name,
+            (bt.strategy_name or "N/A")[:20],
+            bt.pair or "N/A",
+            f"{format_datetime(bt.start_date)[:10]} - {format_datetime(bt.end_date)[:10]}",
+        ])
+
+    bt_table = Table(bt_data, colWidths=[0.4 * inch, 2 * inch, 1.5 * inch, 1 * inch, 1.8 * inch])
+    bt_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(bt_table)
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # Metrics comparison table
+    elements.append(Paragraph("Metrics Comparison", heading_style))
+
+    # Build header with backtest names
+    metric_header = ["Metric"] + [bt.name[:15] for bt in comparison.backtests]
+    metric_data = [metric_header]
+
+    # Key metrics to show in PDF
+    key_metrics = [
+        "total_net_profit", "return_on_investment", "win_rate", "profit_factor",
+        "sharpe_ratio", "max_drawdown_percent", "total_trades", "expectancy"
+    ]
+
+    for metric_key in key_metrics:
+        if metric_key in comparison.metrics_comparison:
+            display_name = COMPARISON_METRIC_NAMES.get(metric_key, metric_key)
+            row = [display_name]
+
+            metric_values = comparison.metrics_comparison[metric_key]
+            best_idx = comparison.best_values.get(metric_key)
+
+            for i, mv in enumerate(metric_values):
+                value_str = mv.formatted_value
+                # Mark best with asterisk
+                if best_idx is not None and i == best_idx:
+                    value_str = f"*{value_str}*"
+                row.append(value_str)
+
+            metric_data.append(row)
+
+    # Calculate column widths based on number of backtests
+    num_backtests = len(comparison.backtests)
+    metric_col_width = (6.5 * inch - 1.5 * inch) / num_backtests
+    col_widths = [1.5 * inch] + [metric_col_width] * num_backtests
+
+    metric_table = Table(metric_data, colWidths=col_widths)
+    metric_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563eb")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(metric_table)
+    elements.append(Paragraph("<i>* indicates best value for each metric</i>", normal_style))
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # Statistical significance
+    if comparison.statistical_significance:
+        elements.append(Paragraph("Statistical Significance", heading_style))
+        stat_data = [["Metric", "P-Value", "Significant", "Best Performer"]]
+
+        for stat in comparison.statistical_significance:
+            stat_data.append([
+                COMPARISON_METRIC_NAMES.get(stat.metric, stat.metric),
+                f"{stat.p_value:.4f}" if stat.p_value is not None else "N/A",
+                "Yes" if stat.is_significant else "No",
+                stat.best_backtest_name or "N/A",
+            ])
+
+        stat_table = Table(stat_data, colWidths=[1.5 * inch, 1 * inch, 1 * inch, 2.5 * inch])
+        stat_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(stat_table)
+        elements.append(Spacer(1, 0.3 * inch))
+
+    # Notes
+    if comparison.notes:
+        elements.append(Paragraph("Comparison Notes", heading_style))
+        elements.append(Paragraph(comparison.notes, normal_style))
 
     # Build PDF
     doc.build(elements)
