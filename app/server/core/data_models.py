@@ -1036,3 +1036,73 @@ class BacktestResultsSummary(BaseModel):
     var_99: Optional[float] = Field(
         default=None, description="Value at Risk at 99% confidence level"
     )
+
+
+# ============================================================================
+# Backtest Comparison Models
+# ============================================================================
+
+
+class MetricValue(BaseModel):
+    """Value of a metric for a single backtest in a comparison."""
+
+    backtest_id: str = Field(..., description="ID of the backtest")
+    backtest_name: str = Field(..., description="Name of the backtest for display")
+    value: Optional[float] = Field(None, description="Numeric value of the metric")
+    formatted_value: str = Field(default="--", description="Formatted display value")
+
+
+class StatisticalTest(BaseModel):
+    """Result of statistical significance test between backtests."""
+
+    metric: str = Field(..., description="Name of the metric tested")
+    p_value: Optional[float] = Field(None, description="P-value from statistical test")
+    is_significant: bool = Field(
+        default=False, description="Whether the difference is statistically significant at p<0.05"
+    )
+    interpretation: str = Field(
+        default="", description="Human-readable interpretation of the test result"
+    )
+    best_backtest_id: Optional[str] = Field(
+        None, description="ID of the backtest with the better value"
+    )
+    best_backtest_name: Optional[str] = Field(
+        None, description="Name of the backtest with the better value"
+    )
+
+
+class BacktestComparisonConfig(BaseModel):
+    """Configuration for a backtest comparison request."""
+
+    backtest_ids: List[str] = Field(
+        ..., min_length=2, max_length=4, description="List of 2-4 backtest IDs to compare"
+    )
+    notes: Optional[str] = Field(None, max_length=2000, description="Comparison notes")
+
+
+class BacktestComparisonResult(BaseModel):
+    """Complete result of a backtest comparison."""
+
+    backtests: List[BacktestConfig] = Field(
+        default=[], description="Full backtest configs with results"
+    )
+    metrics_comparison: Dict[str, List[MetricValue]] = Field(
+        default={}, description="Metrics keyed by metric name, with list of values per backtest"
+    )
+    best_values: Dict[str, int] = Field(
+        default={}, description="Index of best backtest for each metric (0-indexed)"
+    )
+    statistical_significance: List[StatisticalTest] = Field(
+        default=[], description="Statistical significance results for key metrics"
+    )
+    notes: Optional[str] = Field(None, description="Comparison notes")
+
+
+class CompareBacktestsResponse(BaseModel):
+    """Response from comparing backtests."""
+
+    success: bool = Field(..., description="Whether the comparison was successful")
+    comparison: Optional[BacktestComparisonResult] = Field(
+        None, description="Comparison result data"
+    )
+    error: Optional[str] = Field(None, description="Error details if failed")

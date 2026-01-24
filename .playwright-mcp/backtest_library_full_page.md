@@ -1,0 +1,110 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "Forex Dash" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e8]
+        - generic [ref=e11]: Forex Dash
+      - navigation [ref=e12]:
+        - link "Strategies" [ref=e13] [cursor=pointer]:
+          - /url: /strategies
+        - link "Backtest" [active] [ref=e14] [cursor=pointer]:
+          - /url: /backtests
+        - link "Monitor" [ref=e15] [cursor=pointer]:
+          - /url: /monitor
+        - link "Account" [ref=e16] [cursor=pointer]:
+          - /url: /account
+      - generic [ref=e22]: Market Open
+  - main [ref=e23]:
+    - generic [ref=e117]:
+      - generic [ref=e118]:
+        - generic [ref=e119]:
+          - heading "Backtests" [level=1] [ref=e120]
+          - paragraph [ref=e121]: Manage your backtests
+        - button "New Backtest" [ref=e123] [cursor=pointer]:
+          - img [ref=e124]
+          - text: New Backtest
+      - generic [ref=e126]:
+        - generic [ref=e127]:
+          - img [ref=e128]
+          - textbox "Search backtests..." [ref=e131]
+        - generic [ref=e132]:
+          - button "All" [ref=e133] [cursor=pointer]
+          - button "Pending" [ref=e134] [cursor=pointer]
+          - button "Running" [ref=e135] [cursor=pointer]
+          - button "Completed" [ref=e136] [cursor=pointer]
+          - button "Failed" [ref=e137] [cursor=pointer]
+        - generic [ref=e138]:
+          - img [ref=e139]
+          - combobox [ref=e142]:
+            - option "Last Modified" [selected]
+            - option "Date Created"
+            - option "Name A-Z"
+      - generic [ref=e143]:
+        - generic [ref=e145] [cursor=pointer]:
+          - generic [ref=e146]:
+            - generic [ref=e147]:
+              - heading "DEV BACKTEST" [level=3] [ref=e148]
+              - paragraph [ref=e149]: Dev S1
+            - button [ref=e151]:
+              - img [ref=e152]
+          - generic [ref=e156]:
+            - img [ref=e157]
+            - text: Completed
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - img [ref=e163]
+              - paragraph [ref=e166]: "-100.0%"
+              - paragraph [ref=e167]: ROI
+            - generic [ref=e168]:
+              - img [ref=e170]
+              - paragraph [ref=e174]: 11.0%
+              - paragraph [ref=e175]: Win
+            - generic [ref=e176]:
+              - img [ref=e178]
+              - paragraph [ref=e180]: "181"
+              - paragraph [ref=e181]: Trades
+          - generic [ref=e182]:
+            - button "CSV" [ref=e183]:
+              - img [ref=e184]
+              - text: CSV
+            - button "JSON" [ref=e187]:
+              - img [ref=e188]
+              - text: JSON
+            - button "PDF" [ref=e191]:
+              - img [ref=e192]
+              - text: PDF
+          - generic [ref=e195]:
+            - generic [ref=e196]:
+              - img [ref=e197]
+              - generic [ref=e199]: Oct 24, 2025 - Jan 24, 2026
+            - generic [ref=e200]:
+              - img [ref=e201]
+              - generic [ref=e203]: $5,000
+          - paragraph [ref=e205]: Updated 1/24/2026
+        - generic [ref=e207] [cursor=pointer]:
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - heading "S2" [level=3] [ref=e210]
+              - paragraph [ref=e211]: s1
+            - button [ref=e213]:
+              - img [ref=e214]
+          - generic [ref=e218]:
+            - img [ref=e219]
+            - text: Failed
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - img [ref=e225]
+              - generic [ref=e227]: Jul 22, 2025 - Jan 22, 2026
+            - generic [ref=e228]:
+              - img [ref=e229]
+              - generic [ref=e231]: $1,000
+          - paragraph [ref=e232]: Help
+          - paragraph [ref=e234]: Updated 1/22/2026
+  - contentinfo [ref=e31]:
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - img [ref=e36]
+        - generic [ref=e39]: Forex Dash
+      - paragraph [ref=e40]: 2026 Forex Trading Dashboard
+      - generic [ref=e41]: All systems operational

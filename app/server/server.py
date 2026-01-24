@@ -1626,6 +1626,128 @@ async def export_backtest_pdf(backtest_id: str):
 
 
 # =============================================================================
+# Backtest Comparison Routes
+# =============================================================================
+
+
+@app.post(
+    "/api/backtests/compare",
+    summary="Compare multiple backtests",
+    tags=["Backtest Comparison"],
+)
+async def compare_backtests(request: dict):
+    """
+    Compare 2-4 backtests side by side.
+
+    Args:
+        request: JSON body with 'backtest_ids' (list of 2-4 IDs) and optional 'notes'
+
+    Returns:
+        Comparison result with metrics, best values, and statistical significance
+    """
+    from core.comparison_service import get_comparison_data
+    from core.data_models import CompareBacktestsResponse
+
+    try:
+        backtest_ids = request.get("backtest_ids", [])
+        notes = request.get("notes")
+
+        logger.info(f"[COMPARISON] Compare request for backtests: {backtest_ids}")
+
+        if not backtest_ids:
+            return CompareBacktestsResponse(
+                success=False, error="backtest_ids is required"
+            )
+
+        success, comparison, error = get_comparison_data(backtest_ids, notes)
+
+        if success and comparison:
+            logger.info(f"[SUCCESS] Comparison generated for {len(backtest_ids)} backtests")
+            return CompareBacktestsResponse(success=True, comparison=comparison)
+        else:
+            logger.warning(f"[WARNING] Comparison failed: {error}")
+            return CompareBacktestsResponse(success=False, error=error)
+
+    except Exception as e:
+        logger.error(f"[ERROR] Comparison failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return CompareBacktestsResponse(success=False, error=str(e))
+
+
+@app.post(
+    "/api/backtests/compare/export/{format}",
+    summary="Export comparison report",
+    tags=["Backtest Comparison"],
+)
+async def export_comparison(format: str, request: dict):
+    """
+    Export a backtest comparison report.
+
+    Args:
+        format: Export format (csv, json, pdf)
+        request: JSON body with 'backtest_ids', optional 'notes', and 'include_notes'
+
+    Returns:
+        File download in the requested format
+    """
+    from fastapi.responses import Response
+
+    from core.comparison_service import get_comparison_data
+    from utils.export_generators import (
+        generate_comparison_csv,
+        generate_comparison_json,
+        generate_comparison_pdf,
+    )
+
+    try:
+        backtest_ids = request.get("backtest_ids", [])
+        notes = request.get("notes")
+        include_notes = request.get("include_notes", True)
+
+        logger.info(f"[COMPARISON] Export {format} for backtests: {backtest_ids}")
+
+        if format not in ["csv", "json", "pdf"]:
+            raise HTTPException(status_code=400, detail=f"Invalid format: {format}")
+
+        success, comparison, error = get_comparison_data(backtest_ids, notes if include_notes else None)
+
+        if not success or not comparison:
+            raise HTTPException(status_code=400, detail=error or "Failed to generate comparison")
+
+        # Generate export based on format
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        if format == "csv":
+            content = generate_comparison_csv(comparison)
+            filename = f"backtest_comparison_{timestamp}.csv"
+            media_type = "text/csv"
+        elif format == "json":
+            import json
+            content = json.dumps(generate_comparison_json(comparison), indent=2)
+            filename = f"backtest_comparison_{timestamp}.json"
+            media_type = "application/json"
+        else:  # pdf
+            content = generate_comparison_pdf(comparison)
+            filename = f"backtest_comparison_{timestamp}.pdf"
+            media_type = "application/pdf"
+
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": media_type,
+        }
+
+        logger.info(f"[SUCCESS] Comparison {format} export generated")
+        return Response(content=content, headers=headers, media_type=media_type)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Comparison export failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # Entry Point
 # =============================================================================
 

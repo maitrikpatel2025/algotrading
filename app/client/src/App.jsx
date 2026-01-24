@@ -7,6 +7,7 @@ import Strategy from './pages/Strategy';
 import StrategyLibrary from './pages/StrategyLibrary';
 import BacktestLibrary from './pages/BacktestLibrary';
 import BacktestDashboard from './pages/BacktestDashboard';
+import BacktestComparison from './pages/BacktestComparison';
 import Account from './pages/Account';
 
 /**
@@ -45,8 +46,9 @@ function App() {
           <Route path="/strategies/:id/edit" element={<Strategy />} />
           {/* Legacy route redirect */}
           <Route path="/strategy" element={<Navigate to="/strategies" replace />} />
-          {/* Backtests - Library and Dashboard */}
+          {/* Backtests - Library, Dashboard, and Comparison */}
           <Route path="/backtests" element={<BacktestLibrary />} />
+          <Route path="/backtests/compare" element={<BacktestComparison />} />
           <Route path="/backtests/:id" element={<BacktestDashboard />} />
           {/* Other pages */}
           <Route path="/monitor" element={<Monitor />} />
