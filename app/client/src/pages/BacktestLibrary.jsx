@@ -101,11 +101,6 @@ function BacktestLibrary() {
     }
   }, []);
 
-  useEffect(() => {
-    loadBacktests();
-    loadStrategies();
-  }, [loadBacktests, loadStrategies]);
-
   // Load strategies for configuration dialog
   const loadStrategies = useCallback(async () => {
     try {
@@ -117,6 +112,11 @@ function BacktestLibrary() {
       console.error('Error loading strategies:', error);
     }
   }, []);
+
+  useEffect(() => {
+    loadBacktests();
+    loadStrategies();
+  }, [loadBacktests, loadStrategies]);
 
   // Poll for updates if any backtest is running
   useEffect(() => {
