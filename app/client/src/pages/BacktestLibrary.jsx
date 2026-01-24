@@ -18,13 +18,15 @@ import {
   TrendingUp,
   TrendingDown,
   Target,
-  BarChart3
+  BarChart3,
+  Download
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import endPoints from '../app/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Toast from '../components/Toast';
 import BacktestConfigurationDialog from '../components/BacktestConfigurationDialog';
+import BacktestExportDialog from '../components/BacktestExportDialog';
 
 /**
  * BacktestLibrary Page
@@ -86,6 +88,11 @@ function BacktestLibrary() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [editingBacktest, setEditingBacktest] = useState(null);
   const [strategies, setStrategies] = useState([]);
+
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportingBacktest, setExportingBacktest] = useState(null);
+  const [selectedExportFormat, setSelectedExportFormat] = useState('csv');
 
   // Load backtests
   const loadBacktests = useCallback(async () => {
@@ -243,6 +250,15 @@ function BacktestLibrary() {
       console.error('Error saving backtest:', error);
       showToast('Failed to save backtest', 'error');
     }
+  };
+
+  // Handle export click
+  const handleExportClick = (backtest, format, e) => {
+    if (e) e.stopPropagation();
+    setExportingBacktest(backtest);
+    setSelectedExportFormat(format);
+    setExportDialogOpen(true);
+    setOpenMenuId(null);
   };
 
   // Filter and sort backtests
@@ -479,50 +495,83 @@ function BacktestLibrary() {
 
                     {/* Results Preview for Completed Backtests */}
                     {backtest.status === 'completed' && backtest.results && (
-                      <div className="grid grid-cols-3 gap-2 p-2 bg-neutral-50 rounded-md">
-                        {/* ROI */}
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {(backtest.results.return_on_investment || 0) >= 0 ? (
-                              <TrendingUp className="h-3 w-3 text-success" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 text-danger" />
-                            )}
+                      <>
+                        <div className="grid grid-cols-3 gap-2 p-2 bg-neutral-50 rounded-md">
+                          {/* ROI */}
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {(backtest.results.return_on_investment || 0) >= 0 ? (
+                                <TrendingUp className="h-3 w-3 text-success" />
+                              ) : (
+                                <TrendingDown className="h-3 w-3 text-danger" />
+                              )}
+                            </div>
+                            <p className={cn(
+                              "text-sm font-semibold tabular-nums",
+                              (backtest.results.return_on_investment || 0) >= 0 ? "text-success" : "text-danger"
+                            )}>
+                              {(backtest.results.return_on_investment || 0) >= 0 ? '+' : ''}
+                              {(backtest.results.return_on_investment || 0).toFixed(1)}%
+                            </p>
+                            <p className="text-[10px] text-neutral-500 uppercase">ROI</p>
                           </div>
-                          <p className={cn(
-                            "text-sm font-semibold tabular-nums",
-                            (backtest.results.return_on_investment || 0) >= 0 ? "text-success" : "text-danger"
-                          )}>
-                            {(backtest.results.return_on_investment || 0) >= 0 ? '+' : ''}
-                            {(backtest.results.return_on_investment || 0).toFixed(1)}%
-                          </p>
-                          <p className="text-[10px] text-neutral-500 uppercase">ROI</p>
-                        </div>
-                        {/* Win Rate */}
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Target className="h-3 w-3 text-neutral-400" />
+                          {/* Win Rate */}
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Target className="h-3 w-3 text-neutral-400" />
+                            </div>
+                            <p className={cn(
+                              "text-sm font-semibold tabular-nums",
+                              (backtest.results.win_rate || 0) >= 50 ? "text-success" :
+                              (backtest.results.win_rate || 0) < 40 ? "text-danger" : "text-neutral-900"
+                            )}>
+                              {(backtest.results.win_rate || 0).toFixed(1)}%
+                            </p>
+                            <p className="text-[10px] text-neutral-500 uppercase">Win</p>
                           </div>
-                          <p className={cn(
-                            "text-sm font-semibold tabular-nums",
-                            (backtest.results.win_rate || 0) >= 50 ? "text-success" :
-                            (backtest.results.win_rate || 0) < 40 ? "text-danger" : "text-neutral-900"
-                          )}>
-                            {(backtest.results.win_rate || 0).toFixed(1)}%
-                          </p>
-                          <p className="text-[10px] text-neutral-500 uppercase">Win</p>
-                        </div>
-                        {/* Total Trades */}
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <BarChart3 className="h-3 w-3 text-neutral-400" />
+                          {/* Total Trades */}
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <BarChart3 className="h-3 w-3 text-neutral-400" />
+                            </div>
+                            <p className="text-sm font-semibold tabular-nums text-neutral-900">
+                              {backtest.results.total_trades || 0}
+                            </p>
+                            <p className="text-[10px] text-neutral-500 uppercase">Trades</p>
                           </div>
-                          <p className="text-sm font-semibold tabular-nums text-neutral-900">
-                            {backtest.results.total_trades || 0}
-                          </p>
-                          <p className="text-[10px] text-neutral-500 uppercase">Trades</p>
                         </div>
-                      </div>
+
+                        {/* Export Quick Actions */}
+                        <div className="flex items-center gap-1 pt-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => handleExportClick(backtest, 'csv', e)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                            title="Export as CSV"
+                          >
+                            <Download className="h-3 w-3" />
+                            CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleExportClick(backtest, 'json', e)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                            title="Export as JSON"
+                          >
+                            <Download className="h-3 w-3" />
+                            JSON
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleExportClick(backtest, 'pdf', e)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                            title="Export as PDF"
+                          >
+                            <Download className="h-3 w-3" />
+                            PDF
+                          </button>
+                        </div>
+                      </>
                     )}
 
                     {/* Info */}
@@ -585,6 +634,17 @@ function BacktestLibrary() {
           editingBacktest={editingBacktest}
           strategies={strategies}
         />
+
+        {/* Export Dialog */}
+        {exportingBacktest && (
+          <BacktestExportDialog
+            backtestId={exportingBacktest.id}
+            backtestName={exportingBacktest.name}
+            isOpen={exportDialogOpen}
+            onClose={() => setExportDialogOpen(false)}
+            initialFormat={selectedExportFormat}
+          />
+        )}
       </div>
     </div>
   );

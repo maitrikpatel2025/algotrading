@@ -739,6 +739,7 @@ class BacktestConfig(BaseModel):
     results: Optional[Dict[str, Any]] = Field(
         None, description="Backtest results (null until completed)"
     )
+    notes: Optional[str] = Field(None, description="Custom notes and annotations")
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
@@ -759,6 +760,7 @@ class BacktestListItem(BaseModel):
     currency: str = Field(..., description="Account currency")
     status: str = Field(..., description="Backtest status")
     results: Optional[Dict[str, Any]] = Field(None, description="Backtest results summary")
+    notes: Optional[str] = Field(None, description="Custom notes and annotations")
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 

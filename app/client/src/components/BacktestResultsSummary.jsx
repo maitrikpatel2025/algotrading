@@ -17,6 +17,8 @@ import EquityCurveChart from './EquityCurveChart';
 import PriceChart from './PriceChart';
 import BacktestTradeList from './BacktestTradeList';
 import TradeFilterControls from './TradeFilterControls';
+import BacktestNotesEditor from './BacktestNotesEditor';
+import BacktestExportDialog from './BacktestExportDialog';
 import {
   METRIC_DEFINITIONS,
   getMetricTrend,
@@ -51,6 +53,14 @@ function BacktestResultsSummary({
   const [isTradeListExpanded, setIsTradeListExpanded] = useState(false);
   const [showTradesOnChart, setShowTradesOnChart] = useState(false);
   const tradeListRef = useRef(null);
+  const [notes, setNotes] = useState(backtest?.notes || '');
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [selectedExportFormat, setSelectedExportFormat] = useState('csv');
+
+  // Handler for notes updates
+  const handleNotesUpdated = (updatedNotes) => {
+    setNotes(updatedNotes);
+  };
 
   // Trade list state
   const [filters, setFilters] = useState({
@@ -145,6 +155,11 @@ function BacktestResultsSummary({
     exportTradesToCSV(allTrades, backtestName);
   };
 
+  const handleExportClick = (format) => {
+    setSelectedExportFormat(format);
+    setIsExportDialogOpen(true);
+  };
+
   const handleTradeCountClick = () => {
     setIsTradeListExpanded(true);
     // Scroll to trade list section after a brief delay for expansion animation
@@ -217,18 +232,53 @@ function BacktestResultsSummary({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="p-2 rounded text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-          aria-label={isExpanded ? 'Collapse results' : 'Expand results'}
-        >
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5" />
-          ) : (
-            <ChevronDown className="h-5 w-5" />
+        <div className="flex items-center gap-2">
+          {/* Export Button Group */}
+          {backtest && (
+            <div className="flex items-center gap-1 mr-2">
+              <button
+                type="button"
+                onClick={() => handleExportClick('csv')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                title="Export as CSV"
+              >
+                <Download className="h-3 w-3" />
+                CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportClick('json')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                title="Export as JSON"
+              >
+                <Download className="h-3 w-3" />
+                JSON
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportClick('pdf')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded transition-colors"
+                title="Export as PDF"
+              >
+                <Download className="h-3 w-3" />
+                PDF
+              </button>
+            </div>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 rounded text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            aria-label={isExpanded ? 'Collapse results' : 'Expand results'}
+          >
+            {isExpanded ? (
+              <ChevronUp className="h-5 w-5" />
+            ) : (
+              <ChevronDown className="h-5 w-5" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Collapsible Content */}
@@ -412,6 +462,17 @@ function BacktestResultsSummary({
             </div>
           </div>
 
+          {/* Backtest Notes Editor */}
+          {backtest && (
+            <div className="space-y-6">
+              <BacktestNotesEditor
+                backtestId={backtest.id}
+                initialNotes={backtest.notes || notes}
+                onNotesUpdated={handleNotesUpdated}
+              />
+            </div>
+          )}
+
           {/* Trade List Section */}
           {allTrades.length > 0 && (
             <div
@@ -508,6 +569,17 @@ function BacktestResultsSummary({
             </span>
           </div>
         </div>
+      )}
+
+      {/* Export Dialog */}
+      {backtest && (
+        <BacktestExportDialog
+          backtestId={backtest.id}
+          backtestName={results.strategy_name || 'Backtest'}
+          isOpen={isExportDialogOpen}
+          onClose={() => setIsExportDialogOpen(false)}
+          initialFormat={selectedExportFormat}
+        />
       )}
     </div>
   );

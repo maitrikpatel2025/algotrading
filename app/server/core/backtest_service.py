@@ -47,6 +47,7 @@ def _backtest_to_db_row(backtest: BacktestConfig) -> dict:
         else {},
         "status": backtest.status,
         "results": backtest.results,
+        "notes": backtest.notes,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -90,6 +91,7 @@ def _db_row_to_backtest(row: dict, strategy_name: Optional[str] = None) -> Backt
             risk_management=risk_management,
             status=row.get("status", "pending"),
             results=row.get("results"),
+            notes=row.get("notes"),
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),
         )
@@ -154,6 +156,7 @@ def _db_row_to_list_item(row: dict, strategy_name: Optional[str] = None) -> Back
         currency=row.get("currency", "USD"),
         status=row.get("status", "pending"),
         results=row.get("results"),
+        notes=row.get("notes"),
         created_at=row.get("created_at"),
         updated_at=row.get("updated_at"),
     )
@@ -432,3 +435,74 @@ def duplicate_backtest(
     except Exception as e:
         logger.error(f"Failed to duplicate backtest {backtest_id}: {e}")
         return False, None, None, str(e)
+
+
+def update_notes(backtest_id: str, notes: str) -> Tuple[bool, Optional[BacktestConfig], Optional[str]]:
+    """
+    Update notes field for a backtest.
+
+    Args:
+        backtest_id: The backtest ID to update
+        notes: The notes text to set
+
+    Returns:
+        Tuple of (success, updated_backtest, error_message)
+    """
+    if not is_configured():
+        return False, None, "Supabase not configured"
+
+    client = get_supabase_client()
+    if client is None:
+        return False, None, "Failed to get Supabase client"
+
+    try:
+        # Update notes in database
+        result = (
+            client.table("backtests")
+            .update({"notes": notes, "updated_at": datetime.now(timezone.utc).isoformat()})
+            .eq("id", backtest_id)
+            .execute()
+        )
+
+        if result.data and len(result.data) > 0:
+            row = result.data[0]
+
+            # Fetch strategy name if strategy_id exists
+            strategy_name = None
+            if row.get("strategy_id"):
+                strategy_result = (
+                    client.table("strategies")
+                    .select("name")
+                    .eq("id", row.get("strategy_id"))
+                    .execute()
+                )
+                if strategy_result.data and len(strategy_result.data) > 0:
+                    strategy_name = strategy_result.data[0].get("name")
+
+            backtest = _db_row_to_backtest(row, strategy_name)
+            logger.info(f"Notes updated for backtest: {backtest_id}")
+            return True, backtest, None
+        else:
+            return False, None, f"Backtest not found: {backtest_id}"
+
+    except Exception as e:
+        logger.error(f"Failed to update notes for backtest {backtest_id}: {e}")
+        return False, None, str(e)
+
+
+def get_backtest_with_results(backtest_id: str) -> Tuple[bool, Optional[BacktestConfig], Optional[dict], Optional[str]]:
+    """
+    Get a backtest configuration and its results for export.
+
+    Args:
+        backtest_id: The backtest ID to retrieve
+
+    Returns:
+        Tuple of (success, backtest_config, results_dict, error_message)
+    """
+    success, backtest, error = get_backtest(backtest_id)
+
+    if not success or not backtest:
+        return False, None, None, error
+
+    return True, backtest, backtest.results, None
