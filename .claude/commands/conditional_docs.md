@@ -538,3 +538,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing interactive chart markers with click handlers
     - When extending PriceChart component with trade visualization props
     - When working with findClosestTimeIndex() or time mapping utilities
+
+- app_docs/feature-ffe0f2e6-save-backtest-results.md
+  - Conditions:
+    - When implementing backtest results export functionality (CSV, JSON, PDF)
+    - When working with BacktestExportDialog or BacktestNotesEditor components
+    - When implementing notes field on backtest results
+    - When working with export_generators.py or export API endpoints
+    - When adding export buttons to BacktestLibrary or BacktestResultsSummary
+    - When implementing result metrics display on backtest cards
+    - When working with ReportLab PDF generation for backtests
+    - When troubleshooting export file downloads or content-type headers
+    - When implementing auto-save functionality for backtest notes
+    - When extending backtest results with persistent annotations
