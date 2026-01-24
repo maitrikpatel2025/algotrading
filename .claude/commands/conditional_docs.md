@@ -569,3 +569,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing or modifying EquityCurveChart component
     - When working with series creation or markers API in lightweight-charts
     - When troubleshooting webpack cache issues causing stale code to be served
+
+- app_docs/feature-64cbfa24-risk-analytics.md
+  - Conditions:
+    - When working with risk analytics or risk metrics visualization
+    - When implementing or modifying RiskAnalytics, VaRCard, RiskOfRuinCard, or DrawdownDurationCard components
+    - When working with win/loss distribution histograms or P/L scatter plots
+    - When implementing streak analysis (consecutive wins/losses)
+    - When working with Value at Risk (VaR) calculations
+    - When implementing Monte Carlo simulations for risk of ruin
+    - When working with drawdown duration analysis
+    - When extending BacktestResultsSummary with new risk metrics
+    - When troubleshooting risk analytics calculations in backtest_executor.py

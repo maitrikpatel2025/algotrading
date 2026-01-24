@@ -1503,3 +1503,365 @@ class TestConditionFormatHandling:
 
             # Backtest should start successfully with all section types
             assert result["success"] is True
+
+
+class TestRiskAnalyticsCalculations:
+    """Test cases for risk analytics calculation methods."""
+
+    def test_calculate_consecutive_streaks_empty(self, executor):
+        """Test streak calculation with no trades."""
+        result = executor._calculate_consecutive_streaks([])
+
+        assert result["max_consecutive_wins"] == 0
+        assert result["max_consecutive_losses"] == 0
+        assert result["avg_consecutive_wins"] == 0.0
+        assert result["avg_consecutive_losses"] == 0.0
+
+    def test_calculate_consecutive_streaks_all_wins(self, executor):
+        """Test streak calculation with all winning trades."""
+        trades = [
+            {"pnl": 100.0},
+            {"pnl": 50.0},
+            {"pnl": 75.0},
+            {"pnl": 25.0},
+        ]
+        result = executor._calculate_consecutive_streaks(trades)
+
+        assert result["max_consecutive_wins"] == 4
+        assert result["max_consecutive_losses"] == 0
+        assert result["avg_consecutive_wins"] == 4.0
+        assert result["avg_consecutive_losses"] == 0.0
+
+    def test_calculate_consecutive_streaks_all_losses(self, executor):
+        """Test streak calculation with all losing trades."""
+        trades = [
+            {"pnl": -100.0},
+            {"pnl": -50.0},
+            {"pnl": -75.0},
+        ]
+        result = executor._calculate_consecutive_streaks(trades)
+
+        assert result["max_consecutive_wins"] == 0
+        assert result["max_consecutive_losses"] == 3
+        assert result["avg_consecutive_wins"] == 0.0
+        assert result["avg_consecutive_losses"] == 3.0
+
+    def test_calculate_consecutive_streaks_alternating(self, executor):
+        """Test streak calculation with alternating wins/losses."""
+        trades = [
+            {"pnl": 100.0},
+            {"pnl": -50.0},
+            {"pnl": 75.0},
+            {"pnl": -25.0},
+        ]
+        result = executor._calculate_consecutive_streaks(trades)
+
+        assert result["max_consecutive_wins"] == 1
+        assert result["max_consecutive_losses"] == 1
+        assert result["avg_consecutive_wins"] == 1.0
+        assert result["avg_consecutive_losses"] == 1.0
+
+    def test_calculate_consecutive_streaks_mixed(self, executor):
+        """Test streak calculation with mixed win/loss patterns."""
+        trades = [
+            {"pnl": 100.0},
+            {"pnl": 50.0},
+            {"pnl": 75.0},  # 3 wins
+            {"pnl": -50.0},
+            {"pnl": -25.0},  # 2 losses
+            {"pnl": 100.0},  # 1 win
+            {"pnl": -10.0},
+            {"pnl": -20.0},
+            {"pnl": -30.0},  # 3 losses
+        ]
+        result = executor._calculate_consecutive_streaks(trades)
+
+        assert result["max_consecutive_wins"] == 3
+        assert result["max_consecutive_losses"] == 3
+        assert result["avg_consecutive_wins"] == 2.0  # (3 + 1) / 2
+        assert result["avg_consecutive_losses"] == 2.5  # (2 + 3) / 2
+
+    def test_calculate_win_loss_distribution_empty(self, executor):
+        """Test distribution calculation with no trades."""
+        result = executor._calculate_win_loss_distribution([])
+
+        assert result == []
+
+    def test_calculate_win_loss_distribution_single_trade(self, executor):
+        """Test distribution calculation with single trade."""
+        trades = [{"pnl": 100.0}]
+        result = executor._calculate_win_loss_distribution(trades)
+
+        assert len(result) == 1
+        assert result[0]["count"] == 1
+        assert result[0]["is_winner"] is True
+
+    def test_calculate_win_loss_distribution_mixed(self, executor):
+        """Test distribution calculation with mixed trades."""
+        trades = [
+            {"pnl": 100.0},
+            {"pnl": 50.0},
+            {"pnl": -25.0},
+            {"pnl": -75.0},
+            {"pnl": 200.0},
+        ]
+        result = executor._calculate_win_loss_distribution(trades)
+
+        assert len(result) > 0
+        # Total count should equal number of trades
+        total_count = sum(bucket["count"] for bucket in result)
+        assert total_count == 5
+
+    def test_calculate_holding_period_distribution_empty(self, executor):
+        """Test holding period distribution with no trades."""
+        result = executor._calculate_holding_period_distribution([])
+
+        assert result == []
+
+    def test_calculate_holding_period_distribution_with_trades(self, executor):
+        """Test holding period distribution with trades."""
+        trades = [
+            {
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },  # 60 min
+            {
+                "entry_time": "2025-01-02T10:00:00Z",
+                "exit_time": "2025-01-02T11:30:00Z",
+            },  # 90 min
+            {
+                "entry_time": "2025-01-03T10:00:00Z",
+                "exit_time": "2025-01-03T10:30:00Z",
+            },  # 30 min
+        ]
+        result = executor._calculate_holding_period_distribution(trades)
+
+        assert len(result) > 0
+        total_count = sum(bucket["count"] for bucket in result)
+        assert total_count == 3
+
+    def test_calculate_pl_scatter_data_empty(self, executor):
+        """Test scatter data extraction with no trades."""
+        result = executor._calculate_pl_scatter_data([])
+
+        assert result == []
+
+    def test_calculate_pl_scatter_data_with_trades(self, executor):
+        """Test scatter data extraction with trades."""
+        trades = [
+            {"entry_time": "2025-01-01T10:00:00Z", "pnl": 100.0},
+            {"entry_time": "2025-01-02T10:00:00Z", "pnl": -50.0},
+            {"entry_time": "2025-01-03T10:00:00Z", "pnl": 75.0},
+        ]
+        result = executor._calculate_pl_scatter_data(trades)
+
+        assert len(result) == 3
+        assert result[0]["pnl"] == 100.0
+        assert result[0]["is_winner"] is True
+        assert result[1]["pnl"] == -50.0
+        assert result[1]["is_winner"] is False
+
+    def test_calculate_risk_of_ruin_insufficient_trades(self, executor):
+        """Test risk of ruin with insufficient trades."""
+        trades = [{"pnl": 100.0}, {"pnl": -50.0}]
+        result, simulations = executor._calculate_risk_of_ruin(trades, 10000.0)
+
+        assert result is None
+        assert simulations == 10000
+
+    def test_calculate_risk_of_ruin_profitable_strategy(self, executor):
+        """Test risk of ruin with profitable strategy."""
+        # Many profitable trades should have low risk of ruin
+        trades = [{"pnl": 100.0} for _ in range(20)]
+        result, simulations = executor._calculate_risk_of_ruin(
+            trades, 10000.0, simulations=1000
+        )
+
+        assert result is not None
+        assert result < 5.0  # Should be low risk
+        assert simulations == 1000
+
+    def test_calculate_risk_of_ruin_losing_strategy(self, executor):
+        """Test risk of ruin with losing strategy."""
+        # Many losing trades with large losses should have higher risk of ruin
+        # Use large losses relative to initial balance to ensure ruin threshold is hit
+        trades = [{"pnl": -1000.0} for _ in range(20)]  # $1000 losses x 20 trades
+        result, simulations = executor._calculate_risk_of_ruin(
+            trades, 10000.0, simulations=1000
+        )
+
+        assert result is not None
+        assert result > 0.0  # Should have some risk with these losses
+        assert simulations == 1000
+
+    def test_calculate_drawdown_durations_empty(self, executor):
+        """Test drawdown duration calculation with empty equity curve."""
+        result = executor._calculate_drawdown_durations([10000.0])
+
+        assert result["avg_drawdown_duration_minutes"] is None
+        assert result["max_drawdown_duration_minutes"] is None
+        assert result["drawdown_durations"] == []
+
+    def test_calculate_drawdown_durations_no_drawdown(self, executor):
+        """Test drawdown duration calculation with no drawdowns."""
+        equity_curve = [10000, 10100, 10200, 10300, 10400]
+        result = executor._calculate_drawdown_durations(equity_curve)
+
+        assert result["avg_drawdown_duration_minutes"] is None
+        assert result["max_drawdown_duration_minutes"] is None
+        assert result["drawdown_durations"] == []
+
+    def test_calculate_drawdown_durations_with_dates(self, executor):
+        """Test drawdown duration calculation with date information."""
+        equity_curve = [10000, 10500, 10200, 10400, 10600]
+        equity_dates = [
+            "2025-01-01T10:00:00Z",
+            "2025-01-01T11:00:00Z",
+            "2025-01-01T12:00:00Z",
+            "2025-01-01T13:00:00Z",
+            "2025-01-01T14:00:00Z",
+        ]
+        result = executor._calculate_drawdown_durations(equity_curve, equity_dates)
+
+        assert result["avg_drawdown_duration_minutes"] is not None
+        assert result["max_drawdown_duration_minutes"] is not None
+        assert len(result["drawdown_durations"]) > 0
+
+    def test_calculate_var_insufficient_trades(self, executor):
+        """Test VaR calculation with insufficient trades."""
+        trades = [{"pnl": 100.0}, {"pnl": -50.0}]
+        result = executor._calculate_var(trades)
+
+        assert result["var_95"] is None
+        assert result["var_99"] is None
+
+    def test_calculate_var_with_trades(self, executor):
+        """Test VaR calculation with sufficient trades."""
+        trades = [
+            {"pnl": 100.0},
+            {"pnl": -50.0},
+            {"pnl": 75.0},
+            {"pnl": -100.0},
+            {"pnl": 50.0},
+            {"pnl": -25.0},
+            {"pnl": 200.0},
+            {"pnl": -150.0},
+            {"pnl": 80.0},
+            {"pnl": -80.0},
+        ]
+        result = executor._calculate_var(trades)
+
+        assert result["var_95"] is not None
+        assert result["var_99"] is not None
+        # VaR should be a negative or small positive value (worst percentile)
+        assert result["var_99"] <= result["var_95"]
+
+    def test_calculate_var_all_positive(self, executor):
+        """Test VaR calculation with all positive trades."""
+        trades = [{"pnl": i * 10.0} for i in range(1, 21)]
+        result = executor._calculate_var(trades)
+
+        assert result["var_95"] is not None
+        assert result["var_99"] is not None
+        # VaR at worst percentile should be the smallest trade
+        assert result["var_99"] == 10.0  # First trade has pnl of 10
+
+
+class TestRiskAnalyticsInResults:
+    """Test cases for risk analytics integration in backtest results."""
+
+    def test_results_include_risk_analytics(self, executor):
+        """Test that results include risk analytics fields."""
+        trades = [
+            {
+                "pnl": 100.0,
+                "entry_time": "2025-01-01T10:00:00Z",
+                "exit_time": "2025-01-01T11:00:00Z",
+            },
+            {
+                "pnl": -50.0,
+                "entry_time": "2025-01-02T10:00:00Z",
+                "exit_time": "2025-01-02T11:00:00Z",
+            },
+            {
+                "pnl": 75.0,
+                "entry_time": "2025-01-03T10:00:00Z",
+                "exit_time": "2025-01-03T11:00:00Z",
+            },
+            {
+                "pnl": -25.0,
+                "entry_time": "2025-01-04T10:00:00Z",
+                "exit_time": "2025-01-04T11:00:00Z",
+            },
+            {
+                "pnl": 50.0,
+                "entry_time": "2025-01-05T10:00:00Z",
+                "exit_time": "2025-01-05T11:00:00Z",
+            },
+            {
+                "pnl": 80.0,
+                "entry_time": "2025-01-06T10:00:00Z",
+                "exit_time": "2025-01-06T11:00:00Z",
+            },
+        ]
+
+        results = executor._calculate_results(
+            trades=trades, initial_balance=10000.0, final_balance=10230.0
+        )
+
+        # Check streak analysis fields
+        assert "max_consecutive_wins" in results
+        assert "max_consecutive_losses" in results
+        assert "avg_consecutive_wins" in results
+        assert "avg_consecutive_losses" in results
+
+        # Check distribution fields
+        assert "win_loss_distribution" in results
+        assert "holding_period_distribution" in results
+        assert "pl_scatter_data" in results
+
+        # Check risk of ruin
+        assert "risk_of_ruin" in results
+        assert "risk_of_ruin_simulations" in results
+
+        # Check drawdown duration
+        assert "avg_drawdown_duration_minutes" in results
+        assert "max_drawdown_duration_minutes" in results
+        assert "drawdown_durations" in results
+
+        # Check VaR
+        assert "var_95" in results
+        assert "var_99" in results
+
+    def test_risk_analytics_in_results_summary_model(self):
+        """Test that BacktestResultsSummary model includes risk analytics fields."""
+        from core.data_models import BacktestResultsSummary
+
+        summary = BacktestResultsSummary(
+            total_trades=10,
+            max_consecutive_wins=5,
+            max_consecutive_losses=3,
+            avg_consecutive_wins=2.5,
+            avg_consecutive_losses=1.5,
+            win_loss_distribution=[{"bucket_min": 0, "bucket_max": 100, "count": 5, "is_winner": True}],
+            holding_period_distribution=[{"bucket_min_minutes": 0, "bucket_max_minutes": 60, "count": 5}],
+            pl_scatter_data=[{"entry_time": "2025-01-01T10:00:00Z", "pnl": 100.0, "is_winner": True}],
+            risk_of_ruin=5.5,
+            risk_of_ruin_simulations=10000,
+            avg_drawdown_duration_minutes=120.0,
+            max_drawdown_duration_minutes=360.0,
+            drawdown_durations=[{"start_index": 0, "end_index": 5, "duration_minutes": 300.0}],
+            var_95=-50.0,
+            var_99=-100.0,
+        )
+
+        assert summary.max_consecutive_wins == 5
+        assert summary.max_consecutive_losses == 3
+        assert summary.avg_consecutive_wins == 2.5
+        assert summary.avg_consecutive_losses == 1.5
+        assert summary.risk_of_ruin == 5.5
+        assert summary.risk_of_ruin_simulations == 10000
+        assert summary.avg_drawdown_duration_minutes == 120.0
+        assert summary.max_drawdown_duration_minutes == 360.0
+        assert summary.var_95 == -50.0
+        assert summary.var_99 == -100.0

@@ -122,6 +122,58 @@ export const METRIC_DEFINITIONS = {
     suffix: '%',
     format: 'percentage',
   },
+  // Risk Analytics metrics
+  max_consecutive_wins: {
+    label: 'Max Win Streak',
+    tooltip: 'The longest sequence of consecutive winning trades',
+    format: 'integer',
+  },
+  max_consecutive_losses: {
+    label: 'Max Loss Streak',
+    tooltip: 'The longest sequence of consecutive losing trades',
+    format: 'integer',
+  },
+  avg_consecutive_wins: {
+    label: 'Avg Win Streak',
+    tooltip: 'Average length of winning trade streaks',
+    format: 'decimal',
+  },
+  avg_consecutive_losses: {
+    label: 'Avg Loss Streak',
+    tooltip: 'Average length of losing trade streaks',
+    format: 'decimal',
+  },
+  risk_of_ruin: {
+    label: 'Risk of Ruin',
+    tooltip:
+      'Probability of losing 50% of account based on Monte Carlo simulation with 10,000 iterations using historical trade returns',
+    suffix: '%',
+    format: 'percentage',
+  },
+  var_95: {
+    label: 'VaR (95%)',
+    tooltip:
+      'Value at Risk at 95% confidence - the maximum expected loss in 95% of trades based on historical distribution',
+    prefix: '$',
+    format: 'currency',
+  },
+  var_99: {
+    label: 'VaR (99%)',
+    tooltip:
+      'Value at Risk at 99% confidence - the maximum expected loss in 99% of trades based on historical distribution',
+    prefix: '$',
+    format: 'currency',
+  },
+  avg_drawdown_duration_minutes: {
+    label: 'Avg DD Duration',
+    tooltip: 'Average time spent in drawdown before recovering to a new equity high',
+    format: 'duration',
+  },
+  max_drawdown_duration_minutes: {
+    label: 'Max DD Duration',
+    tooltip: 'Longest time spent in drawdown before recovering to a new equity high',
+    format: 'duration',
+  },
 };
 
 /**
@@ -146,6 +198,8 @@ export function getMetricTrend(metricKey, value) {
     'sortino_ratio',
     'expectancy',
     'strategy_vs_benchmark',
+    'max_consecutive_wins',
+    'avg_consecutive_wins',
   ];
 
   // Metrics where lower is better (red for high values)
@@ -154,6 +208,13 @@ export function getMetricTrend(metricKey, value) {
     'max_drawdown_percent',
     'average_loss',
     'largest_loss',
+    'max_consecutive_losses',
+    'avg_consecutive_losses',
+    'risk_of_ruin',
+    'var_95',
+    'var_99',
+    'avg_drawdown_duration_minutes',
+    'max_drawdown_duration_minutes',
   ];
 
   // Win rate thresholds

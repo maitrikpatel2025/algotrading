@@ -20,6 +20,7 @@ import TradeFilterControls from './TradeFilterControls';
 import BacktestNotesEditor from './BacktestNotesEditor';
 import BacktestExportDialog from './BacktestExportDialog';
 import PerformanceByTimePeriod from './PerformanceByTimePeriod';
+import RiskAnalytics from './RiskAnalytics';
 import {
   METRIC_DEFINITIONS,
   getMetricTrend,
@@ -470,6 +471,24 @@ function BacktestResultsSummary({
             hourlyPerformance={results.hourly_performance}
             dayHourHeatmap={results.day_hour_heatmap}
             backtestName={results.strategy_name || 'backtest'}
+            currency="$"
+          />
+
+          {/* Risk Analytics */}
+          <RiskAnalytics
+            maxConsecutiveWins={getMetric('max_consecutive_wins')}
+            maxConsecutiveLosses={getMetric('max_consecutive_losses')}
+            avgConsecutiveWins={getMetric('avg_consecutive_wins')}
+            avgConsecutiveLosses={getMetric('avg_consecutive_losses')}
+            winLossDistribution={results.win_loss_distribution}
+            holdingPeriodDistribution={results.holding_period_distribution}
+            plScatterData={results.pl_scatter_data}
+            riskOfRuin={results.risk_of_ruin}
+            riskOfRuinSimulations={getMetric('risk_of_ruin_simulations', 10000)}
+            avgDrawdownDurationMinutes={results.avg_drawdown_duration_minutes}
+            maxDrawdownDurationMinutes={results.max_drawdown_duration_minutes}
+            var95={results.var_95}
+            var99={results.var_99}
             currency="$"
           />
 
