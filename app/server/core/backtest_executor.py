@@ -1015,6 +1015,220 @@ class BacktestExecutor:
 
         return round(buy_hold_return, 2), buy_hold_curve
 
+    def _calculate_time_period_metrics(
+        self, trades: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Calculate time period performance metrics from trades.
+
+        Groups trades by month, day of week, and hour of day to identify
+        temporal patterns in strategy performance.
+
+        Args:
+            trades: List of trade dictionaries with entry_time and pnl
+
+        Returns:
+            Dict containing monthly_performance, day_of_week_performance,
+            hourly_performance, and day_hour_heatmap
+        """
+        from collections import defaultdict
+
+        if not trades:
+            return {
+                "monthly_performance": None,
+                "day_of_week_performance": None,
+                "hourly_performance": None,
+                "day_hour_heatmap": None,
+            }
+
+        # Initialize aggregation structures
+        monthly_data = defaultdict(lambda: {"trades": 0, "wins": 0, "pnl": 0.0})
+        day_of_week_data = defaultdict(lambda: {"trades": 0, "wins": 0, "pnl": 0.0})
+        hourly_data = defaultdict(lambda: {"trades": 0, "wins": 0, "pnl": 0.0})
+        day_hour_data = defaultdict(lambda: {"trades": 0, "pnl": 0.0})
+
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+        for trade in trades:
+            entry_time = trade.get("entry_time")
+            pnl = trade.get("pnl", 0)
+
+            if entry_time is None:
+                continue
+
+            # Parse entry_time if string
+            if isinstance(entry_time, str):
+                try:
+                    entry_time = datetime.fromisoformat(entry_time.replace("Z", "+00:00"))
+                    if entry_time.tzinfo is not None:
+                        entry_time = entry_time.replace(tzinfo=None)
+                except (ValueError, TypeError):
+                    continue
+
+            if not hasattr(entry_time, "month"):
+                continue
+
+            # Extract time components
+            month_key = entry_time.strftime("%Y-%m")
+            day_of_week = entry_time.weekday()  # 0=Monday, 6=Sunday
+            hour = entry_time.hour
+
+            is_winner = pnl > 0
+
+            # Aggregate monthly data
+            monthly_data[month_key]["trades"] += 1
+            monthly_data[month_key]["pnl"] += pnl
+            if is_winner:
+                monthly_data[month_key]["wins"] += 1
+
+            # Aggregate day of week data
+            day_of_week_data[day_of_week]["trades"] += 1
+            day_of_week_data[day_of_week]["pnl"] += pnl
+            if is_winner:
+                day_of_week_data[day_of_week]["wins"] += 1
+
+            # Aggregate hourly data
+            hourly_data[hour]["trades"] += 1
+            hourly_data[hour]["pnl"] += pnl
+            if is_winner:
+                hourly_data[hour]["wins"] += 1
+
+            # Aggregate day-hour heatmap data
+            day_hour_key = (day_of_week, hour)
+            day_hour_data[day_hour_key]["trades"] += 1
+            day_hour_data[day_hour_key]["pnl"] += pnl
+
+        # Convert to output format with best/worst identification
+
+        # Monthly performance
+        monthly_performance = []
+        for month_key in sorted(monthly_data.keys()):
+            data = monthly_data[month_key]
+            win_rate = (data["wins"] / data["trades"] * 100) if data["trades"] > 0 else 0.0
+            monthly_performance.append({
+                "month": month_key,
+                "trades": data["trades"],
+                "win_rate": round(win_rate, 1),
+                "net_pnl": round(data["pnl"], 2),
+                "is_best": False,
+                "is_worst": False,
+            })
+
+        # Identify best/worst months by net P/L
+        if monthly_performance:
+            pnl_values = [m["net_pnl"] for m in monthly_performance]
+            max_pnl = max(pnl_values)
+            min_pnl = min(pnl_values)
+            for m in monthly_performance:
+                if m["net_pnl"] == max_pnl:
+                    m["is_best"] = True
+                if m["net_pnl"] == min_pnl:
+                    m["is_worst"] = True
+
+        # Day of week performance
+        day_of_week_performance = []
+        for day in range(7):
+            if day in day_of_week_data:
+                data = day_of_week_data[day]
+                win_rate = (data["wins"] / data["trades"] * 100) if data["trades"] > 0 else 0.0
+                day_of_week_performance.append({
+                    "day": day,
+                    "day_name": day_names[day],
+                    "trades": data["trades"],
+                    "win_rate": round(win_rate, 1),
+                    "net_pnl": round(data["pnl"], 2),
+                    "is_best": False,
+                    "is_worst": False,
+                })
+            else:
+                day_of_week_performance.append({
+                    "day": day,
+                    "day_name": day_names[day],
+                    "trades": 0,
+                    "win_rate": 0.0,
+                    "net_pnl": 0.0,
+                    "is_best": False,
+                    "is_worst": False,
+                })
+
+        # Identify best/worst days by net P/L (only among days with trades)
+        days_with_trades = [d for d in day_of_week_performance if d["trades"] > 0]
+        if days_with_trades:
+            pnl_values = [d["net_pnl"] for d in days_with_trades]
+            max_pnl = max(pnl_values)
+            min_pnl = min(pnl_values)
+            for d in day_of_week_performance:
+                if d["trades"] > 0:
+                    if d["net_pnl"] == max_pnl:
+                        d["is_best"] = True
+                    if d["net_pnl"] == min_pnl:
+                        d["is_worst"] = True
+
+        # Hourly performance
+        hourly_performance = []
+        for hour in range(24):
+            if hour in hourly_data:
+                data = hourly_data[hour]
+                win_rate = (data["wins"] / data["trades"] * 100) if data["trades"] > 0 else 0.0
+                hourly_performance.append({
+                    "hour": hour,
+                    "trades": data["trades"],
+                    "win_rate": round(win_rate, 1),
+                    "net_pnl": round(data["pnl"], 2),
+                    "is_best": False,
+                    "is_worst": False,
+                })
+            else:
+                hourly_performance.append({
+                    "hour": hour,
+                    "trades": 0,
+                    "win_rate": 0.0,
+                    "net_pnl": 0.0,
+                    "is_best": False,
+                    "is_worst": False,
+                })
+
+        # Identify best/worst hours by net P/L (only among hours with trades)
+        hours_with_trades = [h for h in hourly_performance if h["trades"] > 0]
+        if hours_with_trades:
+            pnl_values = [h["net_pnl"] for h in hours_with_trades]
+            max_pnl = max(pnl_values)
+            min_pnl = min(pnl_values)
+            for h in hourly_performance:
+                if h["trades"] > 0:
+                    if h["net_pnl"] == max_pnl:
+                        h["is_best"] = True
+                    if h["net_pnl"] == min_pnl:
+                        h["is_worst"] = True
+
+        # Day-hour heatmap
+        day_hour_heatmap = []
+        for day in range(7):
+            for hour in range(24):
+                key = (day, hour)
+                if key in day_hour_data:
+                    data = day_hour_data[key]
+                    day_hour_heatmap.append({
+                        "day": day,
+                        "hour": hour,
+                        "net_pnl": round(data["pnl"], 2),
+                        "trades": data["trades"],
+                    })
+                else:
+                    day_hour_heatmap.append({
+                        "day": day,
+                        "hour": hour,
+                        "net_pnl": 0.0,
+                        "trades": 0,
+                    })
+
+        return {
+            "monthly_performance": monthly_performance if monthly_performance else None,
+            "day_of_week_performance": day_of_week_performance if day_of_week_performance else None,
+            "hourly_performance": hourly_performance if hourly_performance else None,
+            "day_hour_heatmap": day_hour_heatmap if day_hour_heatmap else None,
+        }
+
     def _calculate_average_trade_duration(self, trades: List[Dict[str, Any]]) -> float:
         """
         Calculate average trade duration in minutes.
@@ -1249,6 +1463,9 @@ class BacktestExecutor:
         # Identify drawdown periods
         drawdown_periods = self._identify_drawdown_periods(equity_curve)
 
+        # Calculate time period metrics
+        time_period_metrics = self._calculate_time_period_metrics(trades)
+
         # Build the results summary
         results = BacktestResultsSummary(
             total_net_profit=round(total_net_profit, 2),
@@ -1279,6 +1496,10 @@ class BacktestExecutor:
             trade_counts_per_candle=trade_counts_per_candle if trade_counts_per_candle else None,
             drawdown_periods=drawdown_periods if drawdown_periods else None,
             trades=trades[-100:],  # Keep last 100 trades for detail view
+            monthly_performance=time_period_metrics["monthly_performance"],
+            day_of_week_performance=time_period_metrics["day_of_week_performance"],
+            hourly_performance=time_period_metrics["hourly_performance"],
+            day_hour_heatmap=time_period_metrics["day_hour_heatmap"],
         )
 
         return results.model_dump()
