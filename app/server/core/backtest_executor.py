@@ -1229,6 +1229,470 @@ class BacktestExecutor:
             "day_hour_heatmap": day_hour_heatmap if day_hour_heatmap else None,
         }
 
+    def _calculate_consecutive_streaks(self, trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate consecutive win/loss streaks from trade history.
+
+        Args:
+            trades: List of trade dictionaries with pnl field
+
+        Returns:
+            Dict with max_consecutive_wins, max_consecutive_losses,
+            avg_consecutive_wins, avg_consecutive_losses
+        """
+        if not trades:
+            return {
+                "max_consecutive_wins": 0,
+                "max_consecutive_losses": 0,
+                "avg_consecutive_wins": 0.0,
+                "avg_consecutive_losses": 0.0,
+            }
+
+        # Track streaks
+        win_streaks = []
+        loss_streaks = []
+        current_streak = 0
+        current_type = None  # 'win' or 'loss'
+
+        for trade in trades:
+            pnl = trade.get("pnl", 0)
+            is_win = pnl > 0
+
+            if current_type is None:
+                # First trade
+                current_type = "win" if is_win else "loss"
+                current_streak = 1
+            elif (is_win and current_type == "win") or (not is_win and current_type == "loss"):
+                # Same type, continue streak
+                current_streak += 1
+            else:
+                # Type changed, record streak and start new one
+                if current_type == "win":
+                    win_streaks.append(current_streak)
+                else:
+                    loss_streaks.append(current_streak)
+                current_type = "win" if is_win else "loss"
+                current_streak = 1
+
+        # Don't forget the last streak
+        if current_streak > 0 and current_type:
+            if current_type == "win":
+                win_streaks.append(current_streak)
+            else:
+                loss_streaks.append(current_streak)
+
+        # Calculate stats
+        max_wins = max(win_streaks) if win_streaks else 0
+        max_losses = max(loss_streaks) if loss_streaks else 0
+        avg_wins = sum(win_streaks) / len(win_streaks) if win_streaks else 0.0
+        avg_losses = sum(loss_streaks) / len(loss_streaks) if loss_streaks else 0.0
+
+        return {
+            "max_consecutive_wins": max_wins,
+            "max_consecutive_losses": max_losses,
+            "avg_consecutive_wins": round(avg_wins, 1),
+            "avg_consecutive_losses": round(avg_losses, 1),
+        }
+
+    def _calculate_win_loss_distribution(
+        self, trades: List[Dict[str, Any]], num_buckets: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        Create histogram bucket data for P/L distribution.
+
+        Args:
+            trades: List of trade dictionaries with pnl field
+            num_buckets: Number of histogram buckets
+
+        Returns:
+            List of bucket dicts with bucket_min, bucket_max, count, is_winner
+        """
+        if not trades:
+            return []
+
+        pnl_values = [t.get("pnl", 0) for t in trades]
+        min_pnl = min(pnl_values)
+        max_pnl = max(pnl_values)
+
+        # Handle edge case where all trades have same P/L
+        if min_pnl == max_pnl:
+            return [
+                {
+                    "bucket_min": min_pnl,
+                    "bucket_max": max_pnl,
+                    "count": len(trades),
+                    "is_winner": min_pnl > 0,
+                }
+            ]
+
+        # Calculate bucket size
+        bucket_size = (max_pnl - min_pnl) / num_buckets
+        buckets = []
+
+        for i in range(num_buckets):
+            bucket_min = min_pnl + i * bucket_size
+            bucket_max = min_pnl + (i + 1) * bucket_size
+
+            # Count trades in this bucket
+            count = sum(
+                1
+                for pnl in pnl_values
+                if (bucket_min <= pnl < bucket_max) or (i == num_buckets - 1 and pnl == max_pnl)
+            )
+
+            if count > 0:
+                buckets.append(
+                    {
+                        "bucket_min": round(bucket_min, 2),
+                        "bucket_max": round(bucket_max, 2),
+                        "count": count,
+                        "is_winner": (bucket_min + bucket_max) / 2 > 0,
+                    }
+                )
+
+        return buckets
+
+    def _calculate_holding_period_distribution(
+        self, trades: List[Dict[str, Any]], num_buckets: int = 15
+    ) -> List[Dict[str, Any]]:
+        """
+        Create histogram bucket data for holding period distribution.
+
+        Args:
+            trades: List of trade dictionaries with entry_time and exit_time
+            num_buckets: Number of histogram buckets
+
+        Returns:
+            List of bucket dicts with bucket_min_minutes, bucket_max_minutes, count
+        """
+        if not trades:
+            return []
+
+        durations = []
+        for trade in trades:
+            entry_time = trade.get("entry_time")
+            exit_time = trade.get("exit_time")
+
+            if entry_time and exit_time:
+                try:
+                    # Parse times if strings
+                    if isinstance(entry_time, str):
+                        entry_time = datetime.fromisoformat(entry_time.replace("Z", "+00:00"))
+                        if entry_time.tzinfo is not None:
+                            entry_time = entry_time.replace(tzinfo=None)
+                    if isinstance(exit_time, str):
+                        exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+                        if exit_time.tzinfo is not None:
+                            exit_time = exit_time.replace(tzinfo=None)
+
+                    if hasattr(entry_time, "timestamp") and hasattr(exit_time, "timestamp"):
+                        duration_minutes = (exit_time - entry_time).total_seconds() / 60
+                        if duration_minutes >= 0:
+                            durations.append(duration_minutes)
+                except (ValueError, TypeError):
+                    continue
+
+        if not durations:
+            return []
+
+        min_duration = min(durations)
+        max_duration = max(durations)
+
+        # Handle edge case where all durations are the same
+        if min_duration == max_duration:
+            return [
+                {
+                    "bucket_min_minutes": round(min_duration, 2),
+                    "bucket_max_minutes": round(max_duration, 2),
+                    "count": len(durations),
+                }
+            ]
+
+        # Calculate bucket size
+        bucket_size = (max_duration - min_duration) / num_buckets
+        buckets = []
+
+        for i in range(num_buckets):
+            bucket_min = min_duration + i * bucket_size
+            bucket_max = min_duration + (i + 1) * bucket_size
+
+            # Count durations in this bucket
+            count = sum(
+                1
+                for d in durations
+                if (bucket_min <= d < bucket_max)
+                or (i == num_buckets - 1 and d == max_duration)
+            )
+
+            if count > 0:
+                buckets.append(
+                    {
+                        "bucket_min_minutes": round(bucket_min, 2),
+                        "bucket_max_minutes": round(bucket_max, 2),
+                        "count": count,
+                    }
+                )
+
+        return buckets
+
+    def _calculate_pl_scatter_data(self, trades: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Extract scatter plot data for entry time vs P/L visualization.
+
+        Args:
+            trades: List of trade dictionaries
+
+        Returns:
+            List of scatter point dicts with entry_time, pnl, is_winner
+        """
+        if not trades:
+            return []
+
+        scatter_data = []
+        for trade in trades:
+            entry_time = trade.get("entry_time")
+            pnl = trade.get("pnl", 0)
+
+            if entry_time:
+                # Ensure entry_time is a string
+                if hasattr(entry_time, "isoformat"):
+                    entry_time = entry_time.isoformat()
+
+                scatter_data.append(
+                    {
+                        "entry_time": entry_time,
+                        "pnl": round(pnl, 2),
+                        "is_winner": pnl > 0,
+                    }
+                )
+
+        return scatter_data
+
+    def _calculate_risk_of_ruin(
+        self,
+        trades: List[Dict[str, Any]],
+        initial_balance: float,
+        ruin_threshold: float = 0.5,
+        simulations: int = 10000,
+    ) -> tuple[Optional[float], int]:
+        """
+        Calculate probability of account ruin using Monte Carlo simulation.
+
+        Resamples trade returns with replacement to simulate many possible
+        equity paths. Counts how many paths hit the ruin threshold.
+
+        Args:
+            trades: List of trade dictionaries with pnl field
+            initial_balance: Starting account balance
+            ruin_threshold: Fraction of account lost to trigger "ruin" (0.5 = 50%)
+            simulations: Number of Monte Carlo simulations
+
+        Returns:
+            Tuple of (risk_of_ruin probability, simulation count)
+        """
+        import random
+
+        if not trades or len(trades) < 5:
+            return None, simulations
+
+        # Extract P/L values as returns
+        pnl_values = [t.get("pnl", 0) for t in trades]
+
+        ruin_count = 0
+        ruin_balance = initial_balance * (1 - ruin_threshold)
+
+        for _ in range(simulations):
+            # Simulate one equity path by resampling trades
+            balance = initial_balance
+            for _ in range(len(pnl_values)):
+                # Random sample with replacement
+                sampled_pnl = random.choice(pnl_values)
+                balance += sampled_pnl
+
+                if balance <= ruin_balance:
+                    ruin_count += 1
+                    break
+
+        risk_of_ruin = (ruin_count / simulations) * 100
+        return round(risk_of_ruin, 2), simulations
+
+    def _calculate_drawdown_durations(
+        self,
+        equity_curve: List[float],
+        equity_dates: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Calculate drawdown duration statistics from equity curve.
+
+        Args:
+            equity_curve: List of equity values
+            equity_dates: Optional list of ISO date strings for each equity point
+
+        Returns:
+            Dict with avg_duration_minutes, max_duration_minutes, and list of durations
+        """
+        if len(equity_curve) < 2:
+            return {
+                "avg_drawdown_duration_minutes": None,
+                "max_drawdown_duration_minutes": None,
+                "drawdown_durations": [],
+            }
+
+        # Identify drawdown periods
+        peak = equity_curve[0]
+        peak_index = 0
+        in_drawdown = False
+        drawdown_start = 0
+        durations = []
+
+        for i, equity in enumerate(equity_curve):
+            if equity >= peak:
+                # New peak or recovery
+                if in_drawdown:
+                    # End of drawdown period - calculate duration
+                    if equity_dates and len(equity_dates) > i and len(equity_dates) > drawdown_start:
+                        try:
+                            start_time = datetime.fromisoformat(
+                                equity_dates[drawdown_start].replace("Z", "+00:00")
+                            )
+                            end_time = datetime.fromisoformat(
+                                equity_dates[i].replace("Z", "+00:00")
+                            )
+                            if start_time.tzinfo:
+                                start_time = start_time.replace(tzinfo=None)
+                            if end_time.tzinfo:
+                                end_time = end_time.replace(tzinfo=None)
+                            duration_minutes = (end_time - start_time).total_seconds() / 60
+                            durations.append(
+                                {
+                                    "start_index": drawdown_start,
+                                    "end_index": i,
+                                    "duration_minutes": round(duration_minutes, 2),
+                                }
+                            )
+                        except (ValueError, TypeError):
+                            # Fallback: use index difference
+                            durations.append(
+                                {
+                                    "start_index": drawdown_start,
+                                    "end_index": i,
+                                    "duration_minutes": (i - drawdown_start) * 60,  # Assume 1 hour per candle
+                                }
+                            )
+                    else:
+                        # No date info, use index as proxy (assume 1 hour per candle)
+                        durations.append(
+                            {
+                                "start_index": drawdown_start,
+                                "end_index": i,
+                                "duration_minutes": (i - drawdown_start) * 60,
+                            }
+                        )
+                    in_drawdown = False
+
+                peak = equity
+                peak_index = i
+            else:
+                # In drawdown
+                if not in_drawdown:
+                    in_drawdown = True
+                    drawdown_start = peak_index
+
+        # Handle case where we end in a drawdown
+        if in_drawdown:
+            i = len(equity_curve) - 1
+            if equity_dates and len(equity_dates) > i and len(equity_dates) > drawdown_start:
+                try:
+                    start_time = datetime.fromisoformat(
+                        equity_dates[drawdown_start].replace("Z", "+00:00")
+                    )
+                    end_time = datetime.fromisoformat(equity_dates[i].replace("Z", "+00:00"))
+                    if start_time.tzinfo:
+                        start_time = start_time.replace(tzinfo=None)
+                    if end_time.tzinfo:
+                        end_time = end_time.replace(tzinfo=None)
+                    duration_minutes = (end_time - start_time).total_seconds() / 60
+                    durations.append(
+                        {
+                            "start_index": drawdown_start,
+                            "end_index": i,
+                            "duration_minutes": round(duration_minutes, 2),
+                        }
+                    )
+                except (ValueError, TypeError):
+                    durations.append(
+                        {
+                            "start_index": drawdown_start,
+                            "end_index": i,
+                            "duration_minutes": (i - drawdown_start) * 60,
+                        }
+                    )
+            else:
+                durations.append(
+                    {
+                        "start_index": drawdown_start,
+                        "end_index": i,
+                        "duration_minutes": (i - drawdown_start) * 60,
+                    }
+                )
+
+        # Calculate stats
+        if not durations:
+            return {
+                "avg_drawdown_duration_minutes": None,
+                "max_drawdown_duration_minutes": None,
+                "drawdown_durations": [],
+            }
+
+        duration_values = [d["duration_minutes"] for d in durations]
+        avg_duration = sum(duration_values) / len(duration_values)
+        max_duration = max(duration_values)
+
+        return {
+            "avg_drawdown_duration_minutes": round(avg_duration, 2),
+            "max_drawdown_duration_minutes": round(max_duration, 2),
+            "drawdown_durations": durations,
+        }
+
+    def _calculate_var(
+        self, trades: List[Dict[str, Any]], confidence_levels: List[float] = None
+    ) -> Dict[str, Optional[float]]:
+        """
+        Calculate Value at Risk (VaR) using historical simulation method.
+
+        VaR represents the maximum expected loss at a given confidence level.
+
+        Args:
+            trades: List of trade dictionaries with pnl field
+            confidence_levels: List of confidence levels (default [0.95, 0.99])
+
+        Returns:
+            Dict with var_95 and var_99 values
+        """
+        if confidence_levels is None:
+            confidence_levels = [0.95, 0.99]
+
+        if not trades or len(trades) < 5:
+            return {"var_95": None, "var_99": None}
+
+        # Get sorted P/L values (ascending)
+        pnl_values = sorted([t.get("pnl", 0) for t in trades])
+        n = len(pnl_values)
+
+        result = {}
+        for level in confidence_levels:
+            # VaR at X% confidence = (1-X)th percentile of returns
+            # For 95% confidence, we want the 5th percentile (worst 5%)
+            percentile = 1 - level
+            index = int(percentile * n)
+            index = max(0, min(index, n - 1))  # Clamp to valid range
+
+            var_value = pnl_values[index]
+            key = f"var_{int(level * 100)}"
+            result[key] = round(var_value, 2)
+
+        return result
+
     def _calculate_average_trade_duration(self, trades: List[Dict[str, Any]]) -> float:
         """
         Calculate average trade duration in minutes.
@@ -1466,6 +1930,19 @@ class BacktestExecutor:
         # Calculate time period metrics
         time_period_metrics = self._calculate_time_period_metrics(trades)
 
+        # Calculate risk analytics metrics
+        streak_metrics = self._calculate_consecutive_streaks(trades)
+        win_loss_distribution = self._calculate_win_loss_distribution(trades)
+        holding_period_distribution = self._calculate_holding_period_distribution(trades)
+        pl_scatter_data = self._calculate_pl_scatter_data(trades)
+        risk_of_ruin, risk_of_ruin_simulations = self._calculate_risk_of_ruin(
+            trades, initial_balance
+        )
+        drawdown_duration_metrics = self._calculate_drawdown_durations(
+            equity_curve, equity_curve_dates
+        )
+        var_metrics = self._calculate_var(trades)
+
         # Build the results summary
         results = BacktestResultsSummary(
             total_net_profit=round(total_net_profit, 2),
@@ -1500,6 +1977,27 @@ class BacktestExecutor:
             day_of_week_performance=time_period_metrics["day_of_week_performance"],
             hourly_performance=time_period_metrics["hourly_performance"],
             day_hour_heatmap=time_period_metrics["day_hour_heatmap"],
+            # Risk analytics fields
+            max_consecutive_wins=streak_metrics["max_consecutive_wins"],
+            max_consecutive_losses=streak_metrics["max_consecutive_losses"],
+            avg_consecutive_wins=streak_metrics["avg_consecutive_wins"],
+            avg_consecutive_losses=streak_metrics["avg_consecutive_losses"],
+            win_loss_distribution=win_loss_distribution if win_loss_distribution else None,
+            holding_period_distribution=(
+                holding_period_distribution if holding_period_distribution else None
+            ),
+            pl_scatter_data=pl_scatter_data if pl_scatter_data else None,
+            risk_of_ruin=risk_of_ruin,
+            risk_of_ruin_simulations=risk_of_ruin_simulations,
+            avg_drawdown_duration_minutes=drawdown_duration_metrics["avg_drawdown_duration_minutes"],
+            max_drawdown_duration_minutes=drawdown_duration_metrics["max_drawdown_duration_minutes"],
+            drawdown_durations=(
+                drawdown_duration_metrics["drawdown_durations"]
+                if drawdown_duration_metrics["drawdown_durations"]
+                else None
+            ),
+            var_95=var_metrics.get("var_95"),
+            var_99=var_metrics.get("var_99"),
         )
 
         return results.model_dump()

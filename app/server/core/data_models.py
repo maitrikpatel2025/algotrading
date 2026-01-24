@@ -992,3 +992,47 @@ class BacktestResultsSummary(BaseModel):
         default=None,
         description="Day-hour heatmap data: [{day: 0-6, hour: 0-23, net_pnl: float, trades: int}]",
     )
+
+    # Risk Analytics fields
+    max_consecutive_wins: int = Field(default=0, description="Maximum consecutive winning trades")
+    max_consecutive_losses: int = Field(
+        default=0, description="Maximum consecutive losing trades"
+    )
+    avg_consecutive_wins: float = Field(default=0.0, description="Average consecutive wins streak")
+    avg_consecutive_losses: float = Field(
+        default=0.0, description="Average consecutive losses streak"
+    )
+    win_loss_distribution: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Histogram bucket data for P/L distribution: [{bucket_min, bucket_max, count, is_winner}]",
+    )
+    holding_period_distribution: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Histogram bucket data for holding periods: [{bucket_min_minutes, bucket_max_minutes, count}]",
+    )
+    pl_scatter_data: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Scatter plot data: [{entry_time: ISO string, pnl: float, is_winner: bool}]",
+    )
+    risk_of_ruin: Optional[float] = Field(
+        default=None, description="Probability of account ruin from Monte Carlo simulation"
+    )
+    risk_of_ruin_simulations: int = Field(
+        default=10000, description="Number of Monte Carlo simulations run"
+    )
+    avg_drawdown_duration_minutes: Optional[float] = Field(
+        default=None, description="Average drawdown duration in minutes"
+    )
+    max_drawdown_duration_minutes: Optional[float] = Field(
+        default=None, description="Maximum drawdown duration in minutes"
+    )
+    drawdown_durations: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="List of drawdown periods with durations: [{start_index, end_index, duration_minutes}]",
+    )
+    var_95: Optional[float] = Field(
+        default=None, description="Value at Risk at 95% confidence level"
+    )
+    var_99: Optional[float] = Field(
+        default=None, description="Value at Risk at 99% confidence level"
+    )
