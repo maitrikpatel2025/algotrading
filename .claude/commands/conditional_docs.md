@@ -524,3 +524,16 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing dialog-based configuration patterns for other features
     - When working with backtest routing or navigation patterns
     - When understanding the separation between configuration (dialog) and execution (dashboard) UX
+
+- app_docs/feature-1d08ed0d-view-trades-on-chart.md
+  - Conditions:
+    - When working with trade visualization on price charts
+    - When implementing or modifying trade markers on charts
+    - When working with TradeChartOverlay or trade chart controls
+    - When implementing marker-based chart interactions or click handlers
+    - When working with tradeMarkerUtils.js or trade marker creation functions
+    - When troubleshooting trade marker rendering or timestamp mapping issues
+    - When extending PriceChart component with trade visualization features
+    - When implementing trade navigation from chart markers to trade list
+    - When working with lightweight-charts v5 marker API for trades
+    - When adding filter controls for chart overlays (show/hide, winners/losers)
