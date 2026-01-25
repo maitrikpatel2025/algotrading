@@ -5,6 +5,7 @@ Request and response models for the Forex Trading API.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -1170,3 +1171,117 @@ class AllBotsStatusResponse(BaseModel):
     bots: List[BotInstance] = Field(default=[], description="List of all bot instances")
     count: int = Field(default=0, description="Number of bots")
     last_updated: Optional[datetime] = Field(None, description="Timestamp of last update")
+
+
+# =============================================================================
+# Bot Control Extended Models (Pause, Stop Options, Emergency Stop)
+# =============================================================================
+
+
+class PreStartChecklistItem(BaseModel):
+    """Single pre-start checklist item."""
+
+    name: str = Field(..., description="Checklist item name")
+    status: Literal["passed", "failed", "warning"] = Field(
+        ..., description="Item status: passed, failed, or warning"
+    )
+    message: str = Field(..., description="Status message for this item")
+
+
+class PreStartChecklistResponse(BaseModel):
+    """Response from pre-start checklist validation."""
+
+    items: List[PreStartChecklistItem] = Field(
+        default=[], description="List of checklist items"
+    )
+    can_start: bool = Field(
+        default=False, description="Whether the bot can be started (all critical checks pass)"
+    )
+    message: Optional[str] = Field(None, description="Overall status message")
+
+
+class BotPauseRequest(BaseModel):
+    """Request model for pausing the trading bot."""
+
+    duration_minutes: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=1440,
+        description="Pause duration in minutes (1-1440). None means indefinite pause.",
+    )
+
+
+class BotPauseResponse(BaseModel):
+    """Response from pausing the trading bot."""
+
+    success: bool = Field(..., description="Whether the pause was successful")
+    paused_at: Optional[datetime] = Field(None, description="Timestamp when bot was paused")
+    resume_at: Optional[datetime] = Field(
+        None, description="Scheduled resume time (if timed pause)"
+    )
+    message: str = Field(..., description="Status message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class BotResumeResponse(BaseModel):
+    """Response from resuming the trading bot."""
+
+    success: bool = Field(..., description="Whether the resume was successful")
+    resumed_at: Optional[datetime] = Field(None, description="Timestamp when bot was resumed")
+    message: str = Field(..., description="Status message")
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class StopOption(str, Enum):
+    """Stop option enum for enhanced stop functionality."""
+
+    CLOSE_ALL = "close_all"  # Stop and close all positions at market
+    KEEP_POSITIONS = "keep_positions"  # Stop but keep positions for manual management
+    WAIT_FOR_CLOSE = "wait_for_close"  # Stop after current position closes
+
+
+class BotStopRequest(BaseModel):
+    """Request model for stopping the trading bot with options."""
+
+    stop_option: StopOption = Field(
+        default=StopOption.KEEP_POSITIONS,
+        description="Stop option: close_all, keep_positions, or wait_for_close",
+    )
+
+
+class BotStopResponse(BaseModel):
+    """Response from stopping the trading bot with options."""
+
+    success: bool = Field(..., description="Whether the stop was successful")
+    positions_closed: int = Field(default=0, description="Number of positions closed")
+    final_pnl: Optional[float] = Field(None, description="Final P/L from closed positions")
+    message: str = Field(..., description="Status message")
+    status: Literal["stopped", "stopping", "error"] = Field(
+        default="stopped", description="Current bot status"
+    )
+    error: Optional[str] = Field(None, description="Error details if failed")
+
+
+class EmergencyStopAction(BaseModel):
+    """Single action taken during emergency stop."""
+
+    action: str = Field(..., description="Action description")
+    target: str = Field(..., description="Target of the action (bot name, position ID, etc.)")
+    result: Literal["success", "failed"] = Field(..., description="Action result")
+    details: Optional[str] = Field(None, description="Additional details")
+
+
+class EmergencyStopResponse(BaseModel):
+    """Response from emergency stop all operation."""
+
+    success: bool = Field(..., description="Whether the emergency stop was successful")
+    bots_stopped: int = Field(default=0, description="Number of bots stopped")
+    positions_closed: int = Field(default=0, description="Number of positions closed")
+    total_pnl_realized: Optional[float] = Field(
+        None, description="Total P/L realized from closed positions"
+    )
+    actions: List[EmergencyStopAction] = Field(
+        default=[], description="Detailed list of actions taken"
+    )
+    message: str = Field(..., description="Status message")
+    error: Optional[str] = Field(None, description="Error details if failed")

@@ -80,6 +80,12 @@ const endPoints = {
     botStart: (config = {}) => requests.post("/bot/start", config),
     botStop: () => requests.post("/bot/stop"),
     botRestart: (config = {}) => requests.post("/bot/restart", config),
+    // Enhanced bot control endpoints
+    botPreStartCheck: () => requests.get("/bot/pre-start-check"),
+    botPause: (durationMinutes = null) => requests.post("/bot/pause", { duration_minutes: durationMinutes }),
+    botResume: () => requests.post("/bot/resume"),
+    botStopWithOptions: (stopOption = "keep_positions") => requests.post("/bot/stop-with-options", { stop_option: stopOption }),
+    botEmergencyStop: () => requests.post("/bot/emergency-stop"),
     // Strategy endpoints
     saveStrategy: (strategy) => requests.post("/strategies", { strategy }),
     listStrategies: () => requests.get("/strategies"),
