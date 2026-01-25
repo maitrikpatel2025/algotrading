@@ -629,3 +629,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When troubleshooting bot status display or card expansion issues
     - When working with multi-bot tracking in BotStatusTracker
     - When implementing bot registration or status update methods
+
+- app_docs/feature-07b7ce3f-realtime-price-feed.md
+  - Conditions:
+    - When working with real-time price feed or live market data display
+    - When implementing or modifying PriceFeed components (PriceFeedCard, PriceTickerRow, WatchlistEditor, LatencyIndicator)
+    - When working with /api/spreads endpoint or batch spread fetching
+    - When implementing watchlist functionality or localStorage persistence for pairs
+    - When adding price flash animations or price change detection
+    - When working with latency indicators or data freshness displays
+    - When troubleshooting price feed polling or update issues
+    - When extending the Monitor page with market data components
