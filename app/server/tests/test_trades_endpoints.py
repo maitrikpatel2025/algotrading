@@ -310,8 +310,360 @@ class TestTradeHistoryEndpoint:
         assert "count" in data
         assert "message" in data
         assert "error" in data
+        assert "summary" in data
         assert isinstance(data["trades"], list)
         assert isinstance(data["count"], int)
+
+    def test_trade_history_with_direction_filter_long(self, client):
+        """Test trade history with direction filter set to long."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": 25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history?direction=long")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["side"] == "Buy"
+
+    def test_trade_history_with_direction_filter_short(self, client):
+        """Test trade history with direction filter set to short."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": 25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history?direction=short")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["side"] == "Sell"
+
+    def test_trade_history_with_outcome_filter_winners(self, client):
+        """Test trade history with outcome filter set to winners."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": -25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history?outcome=winners")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["realized_pl"] == 50.0
+
+    def test_trade_history_with_outcome_filter_losers(self, client):
+        """Test trade history with outcome filter set to losers."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": -25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history?outcome=losers")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["realized_pl"] == -25.0
+
+    def test_trade_history_with_pair_filter(self, client):
+        """Test trade history with pair filter."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": 25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history?pair=EURUSD")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["instrument"] == "EURUSD"
+
+    def test_trade_history_summary_calculation(self, client):
+        """Test that P/L summary is correctly calculated."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": 25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "summary" in data
+        summary = data["summary"]
+        assert summary["total_pl"] == 75.0
+        assert summary["total_trade_count"] == 2
+
+    def test_trade_history_duration_calculation(self, client):
+        """Test that duration is correctly calculated from timestamps."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TradeTimestamp": 1704150000000,  # Entry
+                    "TransactionTimestamp": 1704153600000,  # Exit (1 hour later)
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["trades"][0]["duration_seconds"] == 3600  # 1 hour in seconds
+
+    def test_trade_history_bot_name_extraction_bracket(self, client):
+        """Test that bot name is extracted from [BotName] pattern in comment."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                    "Comment": "[MyBot] Trade opened by strategy",
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["trades"][0]["bot_name"] == "MyBot"
+
+    def test_trade_history_bot_name_extraction_colon(self, client):
+        """Test that bot name is extracted from BotName: pattern in comment."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                    "Comment": "TrendBot: Auto-trade",
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["trades"][0]["bot_name"] == "TrendBot"
+
+    def test_trade_history_bot_name_filter(self, client):
+        """Test trade history with bot_name filter."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                    "Comment": "[MyBot] Trade",
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": 25.0,
+                    "TransactionTimestamp": 1704067200000,
+                    "Comment": "[OtherBot] Trade",
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            response = client.get("/api/trades/history?bot_name=MyBot")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["bot_name"] == "MyBot"
+
+    def test_trade_history_multiple_filters(self, client):
+        """Test trade history with multiple filters combined."""
+        mock_history = {
+            "Records": [
+                {
+                    "TradeId": 1,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.1050,
+                    "BalanceMovement": 50.0,
+                    "TransactionTimestamp": 1704153600000,
+                },
+                {
+                    "TradeId": 2,
+                    "Symbol": "EURUSD",
+                    "TradeSide": "Sell",
+                    "TradeAmount": 5000,
+                    "TradePrice": 1.1100,
+                    "BalanceMovement": -25.0,
+                    "TransactionTimestamp": 1704067200000,
+                },
+                {
+                    "TradeId": 3,
+                    "Symbol": "GBPUSD",
+                    "TradeSide": "Buy",
+                    "TradeAmount": 10000,
+                    "TradePrice": 1.2500,
+                    "BalanceMovement": 30.0,
+                    "TransactionTimestamp": 1704100000000,
+                },
+            ],
+        }
+
+        with patch("server.api.get_trade_history", return_value=mock_history):
+            # Filter by EURUSD pair and long direction
+            response = client.get("/api/trades/history?pair=EURUSD&direction=long")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert data["trades"][0]["instrument"] == "EURUSD"
+        assert data["trades"][0]["side"] == "Buy"
 
 
 class TestCloseTradeEndpoint:

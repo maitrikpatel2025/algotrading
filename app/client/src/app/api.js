@@ -63,7 +63,17 @@ const endPoints = {
     spread: (pair) => requests.get(`/spread/${pair}`),
     spreads: (pairs) => requests.get(`/spreads?pairs=${pairs.join(',')}`),
     openTrades: () => requests.get("/trades/open"),
-    tradeHistory: () => requests.get("/trades/history"),
+    tradeHistory: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params.timestamp_from) queryParams.append('timestamp_from', params.timestamp_from);
+        if (params.timestamp_to) queryParams.append('timestamp_to', params.timestamp_to);
+        if (params.bot_name) queryParams.append('bot_name', params.bot_name);
+        if (params.pair) queryParams.append('pair', params.pair);
+        if (params.direction) queryParams.append('direction', params.direction);
+        if (params.outcome) queryParams.append('outcome', params.outcome);
+        const queryString = queryParams.toString();
+        return requests.get(`/trades/history${queryString ? `?${queryString}` : ''}`);
+    },
     closeTrade: (tradeId) => requests.post(`/trades/${tradeId}/close`),
     botStatus: () => requests.get("/bot/status"),
     botsStatus: () => requests.get("/bots/status"),

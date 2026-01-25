@@ -222,6 +222,22 @@ class TradeHistoryItem(BaseModel):
     balance_movement: Optional[float] = None
     commission: Optional[float] = None
     swap: Optional[float] = None
+    # Enhanced fields for View Trade History feature
+    duration_seconds: Optional[int] = Field(None, description="Trade duration in seconds")
+    exit_reason: Optional[str] = Field(None, description="Reason for trade exit")
+    bot_name: Optional[str] = Field(None, description="Name of bot that executed trade")
+    entry_timestamp: Optional[int] = Field(None, description="Entry timestamp in milliseconds")
+
+
+class TradeHistorySummary(BaseModel):
+    """Summary of trade history P/L totals."""
+
+    daily_pl: float = Field(default=0.0, description="Today's running P/L total")
+    daily_trade_count: int = Field(default=0, description="Number of trades today")
+    weekly_pl: float = Field(default=0.0, description="This week's running P/L total")
+    weekly_trade_count: int = Field(default=0, description="Number of trades this week")
+    total_pl: float = Field(default=0.0, description="Total P/L for filtered period")
+    total_trade_count: int = Field(default=0, description="Total number of trades in filtered period")
 
 
 class TradeHistoryResponse(BaseModel):
@@ -231,6 +247,7 @@ class TradeHistoryResponse(BaseModel):
     count: int = 0
     message: Optional[str] = None
     error: Optional[str] = None
+    summary: Optional[TradeHistorySummary] = Field(None, description="P/L summary totals")
 
 
 class TradeRequest(BaseModel):
