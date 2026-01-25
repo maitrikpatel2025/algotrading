@@ -618,3 +618,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing responsive dashboard layouts
     - When working with useDashboardData or useDarkMode hooks
     - When adding new dashboard sections or metrics displays
+
+- app_docs/feature-4820fa15-bot-status-grid.md
+  - Conditions:
+    - When working with the Bot Status Grid or multi-bot status display
+    - When implementing or modifying BotStatusGrid or BotCard components
+    - When working with /api/bots/status endpoint
+    - When adding new bot metrics or status indicators
+    - When implementing bot sorting or filtering functionality
+    - When troubleshooting bot status display or card expansion issues
+    - When working with multi-bot tracking in BotStatusTracker
+    - When implementing bot registration or status update methods
