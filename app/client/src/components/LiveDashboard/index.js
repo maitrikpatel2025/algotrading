@@ -1,6 +1,8 @@
 export { default as AccountMetrics } from './AccountMetrics';
 export { default as ActiveBotsGrid } from './ActiveBotsGrid';
 export { default as AlertsPanel } from './AlertsPanel';
+export { default as BotCard } from './BotCard';
+export { default as BotStatusGrid } from './BotStatusGrid';
 export { default as ConnectionStatus } from './ConnectionStatus';
 export { default as DashboardHeader } from './DashboardHeader';
 export { default as OpenPositions } from './OpenPositions';

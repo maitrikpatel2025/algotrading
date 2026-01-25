@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import endPoints from '../app/api';
 
-const DEFAULT_POLL_INTERVAL = 10000; // 10 seconds
+const DEFAULT_POLL_INTERVAL = 5000; // 5 seconds for bot status grid auto-refresh
 
 /**
  * Custom hook for coordinated dashboard data fetching with polling
  *
- * Fetches account data, open trades, trade history, and bot status
+ * Fetches account data, open trades, trade history, bot status, and all bots status
  * with configurable refresh interval and connection status tracking.
  */
 export function useDashboardData(pollInterval = DEFAULT_POLL_INTERVAL) {
@@ -15,6 +15,7 @@ export function useDashboardData(pollInterval = DEFAULT_POLL_INTERVAL) {
   const [openTrades, setOpenTrades] = useState([]);
   const [tradeHistory, setTradeHistory] = useState([]);
   const [botStatus, setBotStatus] = useState(null);
+  const [botsStatus, setBotsStatus] = useState(null);
 
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -38,11 +39,12 @@ export function useDashboardData(pollInterval = DEFAULT_POLL_INTERVAL) {
 
     try {
       // Fetch all data in parallel
-      const [accountData, openTradesData, historyData, botData] = await Promise.all([
+      const [accountData, openTradesData, historyData, botData, botsData] = await Promise.all([
         endPoints.account().catch(() => null),
         endPoints.openTrades().catch(() => ({ trades: [] })),
         endPoints.tradeHistory().catch(() => ({ trades: [] })),
         endPoints.botStatus().catch(() => null),
+        endPoints.botsStatus().catch(() => ({ bots: [], count: 0 })),
       ]);
 
       // Update state with fetched data
@@ -50,6 +52,7 @@ export function useDashboardData(pollInterval = DEFAULT_POLL_INTERVAL) {
       setOpenTrades(openTradesData?.trades || []);
       setTradeHistory(historyData?.trades || []);
       setBotStatus(botData);
+      setBotsStatus(botsData);
 
       // Reset error count and update connection status
       consecutiveErrors.current = 0;
@@ -93,6 +96,7 @@ export function useDashboardData(pollInterval = DEFAULT_POLL_INTERVAL) {
     openTrades,
     tradeHistory,
     botStatus,
+    botsStatus,
 
     // Status
     loading,
