@@ -4,11 +4,12 @@ Bot Status Tracker
 Singleton class to manage and track trading bot status.
 Integrates with BotController for process-based status tracking.
 Supports multiple bot instances for the Bot Status Grid feature.
+Extended with pause/resume functionality and multi-bot control.
 """
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock
 from typing import Dict, List, Literal, Optional
@@ -69,6 +70,11 @@ class BotStatusTracker:
         self._trades_today: int = 0
         self._error_message: Optional[str] = None
         self._pid: Optional[int] = None
+
+        # Pause state tracking
+        self._paused_at: Optional[datetime] = None
+        self._pause_duration_minutes: Optional[int] = None
+        self._resume_at: Optional[datetime] = None
 
         # Multi-bot support
         self._bots: Dict[str, BotInstance] = {}
@@ -272,11 +278,77 @@ class BotStatusTracker:
         self._error_message = None
         logger.info("[BOT_STATUS] Bot set to stopped")
 
-    def set_paused(self) -> None:
-        """Set bot status to paused."""
+    def set_paused(self, duration_minutes: Optional[int] = None) -> dict:
+        """
+        Set bot status to paused with optional duration.
+
+        Args:
+            duration_minutes: Optional pause duration in minutes. None means indefinite.
+
+        Returns:
+            dict with paused_at and resume_at timestamps
+        """
         self._status = "paused"
+        self._paused_at = datetime.now()
+        self._pause_duration_minutes = duration_minutes
         self._error_message = None
-        logger.info("[BOT_STATUS] Bot set to paused")
+
+        if duration_minutes:
+            self._resume_at = self._paused_at + timedelta(minutes=duration_minutes)
+            logger.info(
+                f"[BOT_STATUS] Bot paused for {duration_minutes} minutes, "
+                f"auto-resume at {self._resume_at}"
+            )
+        else:
+            self._resume_at = None
+            logger.info("[BOT_STATUS] Bot paused indefinitely")
+
+        return {
+            "paused_at": self._paused_at,
+            "resume_at": self._resume_at,
+        }
+
+    def set_resumed(self) -> dict:
+        """
+        Resume bot from paused state.
+
+        Returns:
+            dict with resumed_at timestamp
+        """
+        resumed_at = datetime.now()
+        self._status = "running"
+        self._paused_at = None
+        self._pause_duration_minutes = None
+        self._resume_at = None
+        self._error_message = None
+        logger.info("[BOT_STATUS] Bot resumed from paused state")
+        return {"resumed_at": resumed_at}
+
+    def check_auto_resume(self) -> bool:
+        """
+        Check if auto-resume should trigger for timed pause.
+
+        Returns:
+            True if auto-resume was triggered, False otherwise
+        """
+        if self._status != "paused" or self._resume_at is None:
+            return False
+
+        if datetime.now() >= self._resume_at:
+            logger.info("[BOT_STATUS] Auto-resume triggered")
+            self.set_resumed()
+            return True
+
+        return False
+
+    def get_pause_info(self) -> dict:
+        """Get current pause information."""
+        return {
+            "paused_at": self._paused_at,
+            "pause_duration_minutes": self._pause_duration_minutes,
+            "resume_at": self._resume_at,
+            "is_paused": self._status == "paused",
+        }
 
     def set_starting(self) -> None:
         """Set bot status to starting (transitional state)."""

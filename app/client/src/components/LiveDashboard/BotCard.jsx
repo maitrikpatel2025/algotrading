@@ -9,6 +9,11 @@ import {
   ChevronDown,
   ChevronUp,
   Activity,
+  Play,
+  Pause,
+  Square,
+  RotateCcw,
+  Loader2,
 } from 'lucide-react';
 
 /**
@@ -18,9 +23,19 @@ import {
  * - Bot name and status badge with color coding
  * - Currency pair, Current P/L, Open position
  * - Last activity timestamp
+ * - Control buttons (Start/Pause/Resume/Stop) based on status
  * - Expand/collapse functionality for detailed view
  */
-function BotCard({ bot, expanded: controlledExpanded, onToggle }) {
+function BotCard({
+  bot,
+  expanded: controlledExpanded,
+  onToggle,
+  onStartClick,
+  onPauseClick,
+  onResumeClick,
+  onStopClick,
+  isLoading = false,
+}) {
   const [internalExpanded, setInternalExpanded] = useState(false);
 
   // Use controlled or uncontrolled state
@@ -99,21 +114,30 @@ function BotCard({ bot, expanded: controlledExpanded, onToggle }) {
   const isPositive = typeof pnl === 'number' && pnl >= 0;
   const isNegative = typeof pnl === 'number' && pnl < 0;
 
+  // Status-based button visibility
+  const isRunning = bot?.status === 'running';
+  const isPaused = bot?.status === 'paused';
+  const isStopped = bot?.status === 'stopped';
+
   if (!bot) return null;
+
+  const handleControlClick = (e, action) => {
+    e.stopPropagation(); // Prevent card toggle
+    action?.();
+  };
 
   return (
     <div
       className={cn(
         'rounded-md border-l-4 bg-white dark:bg-neutral-700/50',
         'border border-neutral-200 dark:border-neutral-600',
-        'transition-all duration-200 cursor-pointer',
+        'transition-all duration-200',
         'hover:shadow-md hover:border-neutral-300 dark:hover:border-neutral-500',
         statusConfig.borderColor
       )}
-      onClick={toggleExpand}
     >
-      {/* Main Content */}
-      <div className="p-4">
+      {/* Main Content - Clickable for expand/collapse */}
+      <div className="p-4 cursor-pointer" onClick={toggleExpand}>
         {/* Header: Name and Status */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -228,6 +252,73 @@ function BotCard({ bot, expanded: controlledExpanded, onToggle }) {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Control Buttons - Always visible for quick actions */}
+      <div className="px-4 pb-3 flex gap-2">
+        {/* Start Button (shown when stopped) */}
+        {isStopped && (
+          <button
+            onClick={(e) => handleControlClick(e, onStartClick)}
+            disabled={isLoading}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
+              'bg-success text-white hover:bg-success-hover',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            Start
+          </button>
+        )}
+
+        {/* Pause Button (shown when running) */}
+        {isRunning && (
+          <button
+            onClick={(e) => handleControlClick(e, onPauseClick)}
+            disabled={isLoading}
+            className={cn(
+              'flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
+              'bg-warning text-white hover:bg-warning-hover',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pause className="h-3 w-3" />}
+            Pause
+          </button>
+        )}
+
+        {/* Resume Button (shown when paused) */}
+        {isPaused && (
+          <button
+            onClick={(e) => handleControlClick(e, onResumeClick)}
+            disabled={isLoading}
+            className={cn(
+              'flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
+              'bg-success text-white hover:bg-success-hover',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+            Resume
+          </button>
+        )}
+
+        {/* Stop Button (shown when running or paused) */}
+        {(isRunning || isPaused) && (
+          <button
+            onClick={(e) => handleControlClick(e, onStopClick)}
+            disabled={isLoading}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
+              'bg-danger text-white hover:bg-danger-hover',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3" />}
+            Stop
+          </button>
+        )}
       </div>
 
       {/* Expanded Details */}

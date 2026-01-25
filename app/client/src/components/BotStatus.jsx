@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import endPoints from '../app/api';
 import { cn } from '../lib/utils';
-import { Bot, Activity, Clock, Signal, TrendingUp, AlertCircle, Play, Square, ChevronDown, ChevronUp, X, Loader2 } from 'lucide-react';
+import { Bot, Activity, Clock, Signal, TrendingUp, AlertCircle, Play, Square, Pause, RotateCcw, ChevronDown, ChevronUp, X, Loader2 } from 'lucide-react';
+import { PreStartChecklist, PauseDurationDialog, StopOptionsDialog } from './BotControls';
 
 const POLL_INTERVAL = 30000; // 30 seconds
 
@@ -36,50 +37,21 @@ function Toast({ message, type, onClose }) {
   );
 }
 
-/**
- * Confirmation dialog component - Precision Swiss Design
- * Clean modal with no gradients
- */
-function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel, isLoading }) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-neutral-900/50" onClick={onCancel} />
-      <div className="relative bg-white border border-neutral-200 rounded-md shadow-elevated p-6 max-w-md w-full mx-4 animate-fade-in">
-        <h3 className="text-lg font-semibold text-neutral-900 mb-2">{title}</h3>
-        <p className="text-sm text-neutral-500 mb-6">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            className="btn btn-secondary disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isLoading}
-            className="btn btn-danger disabled:opacity-50 flex items-center gap-2"
-          >
-            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Confirm
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function BotStatus() {
   const [botStatus, setBotStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isStarting, setIsStarting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Dialog states
+  const [showPreStartChecklist, setShowPreStartChecklist] = useState(false);
+  const [showPauseDurationDialog, setShowPauseDurationDialog] = useState(false);
+  const [showStopOptionsDialog, setShowStopOptionsDialog] = useState(false);
 
   // Configuration state
   const [selectedStrategy, setSelectedStrategy] = useState('Bollinger Bands Strategy');
@@ -115,7 +87,14 @@ function BotStatus() {
     }
   };
 
-  const handleStart = async () => {
+  // Open pre-start checklist dialog
+  const handleStartClick = () => {
+    setShowPreStartChecklist(true);
+  };
+
+  // Confirm start after pre-start checklist passes
+  const handleConfirmStart = async () => {
+    setShowPreStartChecklist(false);
     setIsStarting(true);
     try {
       const config = {
@@ -136,12 +115,68 @@ function BotStatus() {
     }
   };
 
-  const handleStopConfirm = async () => {
+  // Open pause duration dialog
+  const handlePauseClick = () => {
+    setShowPauseDurationDialog(true);
+  };
+
+  // Confirm pause with selected duration
+  const handleConfirmPause = async (durationMinutes) => {
+    setShowPauseDurationDialog(false);
+    setIsPausing(true);
+    try {
+      await endPoints.botPause(durationMinutes);
+      const durationText = durationMinutes ? `for ${durationMinutes} minutes` : 'indefinitely';
+      showToast(`Bot paused ${durationText}`, 'success');
+      await loadBotStatus();
+    } catch (err) {
+      console.error('Error pausing bot:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to pause bot';
+      showToast(`Failed to pause bot: ${errorMessage}`, 'error');
+    } finally {
+      setIsPausing(false);
+    }
+  };
+
+  // Resume bot from paused state
+  const handleResume = async () => {
+    setIsResuming(true);
+    try {
+      await endPoints.botResume();
+      showToast('Bot resumed successfully', 'success');
+      await loadBotStatus();
+    } catch (err) {
+      console.error('Error resuming bot:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to resume bot';
+      showToast(`Failed to resume bot: ${errorMessage}`, 'error');
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+  // Open stop options dialog
+  const handleStopClick = () => {
+    setShowStopOptionsDialog(true);
+  };
+
+  // Confirm stop with selected option
+  const handleConfirmStop = async (stopOption) => {
+    setShowStopOptionsDialog(false);
     setIsStopping(true);
     try {
-      await endPoints.botStop();
-      showToast('Bot stopped successfully', 'success');
-      setShowConfirmDialog(false);
+      const result = await endPoints.botStopWithOptions(stopOption);
+      let message = 'Bot stopped successfully';
+      if (result.positions_closed > 0) {
+        const pnlText = result.final_pnl != null
+          ? ` (P/L: ${result.final_pnl >= 0 ? '+' : ''}$${result.final_pnl.toFixed(2)})`
+          : '';
+        message = `Bot stopped, ${result.positions_closed} positions closed${pnlText}`;
+      } else if (stopOption === 'keep_positions') {
+        message = 'Bot stopped, positions left for manual management';
+      } else if (result.status === 'stopping') {
+        message = 'Bot will stop after current position closes';
+      }
+      showToast(message, 'success');
       await loadBotStatus();
     } catch (err) {
       console.error('Error stopping bot:', err);
@@ -150,10 +185,6 @@ function BotStatus() {
     } finally {
       setIsStopping(false);
     }
-  };
-
-  const handleStop = () => {
-    setShowConfirmDialog(true);
   };
 
   const formatUptime = (seconds) => {
@@ -292,8 +323,19 @@ function BotStatus() {
   }
 
   const statusConfig = getStatusConfig(botStatus?.status);
-  const canStart = botStatus?.can_start && !isStarting && !isStopping;
-  const canStop = botStatus?.can_stop && !isStarting && !isStopping;
+  const isRunning = botStatus?.status === 'running';
+  const isPaused = botStatus?.status === 'paused';
+  const isStopped = botStatus?.status === 'stopped';
+  const isBusy = isStarting || isStopping || isPausing || isResuming;
+
+  // Can start only when stopped and not busy
+  const canStart = isStopped && !isBusy;
+  // Can pause only when running and not busy
+  const canPause = isRunning && !isBusy;
+  // Can resume only when paused and not busy
+  const canResume = isPaused && !isBusy;
+  // Can stop when running or paused and not busy
+  const canStop = (isRunning || isPaused) && !isBusy;
 
   return (
     <div className={cn(
@@ -305,13 +347,27 @@ function BotStatus() {
         <Toast message={toast.message} type={toast.type} onClose={hideToast} />
       )}
 
-      {/* Confirmation dialog */}
-      <ConfirmDialog
-        isOpen={showConfirmDialog}
-        title="Stop Trading Bot"
-        message="Are you sure you want to stop the trading bot? Any active monitoring will be stopped."
-        onConfirm={handleStopConfirm}
-        onCancel={() => setShowConfirmDialog(false)}
+      {/* Pre-Start Checklist Dialog */}
+      <PreStartChecklist
+        isOpen={showPreStartChecklist}
+        onClose={() => setShowPreStartChecklist(false)}
+        onConfirmStart={handleConfirmStart}
+        botName="Trading Bot"
+      />
+
+      {/* Pause Duration Dialog */}
+      <PauseDurationDialog
+        isOpen={showPauseDurationDialog}
+        onClose={() => setShowPauseDurationDialog(false)}
+        onConfirmPause={handleConfirmPause}
+        isLoading={isPausing}
+      />
+
+      {/* Stop Options Dialog */}
+      <StopOptionsDialog
+        isOpen={showStopOptionsDialog}
+        onClose={() => setShowStopOptionsDialog(false)}
+        onConfirmStop={handleConfirmStop}
         isLoading={isStopping}
       />
 
@@ -355,9 +411,10 @@ function BotStatus() {
       {/* Content - Precision Swiss Design */}
       <div className="p-4 space-y-4">
         {/* Control Buttons */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
+          {/* Start Button */}
           <button
-            onClick={handleStart}
+            onClick={handleStartClick}
             disabled={!canStart}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
@@ -371,11 +428,54 @@ function BotStatus() {
             ) : (
               <Play className="h-4 w-4" />
             )}
-            {isStarting ? 'Starting...' : 'Start Bot'}
+            {isStarting ? 'Starting...' : 'Start'}
           </button>
 
+          {/* Pause Button (shown when running) */}
+          {isRunning && (
+            <button
+              onClick={handlePauseClick}
+              disabled={!canPause}
+              className={cn(
+                "flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+                canPause
+                  ? "bg-warning text-white hover:bg-warning-hover"
+                  : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+              )}
+            >
+              {isPausing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+              Pause
+            </button>
+          )}
+
+          {/* Resume Button (shown when paused) */}
+          {isPaused && (
+            <button
+              onClick={handleResume}
+              disabled={!canResume}
+              className={cn(
+                "flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
+                canResume
+                  ? "bg-success text-white hover:bg-success-hover"
+                  : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+              )}
+            >
+              {isResuming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+              Resume
+            </button>
+          )}
+
+          {/* Stop Button */}
           <button
-            onClick={handleStop}
+            onClick={handleStopClick}
             disabled={!canStop}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors",
@@ -389,7 +489,7 @@ function BotStatus() {
             ) : (
               <Square className="h-4 w-4" />
             )}
-            {isStopping ? 'Stopping...' : 'Stop Bot'}
+            {isStopping ? 'Stopping...' : 'Stop'}
           </button>
         </div>
 

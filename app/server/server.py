@@ -52,8 +52,13 @@ from core.data_models import (
     AllBotsStatusResponse,
     BacktestProgressResponse,
     BotControlResponse,
+    BotPauseRequest,
+    BotPauseResponse,
+    BotResumeResponse,
     BotStartRequest,
     BotStatusResponse,
+    BotStopRequest,
+    BotStopResponse,
     CancelBacktestRequest,
     CancelBacktestResponse,
     CheckNameResponse,
@@ -62,6 +67,7 @@ from core.data_models import (
     DeleteStrategyResponse,
     DuplicateBacktestResponse,
     DuplicateStrategyResponse,
+    EmergencyStopResponse,
     HeadlineItem,
     HeadlinesResponse,
     HealthCheckResponse,
@@ -75,6 +81,7 @@ from core.data_models import (
     LoadBacktestResponse,
     LoadStrategyResponse,
     OpenTradesResponse,
+    PreStartChecklistResponse,
     RunBacktestRequest,
     RunBacktestResponse,
     SaveBacktestRequest,
@@ -82,6 +89,7 @@ from core.data_models import (
     SaveStrategyRequest,
     SaveStrategyResponse,
     SpreadResponse,
+    StopOption,
     TradeHistoryItem,
     TradeHistoryResponse,
     TradeHistorySummary,
@@ -768,6 +776,195 @@ async def bot_restart(request: BotStartRequest = None):
         raise
     except Exception as e:
         logger.error(f"[ERROR] Bot restart failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.get("/api/bot/pre-start-check", response_model=PreStartChecklistResponse, tags=["Bot"])
+async def bot_pre_start_check():
+    """
+    Validate pre-start checklist before starting the bot.
+
+    Returns:
+        JSON object with checklist items and can_start flag
+
+    Checklist items:
+        - Strategy assigned
+        - Risk parameters set
+        - Broker connected
+    """
+    try:
+        logger.info("[BOT_CONTROL] Pre-start check request received")
+
+        result = bot_controller.validate_pre_start()
+
+        logger.info(f"[SUCCESS] Pre-start check complete: can_start={result.can_start}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[ERROR] Pre-start check failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.post("/api/bot/pause", response_model=BotPauseResponse, tags=["Bot"])
+async def bot_pause(request: BotPauseRequest = None):
+    """
+    Pause the trading bot.
+
+    The bot process continues running but stops opening new positions.
+    Existing positions are still managed (SL/TP remain active).
+
+    Args:
+        request: Optional pause configuration with duration_minutes
+
+    Returns:
+        JSON object with success status, paused_at, and resume_at timestamps
+    """
+    try:
+        duration = request.duration_minutes if request else None
+        logger.info(f"[BOT_CONTROL] Pause request received - duration: {duration} minutes")
+
+        result = bot_controller.pause_bot(duration_minutes=duration)
+
+        if result["success"]:
+            logger.info(f"[SUCCESS] Bot paused: {result['message']}")
+            return BotPauseResponse(
+                success=True,
+                paused_at=result.get("paused_at"),
+                resume_at=result.get("resume_at"),
+                message=result["message"],
+            )
+        else:
+            error = result.get("error", "")
+            if error == "not_running":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["message"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Bot pause failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.post("/api/bot/resume", response_model=BotResumeResponse, tags=["Bot"])
+async def bot_resume():
+    """
+    Resume the trading bot from paused state.
+
+    Returns:
+        JSON object with success status and resumed_at timestamp
+    """
+    try:
+        logger.info("[BOT_CONTROL] Resume request received")
+
+        result = bot_controller.resume_bot()
+
+        if result["success"]:
+            logger.info(f"[SUCCESS] Bot resumed: {result['message']}")
+            return BotResumeResponse(
+                success=True,
+                resumed_at=result.get("resumed_at"),
+                message=result["message"],
+            )
+        else:
+            error = result.get("error", "")
+            if error in ["not_running", "not_paused"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["message"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Bot resume failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.post("/api/bot/stop-with-options", response_model=BotStopResponse, tags=["Bot"])
+async def bot_stop_with_options(request: BotStopRequest = None):
+    """
+    Stop the trading bot with enhanced options.
+
+    Args:
+        request: Stop configuration with stop_option:
+            - close_all: Close all positions at market price
+            - keep_positions: Leave positions for manual management
+            - wait_for_close: Stop after current position closes
+
+    Returns:
+        JSON object with success, positions_closed, final_pnl, and message
+    """
+    try:
+        stop_option = request.stop_option if request else StopOption.KEEP_POSITIONS
+        logger.info(f"[BOT_CONTROL] Stop with options request received - option: {stop_option}")
+
+        result = bot_controller.stop_bot_with_options(stop_option=stop_option)
+
+        if result["success"]:
+            # Update bot status tracker
+            if result.get("status") == "stopped":
+                bot_status_tracker.set_stopped()
+            logger.info(f"[SUCCESS] Bot stop with options: {result['message']}")
+            return BotStopResponse(
+                success=True,
+                positions_closed=result.get("positions_closed", 0),
+                final_pnl=result.get("final_pnl"),
+                message=result["message"],
+                status=result.get("status", "stopped"),
+            )
+        else:
+            error = result.get("error", "")
+            if error == "not_running":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["message"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Bot stop with options failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.post("/api/bot/emergency-stop", response_model=EmergencyStopResponse, tags=["Bot"])
+async def bot_emergency_stop():
+    """
+    Emergency stop - immediately stop all bots and close all positions.
+
+    This is a panic button that:
+    - Sends SIGKILL to all running bot processes immediately
+    - Closes all open positions at market price
+    - Logs all actions taken
+
+    Returns:
+        JSON object with bots_stopped, positions_closed, total_pnl_realized,
+        detailed actions list, and message
+    """
+    try:
+        logger.warning("[BOT_CONTROL] EMERGENCY STOP request received")
+
+        result = bot_controller.emergency_stop_all()
+
+        logger.warning(f"[EMERGENCY] Stop complete: {result.message}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[ERROR] Emergency stop failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

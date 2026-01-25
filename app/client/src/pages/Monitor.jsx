@@ -67,7 +67,7 @@ function Monitor() {
         <AccountMetrics account={account} loading={loading} />
 
         {/* Bot Status Grid - Full Width */}
-        <BotStatusGrid botsStatus={botsStatus} loading={loading} />
+        <BotStatusGrid botsStatus={botsStatus} loading={loading} onRefresh={refresh} />
 
         {/* Price Feed - Full Width */}
         <PriceFeedCard />
