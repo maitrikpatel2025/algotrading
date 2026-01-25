@@ -57,6 +57,7 @@ from core.data_models import (
     CancelBacktestRequest,
     CancelBacktestResponse,
     CheckNameResponse,
+    CloseTradeResponse,
     DeleteBacktestResponse,
     DeleteStrategyResponse,
     DuplicateBacktestResponse,
@@ -248,11 +249,12 @@ async def account():
 @app.get("/api/trades/open", response_model=OpenTradesResponse, tags=["Trades"])
 async def open_trades():
     """
-    Get all open trades.
+    Get all open trades with enhanced position data.
 
     Returns:
         JSON object with list of open trades including instrument, price,
-        amount, unrealized P/L, margin used, stop loss, and take profit
+        amount, unrealized P/L, margin used, stop loss, take profit,
+        current price, P/L in pips, open time, duration, and bot name
     """
     try:
         trades = api.get_open_trades()
@@ -261,19 +263,66 @@ async def open_trades():
             logger.warning("[WARNING] Open trades returned None - API call may have failed")
             return OpenTradesResponse(trades=[], count=0, error="Failed to fetch open trades")
 
-        trade_info_list = [
-            TradeInfo(
-                id=trade.id,
-                instrument=trade.instrument,
-                price=trade.price,
-                initial_amount=trade.initialAmount,
-                unrealized_pl=trade.unrealizedPL,
-                margin_used=trade.marginUsed,
-                stop_loss=trade.stop_loss if trade.stop_loss else None,
-                take_profit=trade.take_profit if trade.take_profit else None,
+        # Fetch current prices for all instruments in open trades
+        instruments = list(set(trade.instrument for trade in trades))
+        current_prices = {}
+        if instruments:
+            prices = api.get_prices(instruments)
+            if prices:
+                for price in prices:
+                    current_prices[price.name] = {"bid": price.bid, "ask": price.ask}
+
+        # Calculate enhanced trade info
+        now = datetime.now()
+        trade_info_list = []
+        for trade in trades:
+            # Get current price based on position direction
+            # For long (Buy), use bid to close; for short (Sell), use ask to close
+            current_price = None
+            pips_pl = None
+            price_data = current_prices.get(trade.instrument)
+            if price_data:
+                is_long = trade.side == "Buy" or trade.initialAmount > 0
+                current_price = price_data["bid"] if is_long else price_data["ask"]
+
+                # Calculate P/L in pips
+                # JPY pairs have pip at 0.01, others at 0.0001
+                is_jpy_pair = "JPY" in trade.instrument
+                pip_multiplier = 100 if is_jpy_pair else 10000
+
+                if is_long:
+                    pips_pl = round((current_price - trade.price) * pip_multiplier, 1)
+                else:
+                    pips_pl = round((trade.price - current_price) * pip_multiplier, 1)
+
+            # Calculate duration in seconds
+            duration_seconds = None
+            if trade.open_time:
+                duration_seconds = int((now - trade.open_time).total_seconds())
+
+            # Extract bot name from comment if available
+            bot_name = None
+            if trade.comment:
+                # Bot names are typically prefixed in comments
+                bot_name = trade.comment if trade.comment else None
+
+            trade_info_list.append(
+                TradeInfo(
+                    id=trade.id,
+                    instrument=trade.instrument,
+                    price=trade.price,
+                    initial_amount=trade.initialAmount,
+                    unrealized_pl=trade.unrealizedPL,
+                    margin_used=trade.marginUsed,
+                    stop_loss=trade.stop_loss if trade.stop_loss else None,
+                    take_profit=trade.take_profit if trade.take_profit else None,
+                    current_price=current_price,
+                    pips_pl=pips_pl,
+                    open_time=trade.open_time,
+                    duration_seconds=duration_seconds,
+                    bot_name=bot_name,
+                )
             )
-            for trade in trades
-        ]
 
         response = OpenTradesResponse(trades=trade_info_list, count=len(trade_info_list))
         logger.info(f"[SUCCESS] Open trades fetched: {len(trade_info_list)} trades")
@@ -367,6 +416,70 @@ async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Opti
         logger.error(f"[ERROR] Trade history fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return TradeHistoryResponse(trades=[], count=0, error=str(e))
+
+
+@app.post("/api/trades/{trade_id}/close", response_model=CloseTradeResponse, tags=["Trades"])
+async def close_trade(trade_id: int):
+    """
+    Close an open trade by ID.
+
+    Args:
+        trade_id: The ID of the trade to close
+
+    Returns:
+        JSON object with success status, closed price, and realized P/L
+    """
+    try:
+        logger.info(f"[TRADE] Close trade request for ID: {trade_id}")
+
+        # First get the trade to verify it exists and get its current state
+        trade = api.get_open_trade(trade_id)
+        if trade is None:
+            logger.warning(f"[WARNING] Trade not found: {trade_id}")
+            return CloseTradeResponse(
+                success=False,
+                trade_id=trade_id,
+                message=f"Trade {trade_id} not found or already closed",
+                error="Trade not found",
+            )
+
+        # Get current price for the close
+        prices = api.get_prices([trade.instrument])
+        current_price = None
+        if prices and len(prices) > 0:
+            is_long = trade.side == "Buy" or trade.initialAmount > 0
+            current_price = prices[0].bid if is_long else prices[0].ask
+
+        # Close the trade
+        success = api.close_trade(trade_id)
+
+        if success:
+            logger.info(f"[SUCCESS] Trade closed: {trade_id}")
+            return CloseTradeResponse(
+                success=True,
+                trade_id=trade_id,
+                message=f"Trade {trade_id} closed successfully",
+                closed_price=current_price,
+                realized_pl=trade.unrealizedPL,
+            )
+        else:
+            logger.warning(f"[WARNING] Failed to close trade: {trade_id}")
+            return CloseTradeResponse(
+                success=False,
+                trade_id=trade_id,
+                message=f"Failed to close trade {trade_id}",
+                error="Broker rejected the close request",
+            )
+
+    except Exception as e:
+        logger.error(f"[ERROR] Close trade failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return CloseTradeResponse(
+            success=False,
+            trade_id=trade_id,
+            message="Failed to close trade",
+            error=str(e),
+        )
 
 
 @app.get("/api/bot/status", response_model=BotStatusResponse, tags=["Bot"])

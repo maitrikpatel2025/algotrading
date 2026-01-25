@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import endPoints from '../app/api';
 import { calculateCandleCount, GRANULARITY_SECONDS } from '../app/data';
 import PriceChart from '../components/PriceChart';
@@ -108,8 +108,12 @@ function Strategy() {
   // Route params for editing existing strategy
   const { id: strategyIdFromUrl } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isNewStrategy = !strategyIdFromUrl;
-  
+
+  // Get position data from navigation state (from OpenTrades/OpenPositions click)
+  const navigationState = location.state;
+
   const [selectedPair, setSelectedPair] = useState(null);
   const [selectedGran, setSelectedGran] = useState(null);
   const [technicalsData, setTechnicalsData] = useState(null);
@@ -736,7 +740,22 @@ function Strategy() {
       setSelectedGran(data.granularities[0].value);
     }
 
-    setSelectedPair(data.pairs[0].value);
+    // Check if we have a pair from navigation state (from OpenPositions click)
+    if (navigationState?.selectedPair) {
+      const targetPair = navigationState.selectedPair;
+      // Verify the pair exists in available pairs
+      const pairExists = data.pairs.some(p => p.value === targetPair);
+      if (pairExists) {
+        setSelectedPair(targetPair);
+      } else {
+        // Fallback to first pair if navigated pair doesn't exist
+        setSelectedPair(data.pairs[0].value);
+      }
+      // Clear the navigation state after using it
+      navigate(location.pathname, { replace: true, state: null });
+    } else {
+      setSelectedPair(data.pairs[0].value);
+    }
     setLoading(false);
   };
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 import { Briefcase, TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 /**
  * OpenPositions Component - Precision Swiss Design System
@@ -11,10 +11,14 @@ import { Link } from 'react-router-dom';
  * - Side (Buy/Sell with icon)
  * - Amount
  * - Entry Price
- * - Current P/L (colored)
+ * - Current Price
+ * - P/L ($) with color coding
+ * - P/L (pips) with color coding
  * Limited to 5 rows with "View All" link to Account page
+ * Rows are clickable to navigate to Strategy page with position highlighted
  */
 function OpenPositions({ trades = [], loading = false }) {
+  const navigate = useNavigate();
   const MAX_DISPLAY = 5;
 
   const formatValue = (value, decimals = 2) => {
@@ -29,6 +33,23 @@ function OpenPositions({ trades = [], loading = false }) {
   const formatPrice = (value) => {
     if (value === undefined || value === null || value === 0) return '-';
     return formatValue(value, 5);
+  };
+
+  // Handle row click to navigate to chart
+  const handleRowClick = (trade) => {
+    // Format instrument for strategy page (e.g., EURUSD -> EUR_USD)
+    let pair = trade.instrument;
+    if (pair && pair.length === 6 && !pair.includes('_')) {
+      pair = `${pair.slice(0, 3)}_${pair.slice(3)}`;
+    }
+
+    navigate('/strategy', {
+      state: {
+        selectedPair: pair,
+        highlightPrice: trade.price,
+        position: trade
+      }
+    });
   };
 
   // Loading skeleton
@@ -131,20 +152,29 @@ function OpenPositions({ trades = [], loading = false }) {
                 Entry
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                P/L
+                Current
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                P/L ($)
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                P/L (pips)
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700">
             {displayTrades.map((trade) => {
               const isProfit = trade.unrealized_pl >= 0;
+              const isPipsProfit = (trade.pips_pl || 0) >= 0;
               const side = trade.initial_amount > 0 ? 'Buy' : 'Sell';
               const isBuy = side === 'Buy';
 
               return (
                 <tr
                   key={trade.id}
-                  className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors"
+                  className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors cursor-pointer"
+                  onClick={() => handleRowClick(trade)}
+                  title="Click to view on chart"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-neutral-900 dark:text-neutral-50">
                     {trade.instrument}
@@ -172,6 +202,9 @@ function OpenPositions({ trades = [], loading = false }) {
                   <td className="px-4 py-3 text-sm text-right tabular-nums text-neutral-500 dark:text-neutral-400">
                     {formatPrice(trade.price)}
                   </td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums text-neutral-500 dark:text-neutral-400">
+                    {formatPrice(trade.current_price)}
+                  </td>
                   <td
                     className={cn(
                       'px-4 py-3 text-sm text-right tabular-nums font-semibold',
@@ -181,6 +214,15 @@ function OpenPositions({ trades = [], loading = false }) {
                     {isProfit && '+'}
                     {formatValue(trade.unrealized_pl)}
                   </td>
+                  <td
+                    className={cn(
+                      'px-4 py-3 text-sm text-right tabular-nums font-semibold',
+                      isPipsProfit ? 'text-success' : 'text-danger'
+                    )}
+                  >
+                    {isPipsProfit && '+'}
+                    {formatValue(trade.pips_pl, 1)}
+                  </td>
                 </tr>
               );
             })}
@@ -189,17 +231,15 @@ function OpenPositions({ trades = [], loading = false }) {
       </div>
 
       {/* View All Link */}
-      {hasMore && (
-        <div className="p-4 border-t border-neutral-200 dark:border-neutral-700">
-          <Link
-            to="/account"
-            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary-hover transition-colors"
-          >
-            View All Positions
-            <ExternalLink className="h-4 w-4" />
-          </Link>
-        </div>
-      )}
+      <div className="p-4 border-t border-neutral-200 dark:border-neutral-700">
+        <Link
+          to="/account"
+          className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary-hover transition-colors"
+        >
+          {hasMore ? `View All ${trades.length} Positions` : 'View All Positions'}
+          <ExternalLink className="h-4 w-4" />
+        </Link>
+      </div>
     </div>
   );
 }

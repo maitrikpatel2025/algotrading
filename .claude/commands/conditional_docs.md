@@ -640,3 +640,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When working with latency indicators or data freshness displays
     - When troubleshooting price feed polling or update issues
     - When extending the Monitor page with market data components
+
+- app_docs/feature-a49f5d4c-view-open-positions.md
+  - Conditions:
+    - When working with open positions display on Monitor or Account pages
+    - When implementing or modifying OpenTrades or OpenPositions components
+    - When working with position sorting, P/L calculations, or duration formatting
+    - When implementing manual position close functionality
+    - When working with /api/trades/open or /api/trades/{id}/close endpoints
+    - When implementing click-to-chart navigation from position rows
+    - When troubleshooting position data display or close trade errors
+    - When adding new columns or features to the positions table

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import endPoints from '../app/api';
 
-const DEFAULT_POLL_INTERVAL = 5000; // 5 seconds for bot status grid auto-refresh
+const DEFAULT_POLL_INTERVAL = 10000; // 10 seconds for dashboard data refresh including open positions
 
 /**
  * Custom hook for coordinated dashboard data fetching with polling
