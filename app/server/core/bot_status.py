@@ -8,7 +8,6 @@ Supports multiple bot instances for the Bot Status Grid feature.
 
 import json
 import logging
-import uuid
 from datetime import datetime
 from pathlib import Path
 from threading import Lock

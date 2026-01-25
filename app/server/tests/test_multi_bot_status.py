@@ -4,14 +4,12 @@ Tests for Multi-Bot Status API Endpoint
 Unit tests for the multi-bot status endpoint and BotStatusTracker methods.
 """
 
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 
 from core.bot_controller import BotController
-from core.bot_status import BotStatusTracker, bot_status_tracker
-from core.data_models import AllBotsStatusResponse, BotInstance
+from core.bot_status import bot_status_tracker
+from core.data_models import AllBotsStatusResponse
 from server import app
 
 
