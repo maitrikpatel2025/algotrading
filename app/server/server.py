@@ -682,7 +682,7 @@ async def batch_spreads(pairs: str):
         # Limit to 20 pairs per request to avoid overloading
         if len(pair_list) > 20:
             pair_list = pair_list[:20]
-            logger.warning(f"[WARNING] Batch spreads request truncated to 20 pairs")
+            logger.warning("[WARNING] Batch spreads request truncated to 20 pairs")
 
         response = fetch_batch_spreads(pair_list, api)
         logger.info(f"[SUCCESS] Batch spreads fetched for {response.count} pairs")

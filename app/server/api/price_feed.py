@@ -8,9 +8,10 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
+
 from config import settings
 from core.openfx_api import OpenFxApi
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
