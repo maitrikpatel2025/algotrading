@@ -606,3 +606,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When validating date ranges, stop loss/take profit settings, or leverage limits
     - When troubleshooting backtest configuration validation errors or warnings
     - When extending validation rules or adding new validation functions
+
+- app_docs/feature-1a8f76c4-live-trading-dashboard.md
+  - Conditions:
+    - When working with the Monitor page or Live Trading Dashboard
+    - When implementing or modifying real-time data polling functionality
+    - When working with LiveDashboard components (AccountMetrics, ActiveBotsGrid, OpenPositions, RecentTrades, AlertsPanel)
+    - When implementing or modifying dark mode toggle functionality
+    - When working with connection status indicators or connection health monitoring
+    - When troubleshooting dashboard data refresh or auto-update issues
+    - When implementing responsive dashboard layouts
+    - When working with useDashboardData or useDarkMode hooks
+    - When adding new dashboard sections or metrics displays
