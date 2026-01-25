@@ -64,6 +64,7 @@ const endPoints = {
     spreads: (pairs) => requests.get(`/spreads?pairs=${pairs.join(',')}`),
     openTrades: () => requests.get("/trades/open"),
     tradeHistory: () => requests.get("/trades/history"),
+    closeTrade: (tradeId) => requests.post(`/trades/${tradeId}/close`),
     botStatus: () => requests.get("/bot/status"),
     botsStatus: () => requests.get("/bots/status"),
     botStart: (config = {}) => requests.post("/bot/start", config),

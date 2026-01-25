@@ -87,6 +87,11 @@ function Account() {
     loadData(true);
   };
 
+  // Handle successful trade close - refresh data to show updated positions
+  const handleTradeClose = () => {
+    loadData(true);
+  };
+
   // Loading state - Precision Swiss Design
   if (loading) {
     return (
@@ -131,7 +136,7 @@ function Account() {
           <AccountSummary />
 
           {/* Open Trades Section */}
-          <OpenTrades trades={openTrades} loading={refreshing} />
+          <OpenTrades trades={openTrades} loading={refreshing} onTradeClose={handleTradeClose} />
 
           {/* Trade History Section */}
           <TradeHistory

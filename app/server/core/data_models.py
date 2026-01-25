@@ -185,6 +185,11 @@ class TradeInfo(BaseModel):
     margin_used: float
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
+    current_price: Optional[float] = Field(None, description="Current market price (bid for long, ask for short)")
+    pips_pl: Optional[float] = Field(None, description="Profit/loss in pips")
+    open_time: Optional[datetime] = Field(None, description="Position open timestamp")
+    duration_seconds: Optional[int] = Field(None, description="Position duration in seconds")
+    bot_name: Optional[str] = Field(None, description="Name of bot that opened position")
 
 
 class OpenTradesResponse(BaseModel):
@@ -245,6 +250,17 @@ class TradeResponse(BaseModel):
     success: bool = False
     message: str = ""
     error: Optional[str] = None
+
+
+class CloseTradeResponse(BaseModel):
+    """Response from closing a trade."""
+
+    success: bool = Field(default=False, description="Whether the close was successful")
+    trade_id: Optional[int] = Field(None, description="ID of the closed trade")
+    message: str = Field(default="", description="Success or error message")
+    closed_price: Optional[float] = Field(None, description="Price at which the trade was closed")
+    realized_pl: Optional[float] = Field(None, description="Realized profit/loss from the trade")
+    error: Optional[str] = Field(None, description="Error details if failed")
 
 
 # =============================================================================
