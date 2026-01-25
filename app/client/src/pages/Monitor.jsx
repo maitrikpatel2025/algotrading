@@ -4,8 +4,8 @@ import useDashboardData from '../hooks/useDashboardData';
 import useDarkMode from '../hooks/useDarkMode';
 import {
   AccountMetrics,
-  ActiveBotsGrid,
   AlertsPanel,
+  BotStatusGrid,
   DashboardHeader,
   OpenPositions,
   RecentTrades,
@@ -18,11 +18,11 @@ import Headlines from '../components/Headlines';
  *
  * Comprehensive dashboard showing real-time trading activity:
  * - Account metrics (Balance, Equity, P/L, Margin)
- * - Active bots status grid
+ * - Bot Status Grid with all bots (replaces ActiveBotsGrid)
  * - Open positions table
  * - Recent trades activity feed
  * - System alerts panel
- * - Connection status and auto-refresh
+ * - Connection status and auto-refresh (5 seconds)
  * - Dark mode support
  *
  * Precision Swiss Design System
@@ -33,6 +33,7 @@ function Monitor() {
     openTrades,
     tradeHistory,
     botStatus,
+    botsStatus,
     loading,
     isRefreshing,
     connectionStatus,
@@ -63,11 +64,13 @@ function Monitor() {
         {/* Account Metrics - Full Width */}
         <AccountMetrics account={account} loading={loading} />
 
+        {/* Bot Status Grid - Full Width */}
+        <BotStatusGrid botsStatus={botsStatus} loading={loading} />
+
         {/* Main Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Bots and Alerts */}
+          {/* Left Column - Alerts */}
           <div className="lg:col-span-1 space-y-6">
-            <ActiveBotsGrid botStatus={botStatus} loading={loading} />
             <AlertsPanel
               connectionStatus={connectionStatus}
               botStatus={botStatus}

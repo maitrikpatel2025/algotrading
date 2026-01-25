@@ -48,6 +48,7 @@ from core.backtest_service import (
 from core.bot_controller import bot_controller
 from core.bot_status import bot_status_tracker
 from core.data_models import (
+    AllBotsStatusResponse,
     BacktestProgressResponse,
     BotControlResponse,
     BotStartRequest,
@@ -386,6 +387,27 @@ async def bot_status():
         logger.error(f"[ERROR] Bot status fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return BotStatusResponse(status="error", error_message=str(e))
+
+
+@app.get("/api/bots/status", response_model=AllBotsStatusResponse, tags=["Bot"])
+async def all_bots_status():
+    """
+    Get status of all trading bot instances.
+
+    Returns:
+        JSON object with list of all bot instances including:
+        - id, name, status, currency_pair, current_pnl
+        - open_position, last_activity, strategy_name, error_message
+        - count and last_updated timestamp
+    """
+    try:
+        status = bot_status_tracker.get_all_bots()
+        logger.info(f"[SUCCESS] All bots status fetched: {status.count} bots")
+        return status
+    except Exception as e:
+        logger.error(f"[ERROR] All bots status fetch failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return AllBotsStatusResponse(bots=[], count=0, last_updated=None)
 
 
 @app.post("/api/bot/start", response_model=BotControlResponse, tags=["Bot"])

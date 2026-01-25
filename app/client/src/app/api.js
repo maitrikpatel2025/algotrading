@@ -64,6 +64,7 @@ const endPoints = {
     openTrades: () => requests.get("/trades/open"),
     tradeHistory: () => requests.get("/trades/history"),
     botStatus: () => requests.get("/bot/status"),
+    botsStatus: () => requests.get("/bots/status"),
     botStart: (config = {}) => requests.post("/bot/start", config),
     botStop: () => requests.post("/bot/stop"),
     botRestart: (config = {}) => requests.post("/bot/restart", config),

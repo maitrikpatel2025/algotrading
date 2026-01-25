@@ -1106,3 +1106,34 @@ class CompareBacktestsResponse(BaseModel):
         None, description="Comparison result data"
     )
     error: Optional[str] = Field(None, description="Error details if failed")
+
+
+# ============================================================================
+# Multi-Bot Status Models
+# ============================================================================
+
+
+class BotInstance(BaseModel):
+    """Individual bot instance with status and metrics."""
+
+    id: str = Field(..., description="Unique bot identifier")
+    name: str = Field(..., description="Bot display name")
+    status: Literal["running", "paused", "stopped", "error"] = Field(
+        default="stopped", description="Current operational status"
+    )
+    currency_pair: Optional[str] = Field(None, description="Assigned currency pair")
+    current_pnl: Optional[float] = Field(None, description="Current P/L in account currency")
+    open_position: Optional[Dict[str, Any]] = Field(
+        None, description="Open position details if any"
+    )
+    last_activity: Optional[datetime] = Field(None, description="Last activity timestamp")
+    strategy_name: Optional[str] = Field(None, description="Active strategy name")
+    error_message: Optional[str] = Field(None, description="Error message if in error state")
+
+
+class AllBotsStatusResponse(BaseModel):
+    """Response containing status of all bot instances."""
+
+    bots: List[BotInstance] = Field(default=[], description="List of all bot instances")
+    count: int = Field(default=0, description="Number of bots")
+    last_updated: Optional[datetime] = Field(None, description="Timestamp of last update")
