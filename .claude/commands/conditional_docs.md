@@ -663,3 +663,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When adding new filter options or columns to trade history table
     - When working with tradeHistoryUtils.js utility functions
     - When implementing duration calculation or bot name extraction from trades
+
+- app_docs/feature-cd9f1831-bot-controls.md
+  - Conditions:
+    - When working with bot pause, resume, or timed pause functionality
+    - When implementing or modifying EmergencyStopButton, PreStartChecklist, PauseDurationDialog, or StopOptionsDialog components
+    - When working with /api/bot/pause, /api/bot/resume, /api/bot/stop-with-options, or /api/bot/emergency-stop endpoints
+    - When implementing pre-start validation or checklist functionality
+    - When working with enhanced stop options (close all, keep positions, wait for close)
+    - When troubleshooting bot control operations or signal handling (SIGUSR1/SIGUSR2)
+    - When implementing emergency stop functionality or panic buttons
+    - When working with BotControls components in the LiveDashboard
+    - When extending bot status with pause state tracking
