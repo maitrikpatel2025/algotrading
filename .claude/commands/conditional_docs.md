@@ -651,3 +651,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing click-to-chart navigation from position rows
     - When troubleshooting position data display or close trade errors
     - When adding new columns or features to the positions table
+
+- app_docs/feature-7ea0c2d9-view-trade-history.md
+  - Conditions:
+    - When working with trade history filtering, sorting, or pagination
+    - When implementing or modifying TradeHistory, TradeHistoryFilters, TradeHistorySummary, or TradeHistoryPagination components
+    - When working with /api/trades/history endpoint query parameters
+    - When implementing P/L summary calculations (daily, weekly, total)
+    - When working with CSV export functionality for trade data
+    - When troubleshooting trade history display or filtering issues
+    - When adding new filter options or columns to trade history table
+    - When working with tradeHistoryUtils.js utility functions
+    - When implementing duration calculation or bot name extraction from trades
