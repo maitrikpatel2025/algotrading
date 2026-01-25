@@ -84,6 +84,7 @@ from core.data_models import (
     SpreadResponse,
     TradeHistoryItem,
     TradeHistoryResponse,
+    TradeHistorySummary,
     TradeInfo,
     TradingOptionsResponse,
 )
@@ -334,23 +335,35 @@ async def open_trades():
 
 
 @app.get("/api/trades/history", response_model=TradeHistoryResponse, tags=["Trades"])
-async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Optional[int] = None):
+async def trade_history(
+    timestamp_from: Optional[int] = None,
+    timestamp_to: Optional[int] = None,
+    bot_name: Optional[str] = None,
+    pair: Optional[str] = None,
+    direction: Optional[str] = None,
+    outcome: Optional[str] = None,
+):
     """
-    Get trade history (closed/completed trades) from FXOpen API.
+    Get trade history (closed/completed trades) from FXOpen API with optional filters.
 
     Args:
-        timestamp_from: Start timestamp in milliseconds (Unix time). Defaults to 30 days ago.
+        timestamp_from: Start timestamp in milliseconds (Unix time). Defaults to 24 hours ago.
         timestamp_to: End timestamp in milliseconds (Unix time). Defaults to now.
+        bot_name: Filter by bot name (extracted from trade comment).
+        pair: Filter by trading pair/instrument.
+        direction: Filter by direction ('long' or 'short').
+        outcome: Filter by outcome ('winners' or 'losers').
 
     Returns:
-        JSON object with list of historical trades from the FXOpen Trade History API.
+        JSON object with list of historical trades and P/L summary.
     """
     try:
-        # Default to last 30 days if timestamps not provided
+        # Default to last 24 hours if timestamps not provided
+        now = datetime.now()
         if timestamp_to is None:
-            timestamp_to = int(datetime.now().timestamp() * 1000)
+            timestamp_to = int(now.timestamp() * 1000)
         if timestamp_from is None:
-            timestamp_from = int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
+            timestamp_from = int((now - timedelta(hours=24)).timestamp() * 1000)
 
         # Fetch trade history from FXOpen API
         history_data = api.get_trade_history(timestamp_from, timestamp_to)
@@ -358,7 +371,10 @@ async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Opti
         if history_data is None:
             logger.warning("[WARNING] Trade history returned None from API")
             return TradeHistoryResponse(
-                trades=[], count=0, message="Unable to fetch trade history from the API."
+                trades=[],
+                count=0,
+                message="Unable to fetch trade history from the API.",
+                summary=TradeHistorySummary(),
             )
 
         # Parse the response and transform to TradeHistoryItem format
@@ -366,6 +382,29 @@ async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Opti
         trades = []
 
         for record in records:
+            # Extract bot name from comment field (pattern: "[BotName]" or "BotName:")
+            comment = record.get("Comment", "") or ""
+            extracted_bot_name = None
+            if comment:
+                import re
+
+                # Try pattern [BotName] first
+                bracket_match = re.search(r"\[([^\]]+)\]", comment)
+                if bracket_match:
+                    extracted_bot_name = bracket_match.group(1)
+                else:
+                    # Try pattern BotName: at the start
+                    colon_match = re.match(r"^([^:]+):", comment)
+                    if colon_match:
+                        extracted_bot_name = colon_match.group(1).strip()
+
+            # Calculate duration if we have entry and exit timestamps
+            entry_ts = record.get("TradeTimestamp")
+            exit_ts = record.get("TransactionTimestamp")
+            duration_seconds = None
+            if entry_ts and exit_ts:
+                duration_seconds = int((exit_ts - entry_ts) / 1000)
+
             # Map FXOpen API fields to our TradeHistoryItem model
             trade_item = TradeHistoryItem(
                 id=record.get("TradeId", 0),
@@ -389,21 +428,88 @@ async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Opti
                 balance_movement=record.get("BalanceMovement"),
                 commission=record.get("Commission"),
                 swap=record.get("Swap"),
+                duration_seconds=duration_seconds,
+                exit_reason=record.get("TransactionReason"),
+                bot_name=extracted_bot_name,
+                entry_timestamp=entry_ts,
             )
             trades.append(trade_item)
 
-        response = TradeHistoryResponse(
-            trades=trades,
-            count=len(trades),
-            message=f"Retrieved {len(trades)} trade history records.",
+        # Apply filters
+        filtered_trades = trades
+
+        # Filter by bot name
+        if bot_name:
+            filtered_trades = [t for t in filtered_trades if t.bot_name and t.bot_name == bot_name]
+
+        # Filter by pair/instrument
+        if pair:
+            filtered_trades = [t for t in filtered_trades if t.instrument == pair]
+
+        # Filter by direction
+        if direction:
+            direction_lower = direction.lower()
+            if direction_lower == "long":
+                filtered_trades = [
+                    t for t in filtered_trades if t.side and t.side.lower() in ("buy", "long")
+                ]
+            elif direction_lower == "short":
+                filtered_trades = [
+                    t for t in filtered_trades if t.side and t.side.lower() in ("sell", "short")
+                ]
+
+        # Filter by outcome (winners/losers)
+        if outcome:
+            outcome_lower = outcome.lower()
+            if outcome_lower == "winners":
+                filtered_trades = [
+                    t for t in filtered_trades if t.realized_pl is not None and t.realized_pl > 0
+                ]
+            elif outcome_lower == "losers":
+                filtered_trades = [
+                    t for t in filtered_trades if t.realized_pl is not None and t.realized_pl < 0
+                ]
+
+        # Calculate P/L summary
+        total_pl = sum(t.realized_pl or 0 for t in filtered_trades)
+
+        # Calculate daily P/L (trades closed today)
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        daily_trades = [t for t in filtered_trades if t.closed_at and t.closed_at >= today_start]
+        daily_pl = sum(t.realized_pl or 0 for t in daily_trades)
+
+        # Calculate weekly P/L (trades closed this week, starting Monday)
+        today = datetime.now()
+        week_start = today - timedelta(days=today.weekday())
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        weekly_trades = [t for t in filtered_trades if t.closed_at and t.closed_at >= week_start]
+        weekly_pl = sum(t.realized_pl or 0 for t in weekly_trades)
+
+        summary = TradeHistorySummary(
+            daily_pl=round(daily_pl, 2),
+            daily_trade_count=len(daily_trades),
+            weekly_pl=round(weekly_pl, 2),
+            weekly_trade_count=len(weekly_trades),
+            total_pl=round(total_pl, 2),
+            total_trade_count=len(filtered_trades),
         )
-        logger.info(f"[SUCCESS] Trade history endpoint returned {len(trades)} records")
+
+        response = TradeHistoryResponse(
+            trades=filtered_trades,
+            count=len(filtered_trades),
+            message=f"Retrieved {len(filtered_trades)} trade history records.",
+            summary=summary,
+        )
+        logger.info(f"[SUCCESS] Trade history endpoint returned {len(filtered_trades)} records")
         return response
 
     except requests.exceptions.Timeout as e:
         logger.warning(f"[TIMEOUT] Trade history request timed out: {str(e)}")
         return TradeHistoryResponse(
-            trades=[], count=0, message="Trade history request timed out. Please try again later."
+            trades=[],
+            count=0,
+            message="Trade history request timed out. Please try again later.",
+            summary=TradeHistorySummary(),
         )
     except requests.exceptions.RequestException as e:
         logger.warning(f"[NETWORK_ERROR] Trade history network error: {str(e)}")
@@ -411,11 +517,12 @@ async def trade_history(timestamp_from: Optional[int] = None, timestamp_to: Opti
             trades=[],
             count=0,
             message="Unable to connect to trade history service. Please try again later.",
+            summary=TradeHistorySummary(),
         )
     except Exception as e:
         logger.error(f"[ERROR] Trade history fetch failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        return TradeHistoryResponse(trades=[], count=0, error=str(e))
+        return TradeHistoryResponse(trades=[], count=0, error=str(e), summary=TradeHistorySummary())
 
 
 @app.post("/api/trades/{trade_id}/close", response_model=CloseTradeResponse, tags=["Trades"])
