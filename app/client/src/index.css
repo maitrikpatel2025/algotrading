@@ -644,6 +644,39 @@
   }
 }
 
+@keyframes price-flash-up {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(22, 163, 74, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes price-flash-down {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(220, 38, 38, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Price Flash Animation Classes */
+.animate-price-flash-up {
+  animation: price-flash-up 500ms ease-out;
+}
+
+.animate-price-flash-down {
+  animation: price-flash-down 500ms ease-out;
+}
+
 /* ============================================
  * REDUCED MOTION
  * ============================================ */

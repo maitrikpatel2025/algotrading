@@ -12,6 +12,7 @@ import {
 } from '../components/LiveDashboard';
 import BotStatus from '../components/BotStatus';
 import Headlines from '../components/Headlines';
+import { PriceFeedCard } from '../components/PriceFeed';
 
 /**
  * Monitor Page - Live Trading Dashboard
@@ -19,6 +20,7 @@ import Headlines from '../components/Headlines';
  * Comprehensive dashboard showing real-time trading activity:
  * - Account metrics (Balance, Equity, P/L, Margin)
  * - Bot Status Grid with all bots (replaces ActiveBotsGrid)
+ * - Price Feed with real-time forex prices
  * - Open positions table
  * - Recent trades activity feed
  * - System alerts panel
@@ -66,6 +68,9 @@ function Monitor() {
 
         {/* Bot Status Grid - Full Width */}
         <BotStatusGrid botsStatus={botsStatus} loading={loading} />
+
+        {/* Price Feed - Full Width */}
+        <PriceFeedCard />
 
         {/* Main Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

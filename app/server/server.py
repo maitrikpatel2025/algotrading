@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.price_feed import BatchSpreadsResponse, fetch_batch_spreads
 from api.routes import get_options
 from config import settings
 from core.backtest_executor import backtest_executor
@@ -654,6 +655,43 @@ async def spread(pair: str):
         logger.error(f"[ERROR] Spread fetch failed for {pair}: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return SpreadResponse(pair=pair, error=str(e))
+
+
+@app.get("/api/spreads", response_model=BatchSpreadsResponse, tags=["Price Data"])
+async def batch_spreads(pairs: str):
+    """
+    Get current spread data for multiple currency pairs in a single request.
+
+    Args:
+        pairs: Comma-separated list of currency pairs (e.g., 'EUR_USD,GBP_USD,USD_JPY')
+
+    Returns:
+        JSON object with spread data for all requested pairs
+    """
+    try:
+        # Parse comma-separated pairs
+        pair_list = [p.strip() for p in pairs.split(",") if p.strip()]
+
+        if not pair_list:
+            return BatchSpreadsResponse(
+                spreads=[],
+                count=0,
+                error="No pairs provided. Use comma-separated list (e.g., EUR_USD,GBP_USD)",
+            )
+
+        # Limit to 20 pairs per request to avoid overloading
+        if len(pair_list) > 20:
+            pair_list = pair_list[:20]
+            logger.warning(f"[WARNING] Batch spreads request truncated to 20 pairs")
+
+        response = fetch_batch_spreads(pair_list, api)
+        logger.info(f"[SUCCESS] Batch spreads fetched for {response.count} pairs")
+        return response
+
+    except Exception as e:
+        logger.error(f"[ERROR] Batch spread fetch failed: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return BatchSpreadsResponse(spreads=[], count=0, error=str(e))
 
 
 @app.get("/api/technicals/{pair}/{timeframe}", tags=["Technical Analysis"])

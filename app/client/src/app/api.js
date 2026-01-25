@@ -61,6 +61,7 @@ const endPoints = {
     technicals: (p, g) => requests.get(`/technicals/${p}/${g}`),
     prices: (p, g, c) => requests.get(`/prices/${p}/${g}/${c}`),
     spread: (pair) => requests.get(`/spread/${pair}`),
+    spreads: (pairs) => requests.get(`/spreads?pairs=${pairs.join(',')}`),
     openTrades: () => requests.get("/trades/open"),
     tradeHistory: () => requests.get("/trades/history"),
     botStatus: () => requests.get("/bot/status"),
